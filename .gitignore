@@ -1,0 +1,17 @@
+.cheminf_local_environment
+.local
+.config
+.bash_history
+.cache
+.chembl_ws_client__0.10.2.sqlite
+.ipynb_checkpoints
+.ipython
+.jupyter
+.python_history
+.cupy
+.nv
+.cudf/
+
+__pycache__
+dask-worker-space
+./data

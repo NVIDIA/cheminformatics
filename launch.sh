@@ -13,7 +13,7 @@ LOCAL_ENV=.cheminf_local_environment
 usage() {
 	cat <<EOF
 
-USAGE: launch.sh 
+USAGE: launch.sh
 
 launch utility script
 ----------------------------------------
@@ -43,8 +43,8 @@ For more detailed info on getting started, see README.md
 More Information
 ----------------------------------------
 
-Note: This script looks for a file called $LOCAL_ENV in the 
-current directory. This file should define the following environment 
+Note: This script looks for a file called $LOCAL_ENV in the
+current directory. This file should define the following environment
 variables:
 	CONT
 		container image, prepended with registry. e.g.,
@@ -122,11 +122,11 @@ fi
 
 ###############################################################################
 #
-#          shouldn't need to make changes beyond this point 
+#          shouldn't need to make changes beyond this point
 #
 ###############################################################################
 
-DOCKER_CMD="docker run --gpus all --user $(id -u):$(id -g) -p ${JUPYTER_PORT}:8888 -p ${DASK_PORT}:${DASK_PORT} -p ${PLOTLY_PORT}:5000 -v ${PROJECT_PATH}:/workspace -v ${DATA_PATH}:/data --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -e HOME=/workspace -e TF_CPP_MIN_LOG_LEVEL=3 -w /workspace"
+DOCKER_CMD="docker run --network host --gpus all --user $(id -u):$(id -g) -p ${JUPYTER_PORT}:8888 -p ${DASK_PORT}:${DASK_PORT} -p ${PLOTLY_PORT}:5000 -v ${PROJECT_PATH}:/workspace -v ${DATA_PATH}:/data --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -e HOME=/workspace -e TF_CPP_MIN_LOG_LEVEL=3 -w /workspace"
 
 build() {
 	docker build -t ${CONT} .
@@ -161,7 +161,7 @@ root() {
 
 dbSetup() {
 	local DATA_DIR=$1
-	
+
 	if [[ ! -e "${DATA_DIR}/chembl_27.db" ]]; then
 		echo "Downloading chembl db to ${DATA_DIR}..."
 		mkdir -p ${DATA_DIR}

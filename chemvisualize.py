@@ -97,15 +97,17 @@ class ChemVisualization:
         self.app.callback(
             [Output('tb_selected_molecules', 'children'),
              Output('sl_mol_props', 'options'),
-             Output("current_page", "children"),
-             Output("total_page", "children"),
+             Output('current_page', 'children'),
+             Output('total_page', 'children'),
              Output('section_molecule_details', 'style')],
             [Input('main-figure', 'selectedData'),
              Input('sl_mol_props', 'value'),
              Input('sl_prop_gradient', 'value'),
-             Input("bt_page_prev", "n_clicks"),
-             Input("bt_page_next", "n_clicks")],
-             State("current_page", "children")) (self.handle_molecule_selection)
+             Input('bt_page_prev', 'n_clicks'),
+             Input('bt_page_next', 'n_clicks'),
+             Input('bt_north_star', 'n_clicks')],
+            [State('current_page', 'children'),
+             State('north_star', 'value'),]) (self.handle_molecule_selection)
 
         self.app.callback(
             Output("hidden1", "children"),
@@ -220,11 +222,6 @@ class ChemVisualization:
         fig = go.Figure(layout = {'colorscale' : {}})
         ldf = df.merge(self.prop_df, on='chembl_id')
 
-        cmin = cmax = None
-        if gradient_prop is not None:
-            cmin = ldf[gradient_prop].min()
-            cmax = ldf[gradient_prop].max()
-
         north_points = []
         if north_stars:
             for chemblid in north_stars.split(","):
@@ -233,27 +230,55 @@ class ChemVisualization:
                     north_points.append(self.chembl_ids.index(chemblid))
 
         northstar_cluster = []
-        if self.enable_gpu:
-            colors = ldf[color_col].unique().values_host
-        else:
-            colors = ldf[color_col].unique()
+        if gradient_prop is not None:
+            cmin = ldf[gradient_prop].min()
+            cmax = ldf[gradient_prop].max()
 
-        scatter_traces = []
-        for cluster_id in colors:
-            query = 'cluster == ' + str(cluster_id)
-            cdf = ldf.query(query)
-
-            moi_present = False
-            df_size = cdf['id'].isin(north_points)
-            if df_size.unique().shape[0] > 1:
-                northstar_cluster.append(str(cluster_id))
-                moi_present = True
-
+            df_size = ldf['id'].isin(north_points)
             # Compute size of northstar and normal points
             df_shape = df_size.copy()
             df_size = (df_size * 18) + 6
             df_shape = df_shape * 2
-            if gradient_prop is not None:
+
+            fig.add_trace(go.Scattergl({
+                'x': ldf['x'].to_array(),
+                'y': ldf['y'].to_array(),
+                'text': ldf['chembl_id'].to_array(),
+                'customdata': ldf['id'].to_array(),
+                'mode': 'markers',
+                'showlegend': False,
+                'marker': {
+                    'size': df_size.to_array(),
+                    'symbol': df_shape.to_array(),
+                    'color': ldf[gradient_prop].to_array(),
+                    'colorscale': 'Viridis',
+                    'showscale': True,
+                    'cmin': cmin,
+                    'cmax': cmax,
+                }
+            }))
+        else:
+            if self.enable_gpu:
+                colors = ldf[color_col].unique().values_host
+            else:
+                colors = ldf[color_col].unique()
+
+            scatter_traces = []
+            for cluster_id in colors:
+                query = 'cluster == ' + str(cluster_id)
+                cdf = ldf.query(query)
+
+                moi_present = False
+                df_size = cdf['id'].isin(north_points)
+                if df_size.unique().shape[0] > 1:
+                    northstar_cluster.append(str(cluster_id))
+                    moi_present = True
+
+                # Compute size of northstar and normal points
+                df_shape = df_size.copy()
+                df_size = (df_size * 18) + 6
+                df_shape = df_shape * 2
+                if self.enable_gpu:
                     scatter_trace = go.Scattergl({
                         'x': cdf['x'].to_array(),
                         'y': cdf['y'].to_array(),
@@ -261,59 +286,39 @@ class ChemVisualization:
                         'customdata': cdf['id'].to_array(),
                         'name': 'Cluster ' + str(cluster_id),
                         'mode': 'markers',
-                        'showlegend': False,
                         'marker': {
                             'size': df_size.to_array(),
                             'symbol': df_shape.to_array(),
-                            'color': cdf[gradient_prop].to_array(),
-                            'colorscale': 'Viridis',
-                            'showscale': True,
-                            'cmin': cmin,
-                            'cmax': cmax,
-                        }
-                })
-            else:
-                if self.enable_gpu:
-                    scatter_trace = go.Scattergl({
-                            'x': cdf['x'].to_array(),
-                            'y': cdf['y'].to_array(),
-                            'text': cdf['chembl_id'].to_array(),
-                            'customdata': cdf['id'].to_array(),
-                            'name': 'Cluster ' + str(cluster_id),
-                            'mode': 'markers',
-                            'marker': {
-                                'size': df_size.to_array(),
-                                'symbol': df_shape.to_array(),
-                            },
-                            'uid': 'Cluster ' + str(cluster_id),
+                        },
                     })
                 else:
                     scatter_trace = go.Scattergl({
-                            'x': cdf['x'],
-                            'y': cdf['y'],
-                            'text': cdf['chembl_id'],
-                            'customdata': cdf['id'],
-                            'name': 'Cluster ' + str(cluster_id),
-                            'mode': 'markers',
-                            'marker': {
-                                'size': df_size,
-                                'symbol': df_shape,
-                            },
-                            'uid': 'Cluster ' + str(cluster_id),
+                        'x': cdf['x'],
+                        'y': cdf['y'],
+                        'text': cdf['chembl_id'],
+                        'customdata': cdf['id'],
+                        'name': 'Cluster ' + str(cluster_id),
+                        'mode': 'markers',
+                        'marker': {
+                            'size': df_size,
+                            'symbol': df_shape,
+                        },
                     })
-            if moi_present:
-                # save to add later. This is to ensure the scatter is on top
-                scatter_traces.append(scatter_trace)
-            else:
+                if moi_present:
+                    # save to add later. This is to ensure the scatter is on top
+                    scatter_traces.append(scatter_trace)
+                else:
+                    fig.add_trace(scatter_trace)
+
+            for scatter_trace in scatter_traces:
                 fig.add_trace(scatter_trace)
 
-        for scatter_trace in scatter_traces:
-            fig.add_trace(scatter_trace)
-
+        # Change the title to indicate type of H/W in use
         if self.enable_gpu:
             f_color = 'green'
         else:
             f_color = 'blue'
+
         fig.update_layout(
             showlegend=True, clickmode='event', height=main_fig_height,
                 title='Clusters', dragmode='select',
@@ -337,7 +342,8 @@ class ChemVisualization:
                       target='_blank')
 
     #TODO: remove self.selected_chembl_id
-    def construct_molecule_detail(self, selected_points, display_properties, page, pageSize=10):
+    def construct_molecule_detail(self, selected_points, display_properties, \
+        page, pageSize=10, chembl_ids=None):
         # Create Table header
         table_headers = [html.Th("Molecular Structure", style={'width': '30%'}),
               html.Th("Chembl"),
@@ -348,9 +354,12 @@ class ChemVisualization:
         table_headers.append(html.Th(""))
         prop_recs = [html.Tr(table_headers)]
 
-        selected_chembl_ids = []
-        for point in selected_points['points'][((page-1)*pageSize + 1): page * pageSize]:
-            selected_chembl_ids.append(point['text'])
+        if chembl_ids:
+            selected_chembl_ids = chembl_ids
+        else:
+            selected_chembl_ids = []
+            for point in selected_points['points'][((page-1)*pageSize + 1): page * pageSize]:
+                selected_chembl_ids.append(point['text'])
 
         props, selected_molecules = self.fetch_molecule_properties(selected_chembl_ids)
         all_props = []
@@ -512,13 +521,18 @@ class ChemVisualization:
         self.re_cluster(self.df)
 
     def handle_molecule_selection(self, mf_selected_data, selected_columns,
-            sl_prop_gradient, prev_click, next_click, current_page):
-        if not dash.callback_context.triggered or not mf_selected_data:
+            sl_prop_gradient, prev_click, next_click, north_star_click,
+            current_page, north_star):
+        if not dash.callback_context.triggered:
             raise dash.exceptions.PreventUpdate
         comp_id, event_type = \
             dash.callback_context.triggered[0]['prop_id'].split('.')
 
+        if  (not mf_selected_data) and comp_id != 'bt_north_star':
+            raise dash.exceptions.PreventUpdate
+
         module_details = None
+        chembl_ids = None
         # Code to support pagination
         if comp_id == 'bt_page_prev' and event_type == 'n_clicks':
             if current_page == 1:
@@ -528,15 +542,21 @@ class ChemVisualization:
             if len(mf_selected_data['points']) < PAGE_SIZE * (current_page + 1):
                 raise dash.exceptions.PreventUpdate
             current_page += 1
+        elif comp_id == 'bt_north_star' and event_type == 'n_clicks':
+            chembl_ids = north_star.split(',')
 
         if selected_columns and sl_prop_gradient:
             if sl_prop_gradient not in selected_columns:
                 selected_columns.append(sl_prop_gradient)
 
         module_details, all_props = self.construct_molecule_detail(
-            mf_selected_data, selected_columns, current_page, pageSize=PAGE_SIZE)
+            mf_selected_data, selected_columns, current_page,
+            pageSize=PAGE_SIZE, chembl_ids=chembl_ids)
 
-        last_page = ' of ' + str(len(mf_selected_data['points'])//PAGE_SIZE)
+        if chembl_ids:
+            last_page = ''
+        else:
+            last_page = ' of ' + str(len(mf_selected_data['points'])//PAGE_SIZE)
         return module_details, all_props, current_page, last_page, {'display':'block'}
 
     def handle_data_selection(self, mf_click_data, mf_selected_data,

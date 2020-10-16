@@ -134,13 +134,24 @@ class ChemVisualization:
         if new_figerprints is not None and new_chembl_ids is not None:
             # Add new figerprints and chEmblIds before reclustering
             if self.enable_gpu:
-                fp_df = cudf.DataFrame(new_figerprints, columns=gdf.columns)
+                fp_df = cudf.DataFrame(new_figerprints, \
+                    index=[idx for idx in range(self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
+                    columns=gdf.columns)
             else:
-                fp_df = pandas.DataFrame(new_figerprints, columns=gdf.columns)
+                fp_df = pandas.DataFrame(new_figerprints, \
+                    index=[idx for idx in range(self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
+                    columns=gdf.columns)
 
             gdf = gdf.append(fp_df, ignore_index=True)
+            # Update original dataframe for it to work on reload
+            fp_df['id'] = fp_df.index
+            self.orig_df = self.orig_df.append(fp_df, ignore_index=True)
             chembl_ids = chembl_ids.append(
                 cudf.Series(new_chembl_ids), ignore_index=True)
+            ids = ids.append(fp_df['id'], ignore_index=True)
+            self.chembl_ids.extend(new_chembl_ids)
+
+            del fp_df
 
         if self.enable_gpu:
             kmeans_float = cuml.KMeans(n_clusters=self.n_clusters)
@@ -148,7 +159,6 @@ class ChemVisualization:
             kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
 
         kmeans_float.fit(gdf)
-
         Xt = self.umap.fit_transform(gdf)
 
         # Add back the column required for plotting and to correlating data
@@ -156,15 +166,15 @@ class ChemVisualization:
         if self.enable_gpu:
             gdf.add_column('x', Xt[0].to_array())
             gdf.add_column('y', Xt[1].to_array())
-            gdf.add_column('cluster', kmeans_float.labels_)
+            gdf.add_column('cluster', kmeans_float.labels_.to_gpu_array())
             gdf.add_column('chembl_id', chembl_ids)
-            gdf.add_column('id', gdf.index)
+            gdf.add_column('id', ids)
         else:
             gdf['x'] = Xt[:,0]
             gdf['y'] = Xt[:,1]
             gdf['cluster'] = kmeans_float.labels_
             gdf['chembl_id'] = chembl_ids
-            gdf['id'] = gdf.index
+            gdf['id'] = ids
 
         return gdf
 
@@ -225,7 +235,6 @@ class ChemVisualization:
             colors = ldf[color_col].unique().values_host
         else:
             colors = ldf[color_col].unique()
-
         for cluster_id in colors:
             query = 'cluster == ' + str(cluster_id)
             cdf = ldf.query(query)
@@ -480,6 +489,9 @@ class ChemVisualization:
 
     def handle_reset(self, recluster_nofilter):
         self.df = self.orig_df.copy()
+        self.df['chembl_id'] = self.chembl_ids
+        self.df['id'] = self.df.index
+        self.re_cluster(self.df)
 
     def handle_molecule_selection(self, mf_selected_data, selected_columns,
             sl_prop_gradient, prev_click, next_click, current_page):
@@ -611,13 +623,12 @@ class ChemVisualization:
                 figure, northstar_cluster = self.recluster_selected_points(
                     self.df, points, sl_prop_gradient, north_stars=north_star)
 
-        elif (comp_id == 'bt_north_star' and event_type == 'n_clicks') or \
-            (comp_id == 'sl_prop_gradient' and event_type == 'value'):
-
+        elif (comp_id == 'sl_prop_gradient' and event_type == 'value'):
             figure, northstar_cluster = self.create_graph(
                 self.df, gradient_prop=sl_prop_gradient, north_stars=north_star)
 
-        elif (comp_id == 'north_star'  and event_type == 'value'):
+        elif (comp_id == 'bt_north_star' and event_type == 'n_clicks') or \
+            (comp_id == 'north_star' and event_type == 'value'):
             north_star = self.update_new_chembl(north_star)
             if north_star:
                 figure, northstar_cluster = self.create_graph(
@@ -641,7 +652,6 @@ class ChemVisualization:
 
             if ldf.shape[0] > 0:
                 self.prop_df = self.prop_df.append(ldf)
-                self.chembl_ids.extend(missing_chembl)
 
                 smiles = []
                 for i in range(0, ldf.shape[0]):
@@ -649,10 +659,11 @@ class ChemVisualization:
                 results = list(map(self.MorganFromSmiles, smiles))
                 fingerprints = cupy.stack(results).astype(np.float32)
                 tdf = self.re_cluster(self.df, fingerprints, missing_chembl)
-                if tdf is not None:
+                if tdf:
                     self.df = tdf
                 else:
                     return None
+
         return ','.join(north_stars)
 
     def fetch_molecule_properties(self, chemblIDs):

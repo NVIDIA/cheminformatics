@@ -98,7 +98,7 @@ if __name__=='__main__':
     cluster = LocalCluster(dashboard_address=':9001', n_workers=12)
     client = Client(cluster)
 
-    enable_gpu = False
+    enable_gpu = True
     max_molecule=10000
 
     # ensure we have data

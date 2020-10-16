@@ -86,11 +86,12 @@ class ChemVisualization:
             [Input('bt_recluster_clusters', 'n_clicks'),
              Input('bt_recluster_points', 'n_clicks'),
              Input('bt_north_star', 'n_clicks'),
-             Input('north_star', 'value'),
+             Input('hidden_northstar', 'value'),
              Input('sl_prop_gradient', 'value'),
-             Input('sl_nclusters', 'value')],
+             Input('sl_nclusters', 'value'),],
             [State("selected_clusters", "value"),
-             State("main-figure", "selectedData")]) (self.handle_re_cluster)
+             State("main-figure", "selectedData"),
+             State('north_star', 'value'),]) (self.handle_re_cluster)
 
         # Register callbacks for selection inside main figure to update module details
         self.app.callback(
@@ -111,7 +112,8 @@ class ChemVisualization:
             [Input("bt_reset", "n_clicks")]) (self.handle_reset)
 
         self.app.callback(
-            Output('north_star', 'value'),
+            [Output('north_star', 'value'),
+             Output('hidden_northstar', 'value')],
             [Input({'role': 'bt_star_candidate', 'index': ALL}, 'n_clicks')],
             State('north_star', 'value')) \
                 (self.handle_mark_north_star)
@@ -235,22 +237,24 @@ class ChemVisualization:
             colors = ldf[color_col].unique().values_host
         else:
             colors = ldf[color_col].unique()
+
+        scatter_traces = []
         for cluster_id in colors:
             query = 'cluster == ' + str(cluster_id)
             cdf = ldf.query(query)
 
+            moi_present = False
             df_size = cdf['id'].isin(north_points)
             if df_size.unique().shape[0] > 1:
                 northstar_cluster.append(str(cluster_id))
+                moi_present = True
 
             # Compute size of northstar and normal points
             df_shape = df_size.copy()
             df_size = (df_size * 18) + 6
             df_shape = df_shape * 2
             if gradient_prop is not None:
-
-                fig.add_trace(
-                    go.Scattergl({
+                    scatter_trace = go.Scattergl({
                         'x': cdf['x'].to_array(),
                         'y': cdf['y'].to_array(),
                         'text': cdf['chembl_id'].to_array(),
@@ -267,11 +271,10 @@ class ChemVisualization:
                             'cmin': cmin,
                             'cmax': cmax,
                         }
-                }))
+                })
             else:
                 if self.enable_gpu:
-                    fig.add_trace(
-                        go.Scattergl({
+                    scatter_trace = go.Scattergl({
                             'x': cdf['x'].to_array(),
                             'y': cdf['y'].to_array(),
                             'text': cdf['chembl_id'].to_array(),
@@ -281,11 +284,11 @@ class ChemVisualization:
                             'marker': {
                                 'size': df_size.to_array(),
                                 'symbol': df_shape.to_array(),
-                            }
-                    }))
+                            },
+                            'uid': 'Cluster ' + str(cluster_id),
+                    })
                 else:
-                    fig.add_trace(
-                        go.Scattergl({
+                    scatter_trace = go.Scattergl({
                             'x': cdf['x'],
                             'y': cdf['y'],
                             'text': cdf['chembl_id'],
@@ -295,12 +298,26 @@ class ChemVisualization:
                             'marker': {
                                 'size': df_size,
                                 'symbol': df_shape,
-                            }
-                    }))
+                            },
+                            'uid': 'Cluster ' + str(cluster_id),
+                    })
+            if moi_present:
+                # save to add later. This is to ensure the scatter is on top
+                scatter_traces.append(scatter_trace)
+            else:
+                fig.add_trace(scatter_trace)
 
+        for scatter_trace in scatter_traces:
+            fig.add_trace(scatter_trace)
+
+        if self.enable_gpu:
+            f_color = 'green'
+        else:
+            f_color = 'blue'
         fig.update_layout(
             showlegend=True, clickmode='event', height=main_fig_height,
                 title='Clusters', dragmode='select',
+                title_font_color=f_color,
             annotations=[
                 dict(x=0.5, y=-0.07, showarrow=False, text='x',
                     xref="paper", yref="paper"),
@@ -369,7 +386,7 @@ class ChemVisualization:
         return  html.Table(prop_recs, style={'width': '100%'}), all_props
 
     def constuct_layout(self):
-        fig, northstart_cluster = self.create_graph(self.df)
+        fig, _ = self.create_graph(self.df)
 
         return html.Div([
             html.Div(className='row', children=[
@@ -484,7 +501,8 @@ class ChemVisualization:
             ], style={'display':'none'}),
 
             html.Div(id='hidden1', style={'display':'none'}),
-            html.Div(id='northstar_cluster', style={'display':'none'})
+            html.Div(id='northstar_cluster', style={'display':'none'}),
+            html.Div(id='hidden_northstar', style={'display':'none'})
         ])
 
     def handle_reset(self, recluster_nofilter):
@@ -590,11 +608,11 @@ class ChemVisualization:
         if selected_chembl_id not in selected_north_star and \
             selected_chembl_id in self.chembl_ids:
             selected_north_star.append(selected_chembl_id)
-
-        return ','.join(selected_north_star)
+        return ','.join(selected_north_star), ','.join(selected_north_star)
 
     def handle_re_cluster(self, bt_cluster_clicks, bt_point_clicks, bt_north_star_clicks,
-                          north_star, sl_prop_gradient, sl_nclusters, curr_clusters, mf_selected_data):
+                          north_star_hidden, sl_prop_gradient, sl_nclusters,
+                          curr_clusters, mf_selected_data, north_star):
         if not dash.callback_context.triggered:
             raise dash.exceptions.PreventUpdate
 
@@ -628,7 +646,7 @@ class ChemVisualization:
                 self.df, gradient_prop=sl_prop_gradient, north_stars=north_star)
 
         elif (comp_id == 'bt_north_star' and event_type == 'n_clicks') or \
-            (comp_id == 'north_star' and event_type == 'value'):
+            (comp_id == 'hidden_northstar' and event_type == 'value'):
             north_star = self.update_new_chembl(north_star)
             if north_star:
                 figure, northstar_cluster = self.create_graph(

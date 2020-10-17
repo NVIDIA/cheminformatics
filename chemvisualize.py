@@ -82,7 +82,8 @@ class ChemVisualization:
         # Register callbacks for buttons for reclustering selected data
         self.app.callback(
             [Output('main-figure', 'figure'),
-             Output('northstar_cluster', 'children')],
+             Output('northstar_cluster', 'children'),
+             Output('north_star_clusterid_map', 'children')],
             [Input('bt_recluster_clusters', 'n_clicks'),
              Input('bt_recluster_points', 'n_clicks'),
              Input('bt_north_star', 'n_clicks'),
@@ -105,9 +106,8 @@ class ChemVisualization:
              Input('sl_prop_gradient', 'value'),
              Input('bt_page_prev', 'n_clicks'),
              Input('bt_page_next', 'n_clicks'),
-             Input('bt_north_star', 'n_clicks')],
-            [State('current_page', 'children'),
-             State('north_star', 'value'),]) (self.handle_molecule_selection)
+             Input('north_star_clusterid_map', 'children')],
+            State('current_page', 'children')) (self.handle_molecule_selection)
 
         self.app.callback(
             Output("hidden1", "children"),
@@ -192,11 +192,7 @@ class ChemVisualization:
     def recluster_selected_clusters(self, df, values, gradient_prop, north_stars=None):
         df_clusters = df['cluster'].isin(values)
         filters = df_clusters.values
-
-        if self.enable_gpu:
-            tdf = df[filters.get()]
-        else:
-            tdf = df[filters]
+        tdf = df[filters]
         tdf = self.re_cluster(tdf)
         if tdf is not None:
             self.df = tdf
@@ -206,11 +202,7 @@ class ChemVisualization:
     def recluster_selected_points(self, df, values, gradient_prop, north_stars=None):
         df_clusters = df['id'].isin(values)
         filters = df_clusters.values
-
-        if self.enable_gpu:
-            tdf = df[filters.get()]
-        else:
-            tdf = df[filters]
+        tdf = df[filters]
 
         tdf = self.re_cluster(tdf)
         if tdf is not None:
@@ -222,22 +214,27 @@ class ChemVisualization:
         fig = go.Figure(layout = {'colorscale' : {}})
         ldf = df.merge(self.prop_df, on='chembl_id')
 
-        north_points = []
+        north_chembls = []
         if north_stars:
-            for chemblid in north_stars.split(","):
-                chemblid = chemblid.strip()
-                if chemblid in self.chembl_ids:
-                    north_points.append(self.chembl_ids.index(chemblid))
+            north_chembls = north_stars.split(",")
+
+        northstar_filter = ldf['chembl_id'].isin(north_chembls)
+        northstar_df = ldf[northstar_filter]
+
+        chemble_cluster_map = {}
+        if north_stars:
+            chemble_cluster_map = dict(zip(northstar_df['chembl_id'].to_array(), \
+                northstar_df['cluster'].to_array().tolist()))
 
         northstar_cluster = []
         if gradient_prop is not None:
             cmin = ldf[gradient_prop].min()
             cmax = ldf[gradient_prop].max()
 
-            df_size = ldf['id'].isin(north_points)
+            df_size = northstar_filter
             # Compute size of northstar and normal points
-            df_shape = df_size.copy()
-            df_size = (df_size * 18) + 6
+            df_shape = northstar_filter.copy()
+            northstar_filter = (northstar_filter * 18) + 6
             df_shape = df_shape * 2
 
             fig.add_trace(go.Scattergl({
@@ -248,7 +245,7 @@ class ChemVisualization:
                 'mode': 'markers',
                 'showlegend': False,
                 'marker': {
-                    'size': df_size.to_array(),
+                    'size': northstar_filter.to_array(),
                     'symbol': df_shape.to_array(),
                     'color': ldf[gradient_prop].to_array(),
                     'colorscale': 'Viridis',
@@ -263,6 +260,7 @@ class ChemVisualization:
             else:
                 colors = ldf[color_col].unique()
 
+            north_points = northstar_df['id']
             scatter_traces = []
             for cluster_id in colors:
                 query = 'cluster == ' + str(cluster_id)
@@ -328,9 +326,8 @@ class ChemVisualization:
                     xref="paper", yref="paper"),
                 dict(x=-0.05, y=0.5, showarrow=False, text="y",
                     textangle=-90, xref="paper", yref="paper")])
-
         del ldf
-        return fig, northstar_cluster
+        return fig, northstar_cluster, json.dumps(chemble_cluster_map)
 
     def start(self, host=None, port=5000):
         return self.app.run_server(
@@ -350,6 +347,9 @@ class ChemVisualization:
               html.Th("smiles")]
         for prop in display_properties:
             table_headers.append(html.Th(prop))
+
+        if chembl_ids:
+            table_headers.append(html.Th('Cluster'))
 
         table_headers.append(html.Th(""))
         prop_recs = [html.Tr(table_headers)]
@@ -387,15 +387,21 @@ class ChemVisualization:
             td.append(html.Td(smiles))
             for key in display_properties:
                 td.append(html.Td(selected_molecule[props.index(key)]))
+
+            if chembl_ids:
+                td.append(html.Td(chembl_ids[selected_chembl_id]))
+
             td.append(html.Td(
                 dbc.Button('Add to MoI', \
                     id={'role': 'bt_star_candidate', 'index': selected_chembl_id}, n_clicks=0)
             ))
+
             prop_recs.append(html.Tr(td))
+
         return  html.Table(prop_recs, style={'width': '100%'}), all_props
 
     def constuct_layout(self):
-        fig, _ = self.create_graph(self.df)
+        fig, _, _ = self.create_graph(self.df)
 
         return html.Div([
             html.Div(className='row', children=[
@@ -511,7 +517,8 @@ class ChemVisualization:
 
             html.Div(id='hidden1', style={'display':'none'}),
             html.Div(id='northstar_cluster', style={'display':'none'}),
-            html.Div(id='hidden_northstar', style={'display':'none'})
+            html.Div(id='hidden_northstar', style={'display':'none'}),
+            html.Div(id='north_star_clusterid_map', style={'display':'none'}),
         ])
 
     def handle_reset(self, recluster_nofilter):
@@ -521,14 +528,15 @@ class ChemVisualization:
         self.re_cluster(self.df)
 
     def handle_molecule_selection(self, mf_selected_data, selected_columns,
-            sl_prop_gradient, prev_click, next_click, north_star_click,
-            current_page, north_star):
+            sl_prop_gradient, prev_click, next_click, north_star_clusterid_map,
+            current_page):
         if not dash.callback_context.triggered:
             raise dash.exceptions.PreventUpdate
         comp_id, event_type = \
             dash.callback_context.triggered[0]['prop_id'].split('.')
+        print(comp_id, event_type)
 
-        if  (not mf_selected_data) and comp_id != 'bt_north_star':
+        if  (not mf_selected_data) and comp_id != 'north_star_clusterid_map':
             raise dash.exceptions.PreventUpdate
 
         module_details = None
@@ -542,8 +550,8 @@ class ChemVisualization:
             if len(mf_selected_data['points']) < PAGE_SIZE * (current_page + 1):
                 raise dash.exceptions.PreventUpdate
             current_page += 1
-        elif comp_id == 'bt_north_star' and event_type == 'n_clicks':
-            chembl_ids = north_star.split(',')
+        elif comp_id == 'north_star_clusterid_map' and event_type == 'children':
+            chembl_ids = json.loads(north_star_clusterid_map)
 
         if selected_columns and sl_prop_gradient:
             if sl_prop_gradient not in selected_columns:
@@ -643,40 +651,49 @@ class ChemVisualization:
 
         if comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks':
             if not curr_clusters:
-                figure, northstar_cluster = self.recluster_nofilter(
-                    self.df, sl_prop_gradient, north_stars=north_star)
+                figure, northstar_cluster, chembl_clusterid_map = \
+                    self.recluster_nofilter(self.df,
+                                            sl_prop_gradient,
+                                            north_stars=north_star)
             else:
                 clusters = list(map(int, curr_clusters.split(",")))
-                figure, northstar_cluster = self.recluster_selected_clusters(
-                    self.df, clusters, sl_prop_gradient, north_stars=north_star)
+                figure, northstar_cluster, chembl_clusterid_map = \
+                    self.recluster_selected_clusters(self.df,
+                                                     clusters,
+                                                     sl_prop_gradient,
+                                                     north_stars=north_star)
 
         elif comp_id == 'bt_recluster_points' and event_type == 'n_clicks':
             if not mf_selected_data:
-                figure, northstar_cluster = self.recluster_nofilter(
-                    self.df, sl_prop_gradient, north_stars=north_star)
+                figure, northstar_cluster, chembl_clusterid_map = \
+                    self.recluster_nofilter(
+                        self.df, sl_prop_gradient, north_stars=north_star)
             else:
                 points = []
                 for point in mf_selected_data['points']:
                     points.append(point['customdata'])
-                figure, northstar_cluster = self.recluster_selected_points(
-                    self.df, points, sl_prop_gradient, north_stars=north_star)
+                figure, northstar_cluster, chembl_clusterid_map = \
+                    self.recluster_selected_points(self.df, points,
+                                                   sl_prop_gradient,
+                                                   north_stars=north_star)
 
         elif (comp_id == 'sl_prop_gradient' and event_type == 'value'):
-            figure, northstar_cluster = self.create_graph(
+            figure, _, chembl_clusterid_map = self.create_graph(
                 self.df, gradient_prop=sl_prop_gradient, north_stars=north_star)
+            northstar_cluster = curr_clusters.split(',')
 
         elif (comp_id == 'bt_north_star' and event_type == 'n_clicks') or \
             (comp_id == 'hidden_northstar' and event_type == 'value'):
             north_star = self.update_new_chembl(north_star)
             if north_star:
-                figure, northstar_cluster = self.create_graph(
+                figure, northstar_cluster, chembl_clusterid_map = self.create_graph(
                     self.df, gradient_prop=sl_prop_gradient, north_stars=north_star)
             else:
                 raise dash.exceptions.PreventUpdate
         else:
             raise dash.exceptions.PreventUpdate
 
-        return figure, ','.join(northstar_cluster)
+        return figure, ','.join(northstar_cluster), chembl_clusterid_map
 
     def update_new_chembl(self, north_stars, radius=2, nBits=512):
         north_stars = list(map(str.strip, north_stars.split(',')))

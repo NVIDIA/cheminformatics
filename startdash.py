@@ -2,19 +2,22 @@
 #
 # Copyright 2020 NVIDIA Corporation
 # SPDX-License-Identifier: Apache-2.0
-import os, sys, wget, gzip
+import os, wget, gzip
 import hashlib
 import logging
+from datetime import datetime
 
 from dask.distributed import Client, LocalCluster
 import dask_cudf
 import dask.bag as db
 
 import cudf, cuml
-from cuml import KMeans, UMAP
 
 import pandas as pd
 import numpy as np
+
+import sklearn.cluster
+import umap
 
 import rdkit
 from rdkit import Chem
@@ -37,13 +40,13 @@ formatter = logging.Formatter(
 #
 ###############################################################################
 
-def np2cudf(df):
+def np2dataframe(df, enable_gpu):
     # convert numpy array to cuDF dataframe
     df = pd.DataFrame({'fea%d'%i:df[:,i] for i in range(df.shape[1])})
-    pdf = cudf.DataFrame()
-    for c,column in enumerate(df):
-        pdf[str(c)] = df[column]
-    return pdf
+    if not enable_gpu:
+        return df
+
+    return cudf.DataFrame(df)
 
 
 def MorganFromSmiles(smiles, radius=2, nBits=512):
@@ -85,7 +88,7 @@ def dl_chemreps(chemreps_local_path='/data/chembl_26_chemreps.txt.gz'):
 ###############################################################################
 #
 # MAIN
-# 
+#
 ###############################################################################
 
 if __name__=='__main__':
@@ -95,13 +98,15 @@ if __name__=='__main__':
     cluster = LocalCluster(dashboard_address=':9001', n_workers=12)
     client = Client(cluster)
 
+    enable_gpu = True
+    max_molecule=10000
+
     # ensure we have data
     dl_chemreps()
 
     smiles_list = []
     chemblID_list = []
     count=1
-    max=10000
 
     chemreps_local_path = '/data/chembl_26_chemreps.txt.gz'
     with gzip.open(chemreps_local_path, 'rb') as fp:
@@ -111,37 +116,56 @@ if __name__=='__main__':
             chemblID_list.append(fields[0].decode("utf-8"))
             smiles_list.append(fields[1].decode("utf-8"))
             count+=1
-            if count>max:
+            if count>max_molecule:
                 break
 
     logger.info('Initializing Morgan fingerprints...')
     results = db.from_sequence(smiles_list).map(MorganFromSmiles).compute()
 
-    np_array_fingerprints = np.stack(results).astype(np.float32)
+    np_fingerprints = np.stack(results).astype(np.float32)
 
     # take np.array shape (n_mols, nBits) for GPU DataFrame
-    gdf = np2cudf(np_array_fingerprints)
+    df_fingerprints = np2dataframe(np_fingerprints, enable_gpu)
+
+    n_clusters = 7
+    task_start_time = datetime.now()
+    if enable_gpu:
+        kmeans_float = cuml.KMeans(n_clusters=n_clusters)
+    else:
+        kmeans_float = sklearn.cluster.KMeans(n_clusters=n_clusters)
 
     # prepare one set of clusters
-    n_clusters = 7
-    kmeans_float = KMeans(n_clusters=n_clusters)
-    kmeans_float.fit(gdf)
-    
-    # UMAP
-    umap = UMAP(n_neighbors=100,
-                a=1.0,
-                b=1.0,
-                learning_rate=1.0)
-    Xt = umap.fit_transform(gdf)
-    gdf.add_column('x', Xt[0].to_array())
-    gdf.add_column('y', Xt[1].to_array())
+    kmeans_float.fit(df_fingerprints)
+    print('Runtime_Kmeans time (hh:mm:ss.ms) {}'.format(
+        datetime.now() - task_start_time))
 
-    gdf.add_column('cluster', kmeans_float.labels_)
+    # UMAP
+    task_start_time = datetime.now()
+    if enable_gpu:
+        umap = cuml.UMAP(n_neighbors=100,
+                    a=1.0,
+                    b=1.0,
+                    learning_rate=1.0)
+    else:
+        umap = umap.UMAP()
+
+    Xt = umap.fit_transform(df_fingerprints)
+    print('Runtime_UMAP time (hh:mm:ss.ms) {}'.format(
+        datetime.now() - task_start_time))
+
+    if enable_gpu:
+        df_fingerprints.add_column('x', Xt[0].to_array())
+        df_fingerprints.add_column('y', Xt[1].to_array())
+        df_fingerprints.add_column('cluster', kmeans_float.labels_)
+    else:
+        df_fingerprints['x'] = Xt[:,0]
+        df_fingerprints['y'] = Xt[:,1]
+        df_fingerprints['cluster'] = kmeans_float.labels_
 
     # start dash
     v = chemvisualize.ChemVisualization(
-        gdf.copy(), n_clusters, chemblID_list)
+        df_fingerprints.copy(), n_clusters, chemblID_list,
+        enable_gpu=enable_gpu)
 
     logger.info('navigate to https://localhost:5000')
     v.start('0.0.0.0')
-

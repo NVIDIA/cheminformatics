@@ -100,7 +100,7 @@ if __name__=='__main__':
     client = Client(cluster)
 
     enable_gpu = True
-    max_molecule = 500000
+    max_molecule = 10000
     pca_components = 64 # Number of PCA components or False to not use PCA
 
     # ensure we have data

@@ -41,13 +41,14 @@ IMP_PROPS = [
 
 class ChemVisualization:
 
-    def __init__(self, df, n_clusters, chembl_ids, enable_gpu=True):
+    def __init__(self, df, n_clusters, chembl_ids, enable_gpu=True, pca_model=False):
         self.app = dash.Dash(
             __name__, external_stylesheets=external_stylesheets)
         self.df = df
         self.n_clusters = n_clusters
         self.chembl_ids = chembl_ids
         self.enable_gpu = enable_gpu
+        self.pca = pca_model
 
         # Fetch relavant properties from database.
         self.prop_df = self.create_dataframe_molecule_properties(chembl_ids)
@@ -55,7 +56,6 @@ class ChemVisualization:
         self.df['chembl_id'] = chembl_ids
         self.df['id'] = self.df.index
         self.orig_df = df.copy()
-
         # initialize UMAP
         if enable_gpu:
             self.umap = cuml.UMAP(n_neighbors=100,
@@ -137,6 +137,9 @@ class ChemVisualization:
         gdf.drop(['x', 'y', 'cluster', 'id', 'chembl_id'], axis=1, inplace=True)
         if new_figerprints is not None and new_chembl_ids is not None:
             # Add new figerprints and chEmblIds before reclustering
+            if self.pca:
+                new_figerprints = self.pca.transform(new_figerprints)
+
             if self.enable_gpu:
                 fp_df = cudf.DataFrame(new_figerprints, \
                     index=[idx for idx in range(self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],

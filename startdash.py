@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 
 import sklearn.cluster
+import sklearn.decomposition
 import umap
 
 import rdkit
@@ -99,7 +100,8 @@ if __name__=='__main__':
     client = Client(cluster)
 
     enable_gpu = True
-    max_molecule=10000
+    max_molecule = 500000
+    pca_components = 64 # Number of PCA components or False to not use PCA
 
     # ensure we have data
     dl_chemreps()
@@ -127,16 +129,29 @@ if __name__=='__main__':
     # take np.array shape (n_mols, nBits) for GPU DataFrame
     df_fingerprints = np2dataframe(np_fingerprints, enable_gpu)
 
-    n_clusters = 7
+    # prepare one set of clusters
+    if pca_components:
+        task_start_time = datetime.now()
+        if enable_gpu:
+            pca = cuml.PCA(n_components=pca_components)
+        else:
+            pca = sklearn.decomposition.PCA(n_components=pca_components)
+        
+        df_fingerprints = pca.fit_transform(df_fingerprints)
+        print('Runtime PCA time (hh:mm:ss.ms) {}'.format(
+            datetime.now() - task_start_time))
+    else:
+        pca = False
+        print('PCA has been skipped')
+    
     task_start_time = datetime.now()
+    n_clusters = 7
     if enable_gpu:
         kmeans_float = cuml.KMeans(n_clusters=n_clusters)
     else:
         kmeans_float = sklearn.cluster.KMeans(n_clusters=n_clusters)
-
-    # prepare one set of clusters
     kmeans_float.fit(df_fingerprints)
-    print('Runtime_Kmeans time (hh:mm:ss.ms) {}'.format(
+    print('Runtime Kmeans time (hh:mm:ss.ms) {}'.format(
         datetime.now() - task_start_time))
 
     # UMAP
@@ -150,7 +165,7 @@ if __name__=='__main__':
         umap = umap.UMAP()
 
     Xt = umap.fit_transform(df_fingerprints)
-    print('Runtime_UMAP time (hh:mm:ss.ms) {}'.format(
+    print('Runtime UMAP time (hh:mm:ss.ms) {}'.format(
         datetime.now() - task_start_time))
 
     if enable_gpu:
@@ -165,7 +180,7 @@ if __name__=='__main__':
     # start dash
     v = chemvisualize.ChemVisualization(
         df_fingerprints.copy(), n_clusters, chemblID_list,
-        enable_gpu=enable_gpu)
+        enable_gpu=enable_gpu, pca_model=pca)
 
     logger.info('navigate to https://localhost:5000')
     v.start('0.0.0.0')

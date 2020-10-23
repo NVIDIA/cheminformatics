@@ -7,8 +7,6 @@ import pandas
 from rdkit import Chem
 from rdkit.Chem import AllChem, Draw
 import numpy as np
-import sqlite3
-from contextlib import closing
 
 import cudf
 import cuml
@@ -24,8 +22,9 @@ import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 
-from dask import delayed
-from dash.dependencies import Input, Output, State, ALL, MATCH
+from dash.dependencies import Input, Output, State, ALL
+
+from nvidia.cheminformatics.chemutil import morgan_fingerprint
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
@@ -38,6 +37,13 @@ IMP_PROPS = [
     'full_mwt',
     'psa',
     'rtb']
+
+
+COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
+        "#ff9966", "#848482", "#8a2be2", "#de5d83", "#800020", "#e97451",
+        "#5f9ea0", "#36454f", "#008b8b", "#e9692c", "#f0b98d", "#ef9708",
+        "#0fcfc0", "#9cded6", "#d5eae7", "#f3e1eb", "#f6c4e1", "#f79cd4"]
+
 
 class ChemVisualization:
 
@@ -119,12 +125,6 @@ class ChemVisualization:
             [Input({'role': 'bt_star_candidate', 'index': ALL}, 'n_clicks')],
             State('north_star', 'value')) \
                 (self.handle_mark_north_star)
-
-    def MorganFromSmiles(self, smiles, radius=2, nBits=512):
-        m = Chem.MolFromSmiles(smiles)
-        fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, nBits=nBits)
-        ar = cupy.array(fp)
-        return ar
 
     def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
         if gdf.shape[0] == 0:
@@ -237,7 +237,7 @@ class ChemVisualization:
             df_size = northstar_filter
             # Compute size of northstar and normal points
             df_shape = northstar_filter.copy()
-            northstar_filter = (northstar_filter * 18) + 6
+            northstar_filter = (northstar_filter * 18) + 3
             df_shape = df_shape * 2
 
             fig.add_trace(go.Scattergl({
@@ -277,7 +277,7 @@ class ChemVisualization:
 
                 # Compute size of northstar and normal points
                 df_shape = df_size.copy()
-                df_size = (df_size * 18) + 6
+                df_size = (df_size * 18) + 3
                 df_shape = df_shape * 2
                 if self.enable_gpu:
                     scatter_trace = go.Scattergl({
@@ -290,6 +290,7 @@ class ChemVisualization:
                         'marker': {
                             'size': df_size.to_array(),
                             'symbol': df_shape.to_array(),
+                            'color': colors[cluster_id % len(COLORS)],
                         },
                     })
                 else:
@@ -303,6 +304,7 @@ class ChemVisualization:
                         'marker': {
                             'size': df_size,
                             'symbol': df_shape,
+                            'color': colors[cluster_id % len(COLORS)],
                         },
                     })
                 if moi_present:
@@ -341,7 +343,6 @@ class ChemVisualization:
         return html.A(chemblid, href='https://www.ebi.ac.uk/chembl/compound_report_card/' + chemblid,
                       target='_blank')
 
-    #TODO: remove self.selected_chembl_id
     def construct_molecule_detail(self, selected_points, display_properties, \
         page, pageSize=10, chembl_ids=None):
         # Create Table header
@@ -364,7 +365,7 @@ class ChemVisualization:
             for point in selected_points['points'][((page-1)*pageSize + 1): page * pageSize]:
                 selected_chembl_ids.append(point['text'])
 
-        props, selected_molecules = self.fetch_molecule_properties(selected_chembl_ids)
+        props, selected_molecules = self.fetch_props_by_chembl_ids(selected_chembl_ids)
         all_props = []
         for k in props:
             all_props.append({"label": k, "value": k})
@@ -706,7 +707,7 @@ class ChemVisualization:
         # CHEMBL10307, CHEMBL103071, CHEMBL103072
         if missing_chembl:
             missing_chembl = list(missing_chembl)
-            ldf = self.create_dataframe_molecule_properties(missing_chembl)
+            ldf = self.fetch_props_df_by_chembl_ids(missing_chembl)
 
             if ldf.shape[0] > 0:
                 self.prop_df = self.prop_df.append(ldf)
@@ -714,7 +715,7 @@ class ChemVisualization:
                 smiles = []
                 for i in range(0, ldf.shape[0]):
                     smiles.append(ldf.iloc[i]['canonical_smiles'].to_array()[0])
-                results = list(map(self.MorganFromSmiles, smiles))
+                results = list(map(morgan_fingerprint, smiles))
                 fingerprints = cupy.stack(results).astype(np.float32)
                 tdf = self.re_cluster(self.df, fingerprints, missing_chembl)
                 if tdf:
@@ -723,35 +724,3 @@ class ChemVisualization:
                     return None
 
         return ','.join(north_stars)
-
-    def fetch_molecule_properties(self, chemblIDs):
-        with closing(sqlite3.connect(CHEMBL_DB)) as con, con,  \
-            closing(con.cursor()) as cur:
-            select_stmt = '''
-                SELECT md.chembl_id, cp.*, cs.*
-                FROM compound_properties cp, compound_structures cs, molecule_dictionary md
-                WHERE cp.molregno = md.molregno
-                    AND md.molregno = cs.molregno
-                    AND md.chembl_id in (%s);
-            ''' % "'%s'" %"','".join(chemblIDs)
-            cur.execute(select_stmt)
-            cols = list(map(lambda x: x[0], cur.description))
-            return cols, cur.fetchall()
-
-    def create_dataframe_molecule_properties(self, chemblIDs):
-        with closing(sqlite3.connect(CHEMBL_DB)) as con, con,  \
-            closing(con.cursor()) as cur:
-            select_stmt = '''
-                SELECT md.chembl_id, cp.*, cs.*
-                FROM compound_properties cp, molecule_dictionary md, compound_structures cs
-                WHERE cp.molregno = md.molregno
-                    AND md.molregno = cs.molregno
-                    AND md.chembl_id in (%s);
-            ''' % "'%s'" %"','".join(chemblIDs)
-
-            df = pandas.read_sql(select_stmt, con)
-            if not self.enable_gpu:
-                return df
-
-            df = cudf.from_pandas(df)
-            return df.sort_values('chembl_id')

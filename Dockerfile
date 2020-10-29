@@ -14,7 +14,9 @@ RUN /opt/conda/envs/rapids/bin/pip install \
     dash_bootstrap_components \
     dash_core_components \
     dash_html_components \
-    progressbar2
+    progressbar2 \
+    tables \
+    sqlalchemy
 
 # misc python packages
 RUN conda install -n rapids pywget

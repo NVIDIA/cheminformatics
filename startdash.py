@@ -20,18 +20,14 @@ import logging
 import logging
 from datetime import datetime
 
-import dask
-from dask import bag
-from dask.dataframe.utils import make_meta
-from dask.distributed import Client, LocalCluster
-from dask.multiprocessing import get
+import rmm
+from dask_cuda import initialize, LocalCUDACluster
+from dask.distributed import Client
 
-import pandas as pd
-
+import dask_cudf
 import cudf
 import cupy
 import cuml
-import rmm
 
 from cuml.dask.decomposition import PCA
 from cuml.dask.cluster import KMeans
@@ -41,9 +37,7 @@ import sklearn.decomposition
 import umap
 
 import chemvisualize
-
 from nvidia.cheminformatics.chembldata import ChEmblData
-from nvidia.cheminformatics.fingerprint import save_fingerprints
 
 import warnings
 warnings.filterwarnings('ignore', 'Expected ')
@@ -69,29 +63,25 @@ if __name__=='__main__':
     enable_nvlink = False
     enable_infiniband = False
 
-    # initialize.initialize(create_cuda_context=True,
-    #                     enable_tcp_over_ucx=enable_tcp_over_ucx,
-    #                     enable_nvlink=enable_nvlink,
-    #                     enable_infiniband=enable_infiniband)
-    # cluster = LocalCUDACluster(protocol="ucx",
-    #                         dashboard_address=':9001',
-    #                         # We use the number of available GPUs minus device=0
-    #                         # (the client) which is oversubscribed w/ UVM
-    #                         CUDA_VISIBLE_DEVICES=[0, 1],
-    #                         enable_tcp_over_ucx=enable_tcp_over_ucx,
-    #                         enable_nvlink=enable_nvlink,
-    #                         enable_infiniband=enable_infiniband)
-    # client = Client(cluster)
-
     logger.info('Starting dash cluster...')
+    initialize.initialize(create_cuda_context=True,
+                        enable_tcp_over_ucx=enable_tcp_over_ucx,
+                        enable_nvlink=enable_nvlink,
+                        enable_infiniband=enable_infiniband)
+    cluster = LocalCUDACluster(protocol="ucx",
+                            dashboard_address=':9001',
+                            # TODO: Find a way to automate visible device
+                            CUDA_VISIBLE_DEVICES=[0, 1],
+                            enable_tcp_over_ucx=enable_tcp_over_ucx,
+                            enable_nvlink=enable_nvlink,
+                            enable_infiniband=enable_infiniband)
+    client = Client(cluster)
+
     start = time.time()
+    chem_data = ChEmblData()
+    mol_df = chem_data.fetch_all_props(num_recs=100000, batch_size=10000)
 
-    logger.info('Fetching molecules from database for fingerprints...')
-    save_fingerprints('data/filter_*.h5')
-
-    if True:
-        import sys
-        sys.exit()
+    df_fingerprints = dask_cudf.from_dask_dataframe(mol_df)
 
     # prepare one set of clusters
     if PCA_COMPONENTS:
@@ -144,6 +134,7 @@ if __name__=='__main__':
         df_fingerprints['x'] = Xt[:,0]
         df_fingerprints['y'] = Xt[:,1]
         df_fingerprints['cluster'] = kmeans_float.labels_
+
 
     # start dash
     v = chemvisualize.ChemVisualization(

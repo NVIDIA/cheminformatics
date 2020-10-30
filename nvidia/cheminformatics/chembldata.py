@@ -95,7 +95,7 @@ class ChEmblData(object, metaclass=Singleton):
                        row.canonical_smiles, radius=radius, nBits=nBits),
                        axis=1)
 
-        return df['fp'].str.split(pat=', ', n=nBits+1, expand=True).astype('int8')
+        return df['fp'].str.split(pat=', ', n=nBits+1, expand=True).astype('float32')
 
     def fetch_all_props(self, num_recs=None, batch_size=30000, radius=2, nBits=512):
         """
@@ -107,7 +107,7 @@ class ChEmblData(object, metaclass=Singleton):
         if not num_recs:
             num_recs = self.fetch_molecule_cnt()
 
-        prop_meta = {i: pandas.Series([], dtype='int8') for i in range(nBits)}
+        prop_meta = {i: pandas.Series([], dtype='float32') for i in range(nBits)}
         meta_df = pandas.DataFrame(prop_meta)
 
         dls = []

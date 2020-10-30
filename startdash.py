@@ -27,25 +27,26 @@ from dask.distributed import Client
 import dask_cudf
 import cudf
 import cupy
-import cuml
 
+from cuml.manifold import UMAP as S_UMAP
 from cuml.dask.decomposition import PCA
 from cuml.dask.cluster import KMeans
+from cuml.dask.manifold import UMAP
 
 import sklearn.cluster
 import sklearn.decomposition
 import umap
 
-import chemvisualize
+from nvidia.cheminformatics.chemvisualize import ChemVisualization
 from nvidia.cheminformatics.chembldata import ChEmblData
 
 import warnings
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
-logger = logging.getLogger('nv_chem_viz')
+logger = logging.getLogger('nv_chem_dash')
 formatter = logging.Formatter(
         '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
@@ -79,9 +80,10 @@ if __name__=='__main__':
 
     start = time.time()
     chem_data = ChEmblData()
-    mol_df = chem_data.fetch_all_props(num_recs=100000, batch_size=10000)
+    mol_df = chem_data.fetch_all_props(num_recs=10000, batch_size=5000)
 
     df_fingerprints = dask_cudf.from_dask_dataframe(mol_df)
+    df_fingerprints = df_fingerprints.persist()
 
     # prepare one set of clusters
     if PCA_COMPONENTS:
@@ -100,10 +102,10 @@ if __name__=='__main__':
         pca = False
         logger.info('PCA has been skipped')
 
-
     task_start_time = datetime.now()
     n_clusters = 7
     logger.info('KMeans...')
+
     if ENABLE_GPU:
         kmeans_float = KMeans(client=client, n_clusters=n_clusters)
     else:
@@ -113,19 +115,29 @@ if __name__=='__main__':
         datetime.now() - task_start_time))
 
     # UMAP
+    logger.info('UMAP...')
     task_start_time = datetime.now()
     if ENABLE_GPU:
-        umap = cuml.UMAP(n_neighbors=100,
-                    a=1.0,
-                    b=1.0,
-                    learning_rate=1.0)
-    else:
-        umap = umap.UMAP()
+        local_model = S_UMAP()
+        X_train = df_fingerprints.compute()
+        local_model.fit(X_train)
 
-    Xt = umap.fit_transform(df_fingerprints)
+        umap_model = UMAP(local_model,
+                          n_neighbors=100,
+                          a=1.0,
+                          b=1.0,
+                          learning_rate=1.0)
+    else:
+        umap_model = umap.UMAP()
+
+    Xt = umap_model.transform(df_fingerprints)
+
     logger.info('Runtime UMAP time (hh:mm:ss.ms) {}'.format(
         datetime.now() - task_start_time))
 
+    print(df_fingerprints.head())
+    print(dir(df_fingerprints))
+    print(type(df_fingerprints))
     if ENABLE_GPU:
         df_fingerprints.add_column('x', Xt[0].to_array())
         df_fingerprints.add_column('y', Xt[1].to_array())
@@ -135,14 +147,13 @@ if __name__=='__main__':
         df_fingerprints['y'] = Xt[:,1]
         df_fingerprints['cluster'] = kmeans_float.labels_
 
-
     # start dash
-    v = chemvisualize.ChemVisualization(
-        df_fingerprints.copy(),
-        n_clusters,
-        cudf.from_pandas(mol_df),
-        enable_gpu=ENABLE_GPU,
-        pca_model=PCA_COMPONENTS)
+    v = ChemVisualization(
+            df_fingerprints.copy(),
+            n_clusters,
+            cudf.from_pandas(mol_df),
+            enable_gpu=ENABLE_GPU,
+            pca_model=PCA_COMPONENTS)
 
     logger.info('navigate to https://localhost:5000')
     v.start('0.0.0.0')

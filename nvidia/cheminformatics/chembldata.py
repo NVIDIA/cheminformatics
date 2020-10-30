@@ -7,6 +7,7 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
+from nvidia.cheminformatics.chemutil import morgan_fingerprint
 
 SQL_MOLECULAR_PROP = """
 SELECT md.chembl_id, cp.*, cs.*
@@ -52,57 +53,69 @@ class ChEmblData(object, metaclass=Singleton):
             df = cudf.from_pandas(df)
             return df.sort_values('chembl_id')
 
+    def fetch_molecule_cnt(self):
+        logger.debug('Finding number of molecules...')
+        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB)) as con, con,  \
+                closing(con.cursor()) as cur:
+            select_stmt = '''
+                SELECT count(*)
+                FROM compound_properties cp,
+                     molecule_dictionary md,
+                     compound_structures cs
+                WHERE cp.molregno = md.molregno
+                      AND md.molregno = cs.molregno
+            '''
+            cur.execute(select_stmt)
 
-def fetch_molecule_cnt():
-    logger.debug('Finding number of molecules...')
-    with closing(sqlite3.connect(ChEmblData.CHEMBL_DB)) as con, con,  \
-            closing(con.cursor()) as cur:
+            return cur.fetchone()[0]
+
+    @delayed
+    def fetch_molecular_props(self, start, batch_size=100000, radius=2, nBits=512):
+        """
+        Returns compound properties and structure for the first N number of
+        records in a dataframe.
+        """
+
+        logger.info('Fetching %d records starting %d...' % (batch_size, start))
+
         select_stmt = '''
-            SELECT count(*)
-            FROM molecule_dictionary md
-        '''
-        cur.execute(select_stmt)
+            SELECT md.chembl_id, cs.canonical_smiles
+            FROM compound_properties cp,
+                 molecule_dictionary md,
+                 compound_structures cs
+            WHERE cp.molregno = md.molregno
+                  AND md.molregno = cs.molregno
+            LIMIT %d, %d
+        ''' % (start, batch_size)
+        df = pandas.read_sql(select_stmt,
+                            sqlite3.connect(ChEmblData.CHEMBL_DB),
+                            index_col='chembl_id')
 
-        return cur.fetchone()[0]
+        df['fp'] = df.apply(lambda row: morgan_fingerprint(
+                       row.canonical_smiles, radius=radius, nBits=nBits),
+                       axis=1)
 
-@delayed
-def fetch_molecular_props(start, batch_size):
-    """
-    Returns compound properties and structure for the first N number of
-    records in a dataframe.
-    """
+        return df['fp'].str.split(pat=', ', n=nBits+1, expand=True).astype('int8')
 
-    logger.info('Fetching %d records starting %d...' % (batch_size, start))
+    def fetch_all_props(self, num_recs=None, batch_size=100000, radius=2, nBits=512):
+        """
+        Returns compound properties and structure for the first N number of
+        records in a dataframe.
+        """
+        logger.info('Fetching properties for all molecules...')
 
-    select_stmt = '''
-        SELECT md.molregno, md.chembl_id, cs.canonical_smiles
-        FROM compound_properties cp,
-                molecule_dictionary md,
-                compound_structures cs
-        WHERE cp.molregno = md.molregno
-            AND md.molregno = cs.molregno
-        LIMIT %d, %d
-    ''' % (start, batch_size)
-    df = pandas.read_sql(select_stmt,
-                         sqlite3.connect(ChEmblData.CHEMBL_DB),
-                         index_col='molregno')
-    return df
+        if not num_recs:
+            num_recs = self.fetch_molecule_cnt()
 
-def fetch_all_props(num_recs=None, batch_size=10000):
-    """
-    Returns compound properties and structure for the first N number of
-    records in a dataframe.
-    """
-    logger.info('Fetching properties for all molecules...')
+        prop_meta = {i: pandas.Series([], dtype='int8') for i in range(nBits)}
+        meta_df = pandas.DataFrame(prop_meta)
 
-    if not num_recs:
-        num_recs = fetch_molecule_cnt()
+        # meta_df = [(i, 'int8') for i in range(nBits)]
 
-    div = [start for start in range(0, num_recs, batch_size)]
-    dls = []
+        dls = []
+        for start in range(0, num_recs, batch_size):
+            bsize = min(num_recs - start, batch_size)
+            dls.append(self.fetch_molecular_props(
+                start, batch_size=bsize, radius=radius, nBits=nBits))
 
-    for start in div:
-        bsize = min(num_recs - start, batch_size)
-        dls.append(fetch_molecular_props(start, bsize))
-
-    return dataframe.from_delayed(dls)
+        return dataframe.from_delayed(dls, meta=meta_df)

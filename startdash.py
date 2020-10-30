@@ -14,14 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from logging import log
 import time
 import logging
 
 import logging
 from datetime import datetime
 
+import dask
 from dask import bag
+from dask.dataframe.utils import make_meta
 from dask.distributed import Client, LocalCluster
+from dask.multiprocessing import get
+
+import pandas as pd
 
 import cudf
 import cupy
@@ -38,7 +44,7 @@ import umap
 import chemvisualize
 
 from nvidia.cheminformatics.chemutil import morgan_fingerprint
-from nvidia.cheminformatics.chembldata import ChEmblData, fetch_all_props
+from nvidia.cheminformatics.chembldata import ChEmblData
 
 import warnings
 warnings.filterwarnings('ignore', 'Expected ')
@@ -79,32 +85,18 @@ if __name__=='__main__':
     # client = Client(cluster)
 
     logger.info('Starting dash cluster...')
-    cluster = LocalCluster(dashboard_address=':9001', n_workers=12)
+    cluster = LocalCluster(dashboard_address=':9001',
+                           n_workers=12,
+                           threads_per_worker=4)
     client = Client(cluster)
 
     start = time.time()
     chem_data = ChEmblData()
 
     logger.info('Fetching molecules from database for fingerprints...')
-    mol_df = fetch_all_props()
-
-    logger.info('Generating fingerprints...')
-    result = mol_df.map_partitions(
-            lambda df: df.apply(
-                (lambda row: morgan_fingerprint(row.canonical_smiles)),
-                axis=1),
-        meta=tuple).compute()
-
-    logger.info(time.time() - start)
-
-    # # results = results.compute()
-    # logger.info('Copying data into dask_cudf...')
-
-    # df_fingerprints = dask_cudf.from_dask_dataframe(results.to_dataframe())
-    # df_fingerprints = df_fingerprints.compute()
-    # print(df_fingerprints)
-    # print(dir(df_fingerprints))
-    # print(type(df_fingerprints))
+    mol_df = chem_data.fetch_all_props(num_recs=10)
+    print(mol_df.head())
+    # mol_df.to_hdf('data/filter_*.h5', 'fingerprints')
 
     if True:
         import sys
@@ -138,8 +130,6 @@ if __name__=='__main__':
     kmeans_float.fit(df_fingerprints)
     logger.info('Runtime Kmeans time (hh:mm:ss.ms) {}'.format(
         datetime.now() - task_start_time))
-
-
 
     # UMAP
     task_start_time = datetime.now()

@@ -70,7 +70,7 @@ class ChEmblData(object, metaclass=Singleton):
             return cur.fetchone()[0]
 
     @delayed
-    def fetch_molecular_props(self, start, batch_size=100000, radius=2, nBits=512):
+    def fetch_molecular_props(self, start, batch_size=30000, radius=2, nBits=512):
         """
         Returns compound properties and structure for the first N number of
         records in a dataframe.
@@ -97,7 +97,7 @@ class ChEmblData(object, metaclass=Singleton):
 
         return df['fp'].str.split(pat=', ', n=nBits+1, expand=True).astype('int8')
 
-    def fetch_all_props(self, num_recs=None, batch_size=100000, radius=2, nBits=512):
+    def fetch_all_props(self, num_recs=None, batch_size=30000, radius=2, nBits=512):
         """
         Returns compound properties and structure for the first N number of
         records in a dataframe.
@@ -109,8 +109,6 @@ class ChEmblData(object, metaclass=Singleton):
 
         prop_meta = {i: pandas.Series([], dtype='int8') for i in range(nBits)}
         meta_df = pandas.DataFrame(prop_meta)
-
-        # meta_df = [(i, 'int8') for i in range(nBits)]
 
         dls = []
         for start in range(0, num_recs, batch_size):

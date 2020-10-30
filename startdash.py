@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from logging import log
 import time
 import logging
 
@@ -43,8 +42,8 @@ import umap
 
 import chemvisualize
 
-from nvidia.cheminformatics.chemutil import morgan_fingerprint
 from nvidia.cheminformatics.chembldata import ChEmblData
+from nvidia.cheminformatics.fingerprint import save_fingerprints
 
 import warnings
 warnings.filterwarnings('ignore', 'Expected ')
@@ -85,18 +84,10 @@ if __name__=='__main__':
     # client = Client(cluster)
 
     logger.info('Starting dash cluster...')
-    cluster = LocalCluster(dashboard_address=':9001',
-                           n_workers=12,
-                           threads_per_worker=4)
-    client = Client(cluster)
-
     start = time.time()
-    chem_data = ChEmblData()
 
     logger.info('Fetching molecules from database for fingerprints...')
-    mol_df = chem_data.fetch_all_props(num_recs=10)
-    print(mol_df.head())
-    # mol_df.to_hdf('data/filter_*.h5', 'fingerprints')
+    save_fingerprints('data/filter_*.h5')
 
     if True:
         import sys

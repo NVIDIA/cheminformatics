@@ -5,7 +5,7 @@ import json
 import base64
 import pandas
 from rdkit import Chem
-from rdkit.Chem import AllChem, Draw
+from rdkit.Chem import Draw
 import numpy as np
 
 import cudf
@@ -13,7 +13,6 @@ import cuml
 import cupy
 
 import sklearn.cluster
-import umap
 
 # from jupyter_dash import JupyterDash
 import plotly.graph_objects as go
@@ -21,10 +20,9 @@ import dash
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-
 from dash.dependencies import Input, Output, State, ALL
 
-from nvidia.cheminformatics.chemutil import morgan_fingerprint
+from nvidia.cheminformatics.chembldata import ChEmblData, morgan_fingerprint
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
@@ -38,7 +36,6 @@ IMP_PROPS = [
     'psa',
     'rtb']
 
-
 COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
         "#ff9966", "#848482", "#8a2be2", "#de5d83", "#800020", "#e97451",
         "#5f9ea0", "#36454f", "#008b8b", "#e9692c", "#f0b98d", "#ef9708",
@@ -47,29 +44,23 @@ COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
 
 class ChemVisualization:
 
-    def __init__(self, df, n_clusters, chembl_ids, enable_gpu=True, pca_model=False):
+    def __init__(self, df, mol_df, workflow, gpu=True):
+        self.enable_gpu = gpu
         self.app = dash.Dash(
             __name__, external_stylesheets=external_stylesheets)
         self.df = df
-        self.n_clusters = n_clusters
-        self.chembl_ids = chembl_ids
-        self.enable_gpu = enable_gpu
-        self.pca = pca_model
+        self.workflow = workflow
+        self.n_clusters = workflow.n_clusters
+        self.molregno = mol_df.index
+
+        self.chem_data = ChEmblData()
 
         # Fetch relavant properties from database.
-        self.prop_df = self.create_dataframe_molecule_properties(chembl_ids)
+        self.prop_df = self.chem_data.fetch_props_df_by_molregno(
+            mol_df.index, gpu=self.enable_gpu)
 
-        self.df['chembl_id'] = chembl_ids
         self.df['id'] = self.df.index
         self.orig_df = df.copy()
-        # initialize UMAP
-        if enable_gpu:
-            self.umap = cuml.UMAP(n_neighbors=100,
-                        a=1.0,
-                        b=1.0,
-                        learning_rate=1.0)
-        else:
-            self.umap = umap.UMAP()
 
         # Construct the UI
         self.app.layout = self.constuct_layout()
@@ -215,7 +206,8 @@ class ChemVisualization:
 
     def create_graph(self, df, color_col='cluster', north_stars=None, gradient_prop=None):
         fig = go.Figure(layout = {'colorscale' : {}})
-        ldf = df.merge(self.prop_df, on='chembl_id')
+        df['molregno'] = df.index
+        ldf = df.merge(self.prop_df, on='molregno')
 
         north_chembls = []
         if north_stars:
@@ -259,7 +251,8 @@ class ChemVisualization:
             }))
         else:
             if self.enable_gpu:
-                colors = ldf[color_col].unique().values_host
+                # ldf = ldf.compute()
+                colors = ldf[color_col].unique().compute().values_host
             else:
                 colors = ldf[color_col].unique()
 
@@ -267,7 +260,7 @@ class ChemVisualization:
             scatter_traces = []
             for cluster_id in colors:
                 query = 'cluster == ' + str(cluster_id)
-                cdf = ldf.query(query)
+                cdf = ldf.query(query).compute()
 
                 moi_present = False
                 df_size = cdf['id'].isin(north_points)
@@ -290,7 +283,7 @@ class ChemVisualization:
                         'marker': {
                             'size': df_size.to_array(),
                             'symbol': df_shape.to_array(),
-                            'color': colors[cluster_id % len(COLORS)],
+                            'color': colors[cluster_id % len(colors)],
                         },
                     })
                 else:
@@ -365,7 +358,7 @@ class ChemVisualization:
             for point in selected_points['points'][((page-1)*pageSize + 1): page * pageSize]:
                 selected_chembl_ids.append(point['text'])
 
-        props, selected_molecules = self.fetch_props_by_chembl_ids(selected_chembl_ids)
+        props, selected_molecules = self.chem_data.fetch_props_by_molregno(selected_chembl_ids)
         all_props = []
         for k in props:
             all_props.append({"label": k, "value": k})
@@ -527,7 +520,7 @@ class ChemVisualization:
 
     def handle_reset(self, recluster_nofilter):
         self.df = self.orig_df.copy()
-        self.df['chembl_id'] = self.chembl_ids
+        self.df['molregno'] = self.molregno
         self.df['id'] = self.df.index
         self.re_cluster(self.df)
 

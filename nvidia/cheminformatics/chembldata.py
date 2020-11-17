@@ -7,31 +7,33 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
-from nvidia.cheminformatics.chemutil import morgan_fingerprint
+from nvidia.cheminformatics.fingerprint import morgan_fingerprint
+
 
 SQL_MOLECULAR_PROP = """
 SELECT md.chembl_id, cp.*, cs.*
     FROM compound_properties cp,
-            compound_structures cs,
+            compound_structures cs,chemutil
             molecule_dictionary md
     WHERE cp.molregno = md.molregno
         AND md.molregno = cs.molregno
         AND md.chembl_id in (%s);
 """
 
+
 logger = logging.getLogger(__name__)
 
 
 class ChEmblData(object, metaclass=Singleton):
 
-    CHEMBL_DB='/data/db/chembl_27.db'
+    CHEMBL_DB='file:/data/db/chembl_27.db?mode=ro'
 
     def fetch_props_by_chembl_ids(self, chembl_ids):
         """
         Returns compound properties and structure filtered by ChEMBL ids along
         with a list of columns.
         """
-        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB)) as con, con,  \
+        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
             select_stmt = SQL_MOLECULAR_PROP % "'%s'" % "','".join(chembl_ids)
             cur.execute(select_stmt)
@@ -44,7 +46,7 @@ class ChEmblData(object, metaclass=Singleton):
         Returns compound properties and structure filtered by ChEMBL ids in a
         dataframe.
         """
-        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB)) as con:
+        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con:
             select_stmt = SQL_MOLECULAR_PROP % "'%s'" % "','".join(chemblIDs)
             df = pandas.read_sql(select_stmt, con)
             if not self.enable_gpu:
@@ -55,7 +57,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def fetch_molecule_cnt(self):
         logger.debug('Finding number of molecules...')
-        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB)) as con, con,  \
+        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT count(*)
@@ -88,7 +90,7 @@ class ChEmblData(object, metaclass=Singleton):
             LIMIT %d, %d
         ''' % (start, batch_size)
         df = pandas.read_sql(select_stmt,
-                            sqlite3.connect(ChEmblData.CHEMBL_DB),
+                            sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True),
                             index_col='chembl_id')
 
         df['fp'] = df.apply(lambda row: morgan_fingerprint(
@@ -104,7 +106,7 @@ class ChEmblData(object, metaclass=Singleton):
         """
         logger.info('Fetching properties for all molecules...')
 
-        if not num_recs:
+        if not num_recs or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
         prop_meta = {i: pandas.Series([], dtype='float32') for i in range(nBits)}
@@ -117,3 +119,14 @@ class ChEmblData(object, metaclass=Singleton):
                 start, batch_size=bsize, radius=radius, nBits=nBits))
 
         return dataframe.from_delayed(dls, meta=meta_df)
+
+    def save_fingerprints(hdf_path='data/filter_*.h5'):
+        """
+        Generates fingerprints for all ChEmblId's in the database
+        """
+        logger.info('Fetching molecules from database for fingerprints...')
+
+        chem_data = ChEmblData()
+        mol_df = chem_data.fetch_all_props()
+
+        mol_df.to_hdf(hdf_path, 'fingerprints')

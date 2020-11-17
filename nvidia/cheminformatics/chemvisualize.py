@@ -25,6 +25,7 @@ import dash_html_components as html
 from dash.dependencies import Input, Output, State, ALL
 
 from nvidia.cheminformatics.chemutil import morgan_fingerprint
+from nvidia.cheminformatics.chembldata import ChEmblData
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
@@ -47,7 +48,7 @@ COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
 
 class ChemVisualization:
 
-    def __init__(self, df, n_clusters, chembl_ids, enable_gpu=True, pca_model=False):
+    def __init__(self, df, chembl_ids, n_clusters, enable_gpu=True, pca_model=False):
         self.app = dash.Dash(
             __name__, external_stylesheets=external_stylesheets)
         self.df = df
@@ -56,8 +57,10 @@ class ChemVisualization:
         self.enable_gpu = enable_gpu
         self.pca = pca_model
 
+        self.chem_data = ChEmblData()
+
         # Fetch relavant properties from database.
-        self.prop_df = self.create_dataframe_molecule_properties(chembl_ids)
+        self.prop_df = self.chem_data.fetch_props_df_by_chembl_ids(chembl_ids)
 
         self.df['chembl_id'] = chembl_ids
         self.df['id'] = self.df.index

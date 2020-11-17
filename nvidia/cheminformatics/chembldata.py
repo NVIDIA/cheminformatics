@@ -78,7 +78,7 @@ class ChEmblData(object, metaclass=Singleton):
         records in a dataframe.
         """
 
-        logger.info('Fetching %d records starting %d...' % (batch_size, start))
+        logger.debug('Fetching %d records starting %d...' % (batch_size, start))
 
         select_stmt = '''
             SELECT md.chembl_id, cs.canonical_smiles
@@ -104,7 +104,7 @@ class ChEmblData(object, metaclass=Singleton):
         Returns compound properties and structure for the first N number of
         records in a dataframe.
         """
-        logger.info('Fetching properties for all molecules...')
+        logger.debug('Fetching properties for all molecules...')
 
         if not num_recs or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
@@ -124,7 +124,7 @@ class ChEmblData(object, metaclass=Singleton):
         """
         Generates fingerprints for all ChEmblId's in the database
         """
-        logger.info('Fetching molecules from database for fingerprints...')
+        logger.debug('Fetching molecules from database for fingerprints...')
 
         chem_data = ChEmblData()
         mol_df = chem_data.fetch_all_props()

@@ -32,4 +32,6 @@ COPY launch.sh /opt/nvidia/cheminfomatics/
 COPY *.py /opt/nvidia/cheminfomatics/
 COPY *.ipynb /opt/nvidia/cheminfomatics/
 
+ENV UCX_LOG_LEVEL error
+
 CMD /opt/nvidia/cheminfomatics/launch.sh dash

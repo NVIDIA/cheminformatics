@@ -44,7 +44,7 @@ formatter = logging.Formatter(
 
 # Positive number for # of molecules to select and negative number for using
 # all available molecules
-MAX_MOLECULES=10000
+MAX_MOLECULES=100000
 BATCH_SIZE=5000
 
 
@@ -67,11 +67,11 @@ def init_arg_parser():
     parser = ArgumentParser(
         description='Nvidia Cheminfomatics')
 
-    parser.add_argument('-g', '--gpu',
-                        dest='gpu',
+    parser.add_argument('--cpu',
+                        dest='cpu',
                         action='store_true',
-                        default=True,
-                        help='Use GPU')
+                        default=False,
+                        help='Use CPU')
 
     parser.add_argument('-p', '--pca_comps',
                         dest='pca_comps',
@@ -101,7 +101,7 @@ if __name__=='__main__':
     enable_infiniband = False
 
     logger.info('Starting dash cluster...')
-    if args.gpu:
+    if not args.cpu:
         initialize.initialize(create_cuda_context=True,
                             enable_tcp_over_ucx=enable_tcp_over_ucx,
                             enable_nvlink=enable_nvlink,
@@ -121,11 +121,13 @@ if __name__=='__main__':
     client = Client(cluster)
 
     start_time = datetime.now()
+    task_start_time = datetime.now()
     chem_data = ChEmblData()
     mol_df = chem_data.fetch_all_props(num_recs=MAX_MOLECULES,
                                        batch_size=BATCH_SIZE)
 
-    if args.gpu:
+    task_start_time = datetime.now()
+    if not args.cpu:
         workflow = GpuWorkflow(client,
                                pca_comps=64,
                                n_clusters=7)
@@ -135,6 +137,8 @@ if __name__=='__main__':
                                n_clusters=7)
 
     df_fingerprints = workflow.execute(mol_df)
+    logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(
+        datetime.now() - task_start_time))
     logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(
         datetime.now() - start_time))
 

@@ -30,21 +30,23 @@ class CpuWorkflow:
     def execute(self, mol_df):
         logger.info("Executing CPU workflow...")
 
+        mol_df = mol_df.persist()
+
         logger.info('PCA...')
         if self.pca_comps:
             task_start_time = datetime.now()
-            pca = sklearn.decomposition.PCA(n_components=self.pca)
+            pca = sklearn.decomposition.PCA(n_components=self.pca_comps)
             df_fingerprints = pca.fit_transform(mol_df)
-            logger.info('Runtime PCA time (hh:mm:ss.ms) {}'.format(
+            logger.info('### Runtime PCA time (hh:mm:ss.ms) {}'.format(
                 datetime.now() - task_start_time))
         else:
-            df_fingerprints = mol_df
+            df_fingerprints = mol_df.copy()
 
         logger.info('KMeans...')
         task_start_time = datetime.now()
         kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
-        logger.info('Runtime Kmeans time (hh:mm:ss.ms) {}'.format(
+        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {}'.format(
             datetime.now() - task_start_time))
 
         logger.info('UMAP...')
@@ -52,13 +54,15 @@ class CpuWorkflow:
         umap_model = umap.UMAP()
 
         Xt = umap_model.fit_transform(df_fingerprints)
-        df_fingerprints['x'] = Xt[:,0]
-        df_fingerprints['y'] = Xt[:,1]
-        df_fingerprints['cluster'] = kmeans_float.labels_
-        logger.info('Runtime UMAP time (hh:mm:ss.ms) {}'.format(
+        # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
+        mol_df = mol_df.compute()
+        mol_df['x'] = Xt[:, 0]
+        mol_df['y'] = Xt[:, 1]
+        mol_df['cluster'] = kmeans_float.labels_
+        logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(
             datetime.now() - task_start_time))
 
-        return df_fingerprints;
+        return mol_df;
 
 
 class GpuWorkflow:

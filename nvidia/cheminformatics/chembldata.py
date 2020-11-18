@@ -67,5 +67,4 @@ class ChEmblData(object, metaclass=Singleton):
                 LIMIT %d;
             ''' % record_cnt
 
-            df = cudf.from_pandas(pandas.read_sql(select_stmt, con))
-            return df.sort_values('chembl_id')
+            return pandas.read_sql(select_stmt, con)

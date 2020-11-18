@@ -49,7 +49,7 @@ logger = logging.getLogger('nv_chem_viz')
 formatter = logging.Formatter(
         '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
-MAX_MOLECULES=2000
+MAX_MOLECULES=1000
 ENABLE_GPU = True
 PCA_COMPONENTS = 64
 
@@ -80,8 +80,8 @@ if __name__=='__main__':
 
     start = time.time()
     logger.info('Copying data into cuDF...')
-    fp_arrays = cupy.stack(finger_prints).astype(np.float32)
-    df_fingerprints = cudf.DataFrame(fp_arrays)
+    # fp_arrays = cupy.stack(finger_prints).astype(np.float32)
+    df_fingerprints = cudf.DataFrame(finger_prints)
     df_fingerprints.rename(columns={0: 'mol_id'}, inplace=True)
     logger.info(time.time() - start)
 

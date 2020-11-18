@@ -85,8 +85,8 @@ def init_arg_parser():
                         default=64,
                         help='Numer of PCA components')
 
-    parser.add_argument('-c', '--clusters',
-                        dest='clusters',
+    parser.add_argument('-n', '--num_clusters',
+                        dest='num_clusters',
                         type=int,
                         default=7,
                         help='Numer of clusters(KMEANS)')
@@ -143,12 +143,12 @@ if __name__=='__main__':
     task_start_time = datetime.now()
     if not args.cpu:
         workflow = GpuWorkflow(client,
-                               pca_comps=64,
-                               n_clusters=7)
+                               pca_comps=args.pca_comps,
+                               n_clusters=args.num_clusters)
     else:
         workflow = CpuWorkflow(client,
-                               pca_comps=64,
-                               n_clusters=7)
+                               pca_comps=args.pca_comps,
+                               n_clusters=args.num_clusters)
 
     mol_df = workflow.execute(mol_df)
 

@@ -147,7 +147,8 @@ if __name__=='__main__':
     print(df_fingerprints.head())
     logger.info("Starting interactive visualization...")
     if args.benchmark:
-        df_fingerprints.compute()
+        if not args.cpu:
+            df_fingerprints.compute()
 
         logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(
             datetime.now() - task_start_time))

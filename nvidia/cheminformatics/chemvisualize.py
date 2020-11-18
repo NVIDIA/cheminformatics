@@ -3,6 +3,7 @@
 
 import json
 import base64
+import logging
 import pandas
 from rdkit import Chem
 from rdkit.Chem import Draw
@@ -24,6 +25,9 @@ from dash.dependencies import Input, Output, State, ALL
 
 from nvidia.cheminformatics.chembldata import ChEmblData, morgan_fingerprint
 
+
+logger = logging.getLogger(__name__)
+
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
 main_fig_height = 700
@@ -44,21 +48,21 @@ COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
 
 class ChemVisualization:
 
-    def __init__(self, df, mol_df, workflow, gpu=True):
+    def __init__(self, df, workflow, gpu=True):
         self.enable_gpu = gpu
         self.app = dash.Dash(
             __name__, external_stylesheets=external_stylesheets)
         self.df = df
         self.workflow = workflow
         self.n_clusters = workflow.n_clusters
-        self.molregno = mol_df.index
 
         self.chem_data = ChEmblData()
 
         # Fetch relavant properties from database.
         self.prop_df = self.chem_data.fetch_props_df_by_molregno(
-            mol_df.index, gpu=self.enable_gpu)
+            df.index.compute(), gpu=self.enable_gpu)
 
+        self.molregno = self.df.index
         self.df['id'] = self.df.index
         self.orig_df = df.copy()
 
@@ -118,6 +122,8 @@ class ChemVisualization:
                 (self.handle_mark_north_star)
 
     def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
+
+        print('Shape of input dataframe', gdf.shape)
         if gdf.shape[0] == 0:
             return None
 
@@ -520,7 +526,8 @@ class ChemVisualization:
 
     def handle_reset(self, recluster_nofilter):
         self.df = self.orig_df.copy()
-        self.df['molregno'] = self.molregno
+
+        self.molregno = self.df.index
         self.df['id'] = self.df.index
         self.re_cluster(self.df)
 

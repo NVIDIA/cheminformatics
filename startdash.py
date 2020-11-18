@@ -39,13 +39,13 @@ warnings.simplefilter('ignore')
 
 logging.basicConfig(level=logging.INFO)
 
-logger = logging.getLogger('nv_chem_dash')
+logger = logging.getLogger('nvidia.cheminformatics')
 formatter = logging.Formatter(
         '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
 # Positive number for # of molecules to select and negative number for using
 # all available molecules
-MAX_MOLECULES=200000
+MAX_MOLECULES=10000
 BATCH_SIZE=5000
 
 client = None
@@ -91,6 +91,11 @@ def init_arg_parser():
                         default=7,
                         help='Numer of clusters(KMEANS)')
 
+    parser.add_argument('-d', '--debug',
+                        dest='debug',
+                        action='store_true',
+                        default=False,
+                        help='Show debug message')
     return parser
 
 
@@ -98,6 +103,9 @@ if __name__=='__main__':
 
     arg_parser = init_arg_parser()
     args = arg_parser.parse_args()
+
+    if args.debug:
+        logger.setLevel(logging.DEBUG)
 
     rmm.reinitialize(managed_memory=True)
     cupy.cuda.set_allocator(rmm.rmm_cupy_allocator)
@@ -114,7 +122,7 @@ if __name__=='__main__':
                             enable_infiniband=enable_infiniband)
         cluster = LocalCUDACluster(protocol="ucx",
                                 dashboard_address=':9001',
-                                # TODO: Find a way to automate visible device
+                                # TODO: automate visible device list
                                 CUDA_VISIBLE_DEVICES=[0, 1],
                                 enable_tcp_over_ucx=enable_tcp_over_ucx,
                                 enable_nvlink=enable_nvlink,
@@ -142,25 +150,25 @@ if __name__=='__main__':
                                pca_comps=64,
                                n_clusters=7)
 
-    df_fingerprints = workflow.execute(mol_df)
+    mol_df = workflow.execute(mol_df)
 
-    print(df_fingerprints.head())
-    logger.info("Starting interactive visualization...")
     if args.benchmark:
         if not args.cpu:
-            df_fingerprints.compute()
+            mol_df = mol_df.compute()
+        print(mol_df.head())
 
         logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(
             datetime.now() - task_start_time))
         logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(
             datetime.now() - start_time))
     else:
-        # start dash
-        v = ChemVisualization(
-                df_fingerprints.copy(),
-                mol_df,
-                workflow,
-                gpu=not args.cpu)
 
-        logger.info('navigate to https://localhost:5000')
-        v.start('0.0.0.0')
+        logger.info("Starting interactive visualization...")
+        print('mol_df', mol_df.shape)
+        # v = ChemVisualization(
+        #         mol_df,
+        #         workflow,
+        #         gpu=not args.cpu)
+
+        # logger.info('navigate to https://localhost:5000')
+        # v.start('0.0.0.0')

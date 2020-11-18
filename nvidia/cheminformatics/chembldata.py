@@ -48,7 +48,7 @@ class ChEmblData(object, metaclass=Singleton):
         dataframe.
         """
         with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con:
-            select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos)))
+            select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos.values_host)))
             df = pandas.read_sql(select_stmt, con)
 
             if gpu:
@@ -81,7 +81,7 @@ class ChEmblData(object, metaclass=Singleton):
         records in a dataframe.
         """
 
-        logger.debug('Fetching %d records starting %d...' % (batch_size, start))
+        logger.info('Fetching %d records starting %d...' % (batch_size, start))
 
         select_stmt = '''
             SELECT md.molregno, cs.canonical_smiles

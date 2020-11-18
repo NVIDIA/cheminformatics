@@ -6,7 +6,7 @@ import dask_cudf
 
 from cuml.manifold import UMAP as cuUMAP
 from cuml.dask.decomposition import PCA
-from cuml.dask.cluster import KMeans
+from cuml.dask.cluster import KMeans as cuKMeans
 from cuml.dask.manifold import UMAP as Dist_cuUMAP
 
 import sklearn.cluster
@@ -78,19 +78,23 @@ class GpuWorkflow:
     def execute(self, mol_df):
         logger.info("Executing GPU workflow...")
 
-        df_fingerprints = dask_cudf.from_dask_dataframe(mol_df)
-        df_fingerprints = df_fingerprints.persist()
+        mol_df = dask_cudf.from_dask_dataframe(mol_df)
+        mol_df = mol_df.persist()
+
+        chembl_id = mol_df.index
+        mol_df = mol_df.reset_index(drop=True)
 
         logger.info('PCA...')
         if self.pca_comps:
             pca = PCA(client=self.client, n_components=self.pca_comps)
-            df_fingerprints = pca.fit_transform(df_fingerprints)
+            df_fingerprints = pca.fit_transform(mol_df)
         else:
-            df_fingerprints = mol_df
+            df_fingerprints = mol_df.copy()
 
         logger.info('KMeans...')
-        kmeans_float = KMeans(client=self.client, n_clusters=self.n_clusters)
-        kmeans_float.fit(df_fingerprints)
+        kmeans_cuml = cuKMeans(client=self.client, n_clusters=self.n_clusters)
+        kmeans_cuml.fit(df_fingerprints)
+        kmeans_labels = kmeans_cuml.predict(df_fingerprints)
 
         logger.info('UMAP...')
         local_model = cuUMAP()
@@ -105,9 +109,9 @@ class GpuWorkflow:
                           client=self.client)
         Xt = umap_model.transform(df_fingerprints)
 
-        df_fingerprints['x'] = Xt[0]
-        df_fingerprints['y'] = Xt[1]
-        df_fingerprints['cluster'] = kmeans_float.labels_
-        df_fingerprints = df_fingerprints.compute()
+        mol_df['x'] = Xt[0]
+        mol_df['y'] = Xt[1]
+        mol_df['cluster'] = kmeans_labels
+        mol_df['chembl_id'] = chembl_id
 
-        return df_fingerprints;
+        return mol_df;

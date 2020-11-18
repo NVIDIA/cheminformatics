@@ -32,6 +32,7 @@ from dask.distributed import Client, LocalCluster
 
 from nvidia.cheminformatics.workflow import CpuWorkflow, GpuWorkflow
 from nvidia.cheminformatics.chembldata import ChEmblData
+from nvidia.cheminformatics.chemvisualize import ChemVisualization
 
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
@@ -44,9 +45,8 @@ formatter = logging.Formatter(
 
 # Positive number for # of molecules to select and negative number for using
 # all available molecules
-MAX_MOLECULES=100000
+MAX_MOLECULES=10000
 BATCH_SIZE=5000
-
 
 client = None
 cluster = None
@@ -72,6 +72,12 @@ def init_arg_parser():
                         action='store_true',
                         default=False,
                         help='Use CPU')
+
+    parser.add_argument('-b', '--benchmark',
+                        dest='benchmark',
+                        action='store_true',
+                        default=False,
+                        help='Execute for benchmark')
 
     parser.add_argument('-p', '--pca_comps',
                         dest='pca_comps',
@@ -143,13 +149,13 @@ if __name__=='__main__':
         datetime.now() - start_time))
 
     logger.info("Starting interactive visualization...")
-    # # start dash
-    # v = ChemVisualization(
-    #         df_fingerprints.copy(),
-    #         mol_df,
-    #         n_clusters,
-    #         enable_gpu=ENABLE_GPU,
-    #         pca_model=PCA_COMPONENTS)
+    if not args.benchmark:
+        # start dash
+        v = ChemVisualization(
+                df_fingerprints.copy(),
+                mol_df,
+                workflow,
+                gpu=not args.cpu)
 
-    # logger.info('navigate to https://localhost:5000')
-    # v.start('0.0.0.0')
+        logger.info('navigate to https://localhost:5000')
+        v.start('0.0.0.0')

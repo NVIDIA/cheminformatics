@@ -5,7 +5,7 @@ import json
 import base64
 import pandas
 from rdkit import Chem
-from rdkit.Chem import AllChem, Draw
+from rdkit.Chem import Draw
 import numpy as np
 
 import cudf
@@ -13,7 +13,6 @@ import cuml
 import cupy
 
 import sklearn.cluster
-import umap
 
 # from jupyter_dash import JupyterDash
 import plotly.graph_objects as go
@@ -21,11 +20,9 @@ import dash
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
-
 from dash.dependencies import Input, Output, State, ALL
 
-from nvidia.cheminformatics.chemutil import morgan_fingerprint
-from nvidia.cheminformatics.chembldata import ChEmblData
+from nvidia.cheminformatics.chembldata import ChEmblData, morgan_fingerprint
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
@@ -39,7 +36,6 @@ IMP_PROPS = [
     'psa',
     'rtb']
 
-
 COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
         "#ff9966", "#848482", "#8a2be2", "#de5d83", "#800020", "#e97451",
         "#5f9ea0", "#36454f", "#008b8b", "#e9692c", "#f0b98d", "#ef9708",
@@ -48,31 +44,29 @@ COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
 
 class ChemVisualization:
 
-    def __init__(self, df, chembl_ids, n_clusters, enable_gpu=True, pca_model=False):
+    def __init__(self, df, chembl_ids, workflow, gpu=True):
         self.app = dash.Dash(
             __name__, external_stylesheets=external_stylesheets)
         self.df = df
-        self.n_clusters = n_clusters
-        self.chembl_ids = chembl_ids
-        self.enable_gpu = enable_gpu
-        self.pca = pca_model
-
+        self.workflow = workflow
         self.chem_data = ChEmblData()
 
         # Fetch relavant properties from database.
-        self.prop_df = self.chem_data.fetch_props_df_by_chembl_ids(chembl_ids)
+        self.prop_df = self.chem_data.fetch_props_df_by_chembl_ids(
+            chembl_ids.index, gpu=gpu)
 
-        self.df['chembl_id'] = chembl_ids
-        self.df['id'] = self.df.index
-        self.orig_df = df.copy()
-        # initialize UMAP
-        if enable_gpu:
-            self.umap = cuml.UMAP(n_neighbors=100,
-                        a=1.0,
-                        b=1.0,
-                        learning_rate=1.0)
-        else:
-            self.umap = umap.UMAP()
+        print('self.prop_df', self.prop_df.head())
+        print('self.prop_df', type(self.prop_df))
+
+        print('self.df', self.df.head())
+        print('self.df', type(self.df))
+        # self.df['chembl_id'] = chembl_ids
+        # self.df['id'] = self.df.index
+        # self.orig_df = df.copy()
+
+        if True:
+            import sys
+            sys.exit(0)
 
         # Construct the UI
         self.app.layout = self.constuct_layout()

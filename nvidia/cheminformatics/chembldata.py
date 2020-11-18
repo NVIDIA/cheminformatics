@@ -13,7 +13,7 @@ from nvidia.cheminformatics.fingerprint import morgan_fingerprint
 SQL_MOLECULAR_PROP = """
 SELECT md.chembl_id, cp.*, cs.*
     FROM compound_properties cp,
-            compound_structures cs,chemutil
+            compound_structures cs,
             molecule_dictionary md
     WHERE cp.molregno = md.molregno
         AND md.molregno = cs.molregno
@@ -41,7 +41,7 @@ class ChEmblData(object, metaclass=Singleton):
             cols = list(map(lambda x: x[0], cur.description))
             return cols, cur.fetchall()
 
-    def fetch_props_df_by_chembl_ids(self, chemblIDs) -> cudf.DataFrame:
+    def fetch_props_df_by_chembl_ids(self, chemblIDs, gpu=True):
         """
         Returns compound properties and structure filtered by ChEMBL ids in a
         dataframe.
@@ -49,11 +49,13 @@ class ChEmblData(object, metaclass=Singleton):
         with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con:
             select_stmt = SQL_MOLECULAR_PROP % "'%s'" % "','".join(chemblIDs)
             df = pandas.read_sql(select_stmt, con)
-            if not self.enable_gpu:
+
+            if gpu:
+                df = cudf.from_pandas(df)
+                return df.sort_values('chembl_id')
+            else:
                 return df
 
-            df = cudf.from_pandas(df)
-            return df.sort_values('chembl_id')
 
     def fetch_molecule_cnt(self):
         logger.debug('Finding number of molecules...')

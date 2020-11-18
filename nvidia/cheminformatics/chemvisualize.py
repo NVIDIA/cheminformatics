@@ -44,29 +44,23 @@ COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
 
 class ChemVisualization:
 
-    def __init__(self, df, chembl_ids, workflow, gpu=True):
+    def __init__(self, df, mol_df, workflow, gpu=True):
+        self.enable_gpu = gpu
         self.app = dash.Dash(
             __name__, external_stylesheets=external_stylesheets)
         self.df = df
         self.workflow = workflow
+        self.n_clusters = workflow.n_clusters
+        self.molregno = mol_df.index
+
         self.chem_data = ChEmblData()
 
         # Fetch relavant properties from database.
-        self.prop_df = self.chem_data.fetch_props_df_by_chembl_ids(
-            chembl_ids.index, gpu=gpu)
+        self.prop_df = self.chem_data.fetch_props_df_by_molregno(
+            mol_df.index, gpu=self.enable_gpu)
 
-        print('self.prop_df', self.prop_df.head())
-        print('self.prop_df', type(self.prop_df))
-
-        print('self.df', self.df.head())
-        print('self.df', type(self.df))
-        # self.df['chembl_id'] = chembl_ids
-        # self.df['id'] = self.df.index
-        # self.orig_df = df.copy()
-
-        if True:
-            import sys
-            sys.exit(0)
+        self.df['id'] = self.df.index
+        self.orig_df = df.copy()
 
         # Construct the UI
         self.app.layout = self.constuct_layout()
@@ -212,7 +206,8 @@ class ChemVisualization:
 
     def create_graph(self, df, color_col='cluster', north_stars=None, gradient_prop=None):
         fig = go.Figure(layout = {'colorscale' : {}})
-        ldf = df.merge(self.prop_df, on='chembl_id')
+        df['molregno'] = df.index
+        ldf = df.merge(self.prop_df, on='molregno')
 
         north_chembls = []
         if north_stars:
@@ -256,7 +251,8 @@ class ChemVisualization:
             }))
         else:
             if self.enable_gpu:
-                colors = ldf[color_col].unique().values_host
+                # ldf = ldf.compute()
+                colors = ldf[color_col].unique().compute().values_host
             else:
                 colors = ldf[color_col].unique()
 
@@ -264,7 +260,7 @@ class ChemVisualization:
             scatter_traces = []
             for cluster_id in colors:
                 query = 'cluster == ' + str(cluster_id)
-                cdf = ldf.query(query)
+                cdf = ldf.query(query).compute()
 
                 moi_present = False
                 df_size = cdf['id'].isin(north_points)
@@ -287,7 +283,7 @@ class ChemVisualization:
                         'marker': {
                             'size': df_size.to_array(),
                             'symbol': df_shape.to_array(),
-                            'color': colors[cluster_id % len(COLORS)],
+                            'color': colors[cluster_id % len(colors)],
                         },
                     })
                 else:
@@ -362,7 +358,7 @@ class ChemVisualization:
             for point in selected_points['points'][((page-1)*pageSize + 1): page * pageSize]:
                 selected_chembl_ids.append(point['text'])
 
-        props, selected_molecules = self.fetch_props_by_chembl_ids(selected_chembl_ids)
+        props, selected_molecules = self.chem_data.fetch_props_by_molregno(selected_chembl_ids)
         all_props = []
         for k in props:
             all_props.append({"label": k, "value": k})
@@ -524,7 +520,7 @@ class ChemVisualization:
 
     def handle_reset(self, recluster_nofilter):
         self.df = self.orig_df.copy()
-        self.df['chembl_id'] = self.chembl_ids
+        self.df['molregno'] = self.molregno
         self.df['id'] = self.df.index
         self.re_cluster(self.df)
 

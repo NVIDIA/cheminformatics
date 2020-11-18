@@ -11,13 +11,13 @@ from nvidia.cheminformatics.fingerprint import morgan_fingerprint
 
 
 SQL_MOLECULAR_PROP = """
-SELECT md.chembl_id, cp.*, cs.*
+SELECT md.molregno, md.chembl_id, cp.*, cs.*
     FROM compound_properties cp,
             compound_structures cs,
             molecule_dictionary md
     WHERE cp.molregno = md.molregno
         AND md.molregno = cs.molregno
-        AND md.chembl_id in (%s);
+        AND md.molregno in (%s);
 """
 
 
@@ -28,31 +28,32 @@ class ChEmblData(object, metaclass=Singleton):
 
     CHEMBL_DB='file:/data/db/chembl_27.db?mode=ro'
 
-    def fetch_props_by_chembl_ids(self, chembl_ids):
+    def fetch_props_by_molregno(self, molregnos):
         """
         Returns compound properties and structure filtered by ChEMBL ids along
         with a list of columns.
         """
         with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
-            select_stmt = SQL_MOLECULAR_PROP % "'%s'" % "','".join(chembl_ids)
+            select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos)))
+            logger.info(select_stmt)
             cur.execute(select_stmt)
 
             cols = list(map(lambda x: x[0], cur.description))
             return cols, cur.fetchall()
 
-    def fetch_props_df_by_chembl_ids(self, chemblIDs, gpu=True):
+    def fetch_props_df_by_molregno(self, molregnos, gpu=True):
         """
         Returns compound properties and structure filtered by ChEMBL ids in a
         dataframe.
         """
         with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con:
-            select_stmt = SQL_MOLECULAR_PROP % "'%s'" % "','".join(chemblIDs)
+            select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos)))
             df = pandas.read_sql(select_stmt, con)
 
             if gpu:
                 df = cudf.from_pandas(df)
-                return df.sort_values('chembl_id')
+                return df.sort_values('molregno')
             else:
                 return df
 
@@ -83,7 +84,7 @@ class ChEmblData(object, metaclass=Singleton):
         logger.debug('Fetching %d records starting %d...' % (batch_size, start))
 
         select_stmt = '''
-            SELECT md.chembl_id, cs.canonical_smiles
+            SELECT md.molregno, cs.canonical_smiles
             FROM compound_properties cp,
                  molecule_dictionary md,
                  compound_structures cs
@@ -93,7 +94,7 @@ class ChEmblData(object, metaclass=Singleton):
         ''' % (start, batch_size)
         df = pandas.read_sql(select_stmt,
                             sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True),
-                            index_col='chembl_id')
+                            index_col='molregno')
 
         df['fp'] = df.apply(lambda row: morgan_fingerprint(
                        row.canonical_smiles, radius=radius, nBits=nBits),

@@ -45,7 +45,7 @@ formatter = logging.Formatter(
 
 # Positive number for # of molecules to select and negative number for using
 # all available molecules
-MAX_MOLECULES=10000
+MAX_MOLECULES=200000
 BATCH_SIZE=5000
 
 client = None
@@ -143,13 +143,17 @@ if __name__=='__main__':
                                n_clusters=7)
 
     df_fingerprints = workflow.execute(mol_df)
-    logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(
-        datetime.now() - task_start_time))
-    logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(
-        datetime.now() - start_time))
 
+    print(df_fingerprints.head())
     logger.info("Starting interactive visualization...")
-    if not args.benchmark:
+    if args.benchmark:
+        df_fingerprints.compute()
+
+        logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(
+            datetime.now() - task_start_time))
+        logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(
+            datetime.now() - start_time))
+    else:
         # start dash
         v = ChemVisualization(
                 df_fingerprints.copy(),

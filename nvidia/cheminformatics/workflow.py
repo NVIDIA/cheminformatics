@@ -81,9 +81,6 @@ class GpuWorkflow:
         mol_df = dask_cudf.from_dask_dataframe(mol_df)
         mol_df = mol_df.persist()
 
-        chembl_id = mol_df.index
-        mol_df = mol_df.reset_index(drop=True)
-
         logger.info('PCA...')
         if self.pca_comps:
             pca = PCA(client=self.client, n_components=self.pca_comps)
@@ -112,6 +109,5 @@ class GpuWorkflow:
         mol_df['x'] = Xt[0]
         mol_df['y'] = Xt[1]
         mol_df['cluster'] = kmeans_labels
-        mol_df['chembl_id'] = chembl_id
 
         return mol_df;

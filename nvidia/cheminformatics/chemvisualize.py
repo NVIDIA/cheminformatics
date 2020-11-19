@@ -28,10 +28,11 @@ from nvidia.cheminformatics.chembldata import ChEmblData, morgan_fingerprint
 
 logger = logging.getLogger(__name__)
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
+external_stylesheets = [
+    'https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
 
 main_fig_height = 700
-CHEMBL_DB='/data/db/chembl_27.db'
+CHEMBL_DB = '/data/db/chembl_27.db'
 PAGE_SIZE = 10
 IMP_PROPS = [
     'alogp',
@@ -41,9 +42,9 @@ IMP_PROPS = [
     'rtb']
 
 COLORS = ["#406278", "#e32636", "#9966cc", "#cd9575", "#915c83", "#008000",
-        "#ff9966", "#848482", "#8a2be2", "#de5d83", "#800020", "#e97451",
-        "#5f9ea0", "#36454f", "#008b8b", "#e9692c", "#f0b98d", "#ef9708",
-        "#0fcfc0", "#9cded6", "#d5eae7", "#f3e1eb", "#f6c4e1", "#f79cd4"]
+          "#ff9966", "#848482", "#8a2be2", "#de5d83", "#800020", "#e97451",
+          "#5f9ea0", "#36454f", "#008b8b", "#e9692c", "#f0b98d", "#ef9708",
+          "#0fcfc0", "#9cded6", "#d5eae7", "#f3e1eb", "#f6c4e1", "#f79cd4"]
 
 
 class ChemVisualization:
@@ -78,7 +79,7 @@ class ChemVisualization:
              Input('bt_recluster_clusters', 'n_clicks'),
              Input('bt_recluster_points', 'n_clicks'),
              Input('northstar_cluster', 'children')],
-            [State("selected_clusters", "value")]) (self.handle_data_selection)
+            [State("selected_clusters", "value")])(self.handle_data_selection)
 
         # Register callbacks for buttons for reclustering selected data
         self.app.callback(
@@ -90,10 +91,10 @@ class ChemVisualization:
              Input('bt_north_star', 'n_clicks'),
              Input('hidden_northstar', 'value'),
              Input('sl_prop_gradient', 'value'),
-             Input('sl_nclusters', 'value'),],
+             Input('sl_nclusters', 'value'), ],
             [State("selected_clusters", "value"),
              State("main-figure", "selectedData"),
-             State('north_star', 'value'),]) (self.handle_re_cluster)
+             State('north_star', 'value'), ])(self.handle_re_cluster)
 
         # Register callbacks for selection inside main figure to update module details
         self.app.callback(
@@ -108,18 +109,17 @@ class ChemVisualization:
              Input('bt_page_prev', 'n_clicks'),
              Input('bt_page_next', 'n_clicks'),
              Input('north_star_clusterid_map', 'children')],
-            State('current_page', 'children')) (self.handle_molecule_selection)
+            State('current_page', 'children'))(self.handle_molecule_selection)
 
         self.app.callback(
             Output("hidden1", "children"),
-            [Input("bt_reset", "n_clicks")]) (self.handle_reset)
+            [Input("bt_reset", "n_clicks")])(self.handle_reset)
 
         self.app.callback(
             [Output('north_star', 'value'),
              Output('hidden_northstar', 'value')],
             [Input({'role': 'bt_star_candidate', 'index': ALL}, 'n_clicks')],
-            State('north_star', 'value')) \
-                (self.handle_mark_north_star)
+            State('north_star', 'value'))(self.handle_mark_north_star)
 
     def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
 
@@ -131,20 +131,23 @@ class ChemVisualization:
         ids = gdf['id']
         chembl_ids = gdf['chembl_id']
 
-        gdf.drop(['x', 'y', 'cluster', 'id', 'chembl_id'], axis=1, inplace=True)
+        gdf.drop(['x', 'y', 'cluster', 'id', 'chembl_id'],
+                 axis=1, inplace=True)
         if new_figerprints is not None and new_chembl_ids is not None:
             # Add new figerprints and chEmblIds before reclustering
             if self.pca:
                 new_figerprints = self.pca.transform(new_figerprints)
 
             if self.enable_gpu:
-                fp_df = cudf.DataFrame(new_figerprints, \
-                    index=[idx for idx in range(self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
-                    columns=gdf.columns)
+                fp_df = cudf.DataFrame(new_figerprints,
+                                       index=[idx for idx in range(
+                                           self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
+                                       columns=gdf.columns)
             else:
-                fp_df = pandas.DataFrame(new_figerprints, \
-                    index=[idx for idx in range(self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
-                    columns=gdf.columns)
+                fp_df = pandas.DataFrame(new_figerprints,
+                                         index=[idx for idx in range(
+                                             self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
+                                         columns=gdf.columns)
 
             gdf = gdf.append(fp_df, ignore_index=True)
             # Update original dataframe for it to work on reload
@@ -174,8 +177,8 @@ class ChemVisualization:
             gdf.add_column('chembl_id', chembl_ids)
             gdf.add_column('id', ids)
         else:
-            gdf['x'] = Xt[:,0]
-            gdf['y'] = Xt[:,1]
+            gdf['x'] = Xt[:, 0]
+            gdf['y'] = Xt[:, 1]
             gdf['cluster'] = kmeans_float.labels_
             gdf['chembl_id'] = chembl_ids
             gdf['id'] = ids
@@ -187,7 +190,7 @@ class ChemVisualization:
         if tdf is not None:
             self.df = tdf
         return self.create_graph(self.df, color_col='cluster',
-            gradient_prop=gradient_prop, north_stars=north_stars)
+                                 gradient_prop=gradient_prop, north_stars=north_stars)
 
     def recluster_selected_clusters(self, df, values, gradient_prop, north_stars=None):
         df_clusters = df['cluster'].isin(values)
@@ -197,7 +200,7 @@ class ChemVisualization:
         if tdf is not None:
             self.df = tdf
         return self.create_graph(self.df, color_col='cluster',
-            gradient_prop=gradient_prop, north_stars=north_stars)
+                                 gradient_prop=gradient_prop, north_stars=north_stars)
 
     def recluster_selected_points(self, df, values, gradient_prop, north_stars=None):
         df_clusters = df['id'].isin(values)
@@ -208,10 +211,10 @@ class ChemVisualization:
         if tdf is not None:
             self.df = tdf
         return self.create_graph(self.df, color_col='cluster',
-            gradient_prop=gradient_prop, north_stars=north_stars)
+                                 gradient_prop=gradient_prop, north_stars=north_stars)
 
     def create_graph(self, df, color_col='cluster', north_stars=None, gradient_prop=None):
-        fig = go.Figure(layout = {'colorscale' : {}})
+        fig = go.Figure(layout={'colorscale': {}})
         df['molregno'] = df.index
         ldf = df.merge(self.prop_df, on='molregno')
 
@@ -224,8 +227,8 @@ class ChemVisualization:
 
         chemble_cluster_map = {}
         if north_stars:
-            chemble_cluster_map = dict(zip(northstar_df['chembl_id'].to_array(), \
-                northstar_df['cluster'].to_array().tolist()))
+            chemble_cluster_map = dict(zip(northstar_df['chembl_id'].to_array(),
+                                           northstar_df['cluster'].to_array().tolist()))
 
         northstar_cluster = []
         if gradient_prop is not None:
@@ -323,13 +326,13 @@ class ChemVisualization:
 
         fig.update_layout(
             showlegend=True, clickmode='event', height=main_fig_height,
-                title='Clusters', dragmode='select',
-                title_font_color=f_color,
+            title='Clusters', dragmode='select',
+            title_font_color=f_color,
             annotations=[
                 dict(x=0.5, y=-0.07, showarrow=False, text='x',
-                    xref="paper", yref="paper"),
+                     xref="paper", yref="paper"),
                 dict(x=-0.05, y=0.5, showarrow=False, text="y",
-                    textangle=-90, xref="paper", yref="paper")])
+                     textangle=-90, xref="paper", yref="paper")])
         del ldf
         return fig, northstar_cluster, json.dumps(chemble_cluster_map)
 
@@ -337,17 +340,16 @@ class ChemVisualization:
         return self.app.run_server(
             debug=False, use_reloader=False, host=host, port=port)
 
-
     def href_ify(self, chemblid):
         return html.A(chemblid, href='https://www.ebi.ac.uk/chembl/compound_report_card/' + chemblid,
                       target='_blank')
 
-    def construct_molecule_detail(self, selected_points, display_properties, \
-        page, pageSize=10, chembl_ids=None):
+    def construct_molecule_detail(self, selected_points, display_properties,
+                                  page, pageSize=10, chembl_ids=None):
         # Create Table header
         table_headers = [html.Th("Molecular Structure", style={'width': '30%'}),
-              html.Th("Chembl"),
-              html.Th("smiles")]
+                         html.Th("Chembl"),
+                         html.Th("smiles")]
         for prop in display_properties:
             table_headers.append(html.Th(prop))
 
@@ -364,7 +366,8 @@ class ChemVisualization:
             for point in selected_points['points'][((page-1)*pageSize + 1): page * pageSize]:
                 selected_chembl_ids.append(point['text'])
 
-        props, selected_molecules = self.chem_data.fetch_props_by_molregno(selected_chembl_ids)
+        props, selected_molecules = self.chem_data.fetch_props_by_molregno(
+            selected_chembl_ids)
         all_props = []
         for k in props:
             all_props.append({"label": k, "value": k})
@@ -382,7 +385,7 @@ class ChemVisualization:
             drawer.DrawMolecule(m)
             drawer.FinishDrawing()
 
-            img_binary="data:image/png;base64," + \
+            img_binary = "data:image/png;base64," + \
                 base64.b64encode(drawer.GetDrawingText()).decode("utf-8")
 
             td.append(html.Img(src=img_binary))
@@ -395,22 +398,22 @@ class ChemVisualization:
                 td.append(html.Td(chembl_ids[selected_chembl_id]))
 
             td.append(html.Td(
-                dbc.Button('Add to MoI', \
-                    id={'role': 'bt_star_candidate', 'index': selected_chembl_id}, n_clicks=0)
+                dbc.Button('Add to MoI',
+                           id={'role': 'bt_star_candidate', 'index': selected_chembl_id}, n_clicks=0)
             ))
 
             prop_recs.append(html.Tr(td))
 
-        return  html.Table(prop_recs, style={'width': '100%'}), all_props
+        return html.Table(prop_recs, style={'width': '100%'}), all_props
 
     def constuct_layout(self):
         fig, _, _ = self.create_graph(self.df)
 
         return html.Div([
             html.Div(className='row', children=[
-                html.Div([dcc.Graph(id='main-figure', figure=fig),],
-                    className='nine columns',
-                    style={'verticalAlign': 'text-top',}),
+                html.Div([dcc.Graph(id='main-figure', figure=fig), ],
+                         className='nine columns',
+                         style={'verticalAlign': 'text-top', }),
                 html.Div([
                     html.Div(children=[
                         dcc.Markdown("""
@@ -420,18 +423,19 @@ class ChemVisualization:
                     html.Div(className='row', children=[
                         dcc.Input(id='north_star', type='text', debounce=True),
                         dbc.Button('Highlight',
-                            id='bt_north_star', n_clicks=0,
-                            style={'marginLeft': 6,}),
-                        ], style={'marginLeft': 0, 'marginTop': 18,}),
+                                   id='bt_north_star', n_clicks=0,
+                                   style={'marginLeft': 6, }),
+                    ], style={'marginLeft': 0, 'marginTop': 18, }),
 
                     html.Div(id='section_nclusters', children=[
                         html.Label([
                             "Set number of clusters",
                             dcc.Dropdown(id='sl_nclusters',
                                          multi=False,
-                                         options=[{"label": p, "value": p} for p in range(2,10)],
+                                         options=[{"label": p, "value": p}
+                                                  for p in range(2, 10)],
                                          value=self.n_clusters
-                                        ),
+                                         ),
                         ], style={'marginTop': 6})],
                     ),
 
@@ -440,14 +444,14 @@ class ChemVisualization:
                             **Cluster Selection**
 
                             Click a point to select a cluster.
-                        """)], style={'marginTop': 18,}),
+                        """)], style={'marginTop': 18, }),
 
                     html.Div(className='row', children=[
                         dcc.Input(id='selected_clusters', type='text'),
                         dbc.Button('Recluster',
-                            id='bt_recluster_clusters', n_clicks=0,
-                            style={'marginLeft': 6,}),
-                        ], style={'marginLeft': 0, 'marginTop': 18,}),
+                                   id='bt_recluster_clusters', n_clicks=0,
+                                   style={'marginLeft': 6, }),
+                    ], style={'marginLeft': 0, 'marginTop': 18, }),
 
                     html.Div(children=[
                         dcc.Markdown("""
@@ -455,39 +459,40 @@ class ChemVisualization:
 
                             Choose the lasso or rectangle tool in the graph's menu
                             bar and then select points in the graph.
-                        """),], style={'marginTop': 18,}),
+                        """), ], style={'marginTop': 18, }),
                     dbc.Button('Recluster Selection',
-                        id='bt_recluster_points', n_clicks=0),
+                               id='bt_recluster_points', n_clicks=0),
                     html.Div(children=[
-                             html.Div(id='selected_point_cnt'),]),
+                             html.Div(id='selected_point_cnt'), ]),
 
                     html.Div(className='row', children=[
                         html.Div(children=[
                             dbc.Button("Close", id="bt_close"),
                             dbc.Modal([
-                                    dbc.ModalHeader("Close"),
-                                    dbc.ModalBody(
-                                        dcc.Markdown("""
+                                dbc.ModalHeader("Close"),
+                                dbc.ModalBody(
+                                    dcc.Markdown("""
                                             Dashboard closed. Please return to the notebook.
                                         """),
-                                    ),
-                                    dbc.ModalFooter(dbc.Button("Close", id="bt_close_dash", className="ml-auto")),
-                                ], id="md_export"),
+                                ),
+                                dbc.ModalFooter(dbc.Button(
+                                    "Close", id="bt_close_dash", className="ml-auto")),
+                            ], id="md_export"),
                         ]),
 
-                        html.Div(children=[html.A(dbc.Button('Reload', id='bt_reset'), href='/'),],
-                                style={'marginLeft': 18,}),
-                    ], style={'marginLeft': 0, 'marginTop': 18,}),
+                        html.Div(children=[html.A(dbc.Button('Reload', id='bt_reset'), href='/'), ],
+                                 style={'marginLeft': 18, }),
+                    ], style={'marginLeft': 0, 'marginTop': 18, }),
 
                     html.Div(id='section_prop_gradient', children=[
                         html.Label([
                             "Select Molecular Property for color gradient",
                             dcc.Dropdown(id='sl_prop_gradient', multi=False,
-                                options=[{"label": p, "value": p} for p in IMP_PROPS],),
+                                         options=[{"label": p, "value": p} for p in IMP_PROPS],),
                         ], style={'marginTop': 18})],
                     ),
 
-                ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top',}),
+                ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
             ]),
             html.Div(id='section_molecule_details', className='row', children=[
                 html.Div(className='row', children=[
@@ -495,33 +500,40 @@ class ChemVisualization:
                         html.Label([
                             "Select Molecular Properties",
                             dcc.Dropdown(id='sl_mol_props', multi=True,
-                                options=[{'label': 'alogp', 'value': 'alogp'}],
-                                value=['alogp']),
+                                         options=[
+                                             {'label': 'alogp', 'value': 'alogp'}],
+                                         value=['alogp']),
                         ], style={'marginLeft': 60})],
                         className='nine columns',
                     ),
                     html.Div(children=[
-                            dbc.Button("<", id="bt_page_prev", style={"height": "25px"}),
-                            html.Span(children=1, id='current_page', style={"paddingLeft": "6px"}),
-                            html.Span(children=' of 1', id='total_page', style={"paddingRight": "6px"}),
-                            dbc.Button(">", id="bt_page_next", style={"height": "25px"})
-                        ],
+                        dbc.Button("<", id="bt_page_prev",
+                                   style={"height": "25px"}),
+                        html.Span(children=1, id='current_page',
+                                  style={"paddingLeft": "6px"}),
+                        html.Span(children=' of 1', id='total_page',
+                                  style={"paddingRight": "6px"}),
+                        dbc.Button(">", id="bt_page_next",
+                                   style={"height": "25px"})
+                    ],
                         className='three columns',
-                        style={'paddingRight': 60, 'verticalAlign': 'text-bottom', 'text-align': 'right'}
+                        style={
+                            'paddingRight': 60, 'verticalAlign': 'text-bottom', 'text-align': 'right'}
                     ),
                 ]),
 
                 html.Div(className='row', children=[
                     html.Div(id='tb_selected_molecules', children=[],
-                        style={'marginLeft': 60, 'verticalAlign': 'text-top'}
-                    ),
+                             style={'marginLeft': 60,
+                                    'verticalAlign': 'text-top'}
+                             ),
                 ])
-            ], style={'display':'none'}),
+            ], style={'display': 'none'}),
 
-            html.Div(id='hidden1', style={'display':'none'}),
-            html.Div(id='northstar_cluster', style={'display':'none'}),
-            html.Div(id='hidden_northstar', style={'display':'none'}),
-            html.Div(id='north_star_clusterid_map', style={'display':'none'}),
+            html.Div(id='hidden1', style={'display': 'none'}),
+            html.Div(id='northstar_cluster', style={'display': 'none'}),
+            html.Div(id='hidden_northstar', style={'display': 'none'}),
+            html.Div(id='north_star_clusterid_map', style={'display': 'none'}),
         ])
 
     def handle_reset(self, recluster_nofilter):
@@ -532,15 +544,15 @@ class ChemVisualization:
         self.re_cluster(self.df)
 
     def handle_molecule_selection(self, mf_selected_data, selected_columns,
-            sl_prop_gradient, prev_click, next_click, north_star_clusterid_map,
-            current_page):
+                                  sl_prop_gradient, prev_click, next_click, north_star_clusterid_map,
+                                  current_page):
         if not dash.callback_context.triggered:
             raise dash.exceptions.PreventUpdate
         comp_id, event_type = \
             dash.callback_context.triggered[0]['prop_id'].split('.')
         print(comp_id, event_type)
 
-        if  (not mf_selected_data) and comp_id != 'north_star_clusterid_map':
+        if (not mf_selected_data) and comp_id != 'north_star_clusterid_map':
             raise dash.exceptions.PreventUpdate
 
         module_details = None
@@ -568,8 +580,9 @@ class ChemVisualization:
         if chembl_ids:
             last_page = ''
         else:
-            last_page = ' of ' + str(len(mf_selected_data['points'])//PAGE_SIZE)
-        return module_details, all_props, current_page, last_page, {'display':'block'}
+            last_page = ' of ' + \
+                str(len(mf_selected_data['points'])//PAGE_SIZE)
+        return module_details, all_props, current_page, last_page, {'display': 'block'}
 
     def handle_data_selection(self, mf_click_data, mf_selected_data,
                               bt_cluster_clicks, bt_point_clicks,
@@ -612,7 +625,7 @@ class ChemVisualization:
         elif comp_id == 'northstar_cluster' and event_type == 'children':
             selected_clusters = northstar_cluster
         elif (comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks') \
-            or (comp_id == 'bt_recluster_points' and event_type == 'n_clicks'):
+                or (comp_id == 'bt_recluster_points' and event_type == 'n_clicks'):
             selected_clusters = northstar_cluster
         else:
             raise dash.exceptions.PreventUpdate
@@ -638,7 +651,7 @@ class ChemVisualization:
         selected_chembl_id = comp_detail['index']
 
         if selected_chembl_id not in selected_north_star and \
-            selected_chembl_id in self.chembl_ids:
+                selected_chembl_id in self.chembl_ids:
             selected_north_star.append(selected_chembl_id)
         return ','.join(selected_north_star), ','.join(selected_north_star)
 
@@ -687,7 +700,7 @@ class ChemVisualization:
             northstar_cluster = curr_clusters.split(',')
 
         elif (comp_id == 'bt_north_star' and event_type == 'n_clicks') or \
-            (comp_id == 'hidden_northstar' and event_type == 'value'):
+                (comp_id == 'hidden_northstar' and event_type == 'value'):
             north_star = self.update_new_chembl(north_star)
             if north_star:
                 figure, northstar_cluster, chembl_clusterid_map = self.create_graph(
@@ -714,7 +727,8 @@ class ChemVisualization:
 
                 smiles = []
                 for i in range(0, ldf.shape[0]):
-                    smiles.append(ldf.iloc[i]['canonical_smiles'].to_array()[0])
+                    smiles.append(
+                        ldf.iloc[i]['canonical_smiles'].to_array()[0])
                 results = list(map(morgan_fingerprint, smiles))
                 fingerprints = cupy.stack(results).astype(np.float32)
                 tdf = self.re_cluster(self.df, fingerprints, missing_chembl)

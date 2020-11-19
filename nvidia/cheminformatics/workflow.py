@@ -62,7 +62,7 @@ class CpuWorkflow:
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(
             datetime.now() - task_start_time))
 
-        return mol_df;
+        return mol_df
 
 
 class GpuWorkflow:
@@ -99,15 +99,15 @@ class GpuWorkflow:
         local_model.fit(X_train)
 
         umap_model = Dist_cuUMAP(local_model,
-                          n_neighbors=100,
-                          a=1.0,
-                          b=1.0,
-                          learning_rate=1.0,
-                          client=self.client)
+                                 n_neighbors=100,
+                                 a=1.0,
+                                 b=1.0,
+                                 learning_rate=1.0,
+                                 client=self.client)
         Xt = umap_model.transform(df_fingerprints)
 
         mol_df['x'] = Xt[0]
         mol_df['y'] = Xt[1]
         mol_df['cluster'] = kmeans_labels
 
-        return mol_df;
+        return mol_df

@@ -51,7 +51,6 @@ class CpuWorkflow:
 
         logger.info('PCA...')
         n_cpu = len(self.client.cluster.workers)
-        print('WORKERS', n_cpu)
 
         if self.pca_comps:
             task_start_time = datetime.now()
@@ -101,7 +100,6 @@ class GpuWorkflow:
     def execute(self, mol_df):
         logger.info("Executing GPU workflow...")
         n_gpu = len(self.client.cluster.workers)
-        print('WORKERS', n_gpu)
 
         mol_df = dask_cudf.from_dask_dataframe(mol_df)
         mol_df = mol_df.persist()

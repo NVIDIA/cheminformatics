@@ -13,6 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from nvidia.cheminformatics.utils.fileio import initialize_logfile
 import os
 import sys
 import atexit
@@ -23,6 +25,7 @@ import warnings
 import argparse
 
 from datetime import datetime
+from dask_cuda.local_cuda_cluster import cuda_visible_devices
 
 import rmm
 import cupy
@@ -35,6 +38,7 @@ from dask.distributed import Client, LocalCluster
 from nvidia.cheminformatics.workflow import CpuWorkflow, GpuWorkflow
 from nvidia.cheminformatics.chembldata import ChEmblData
 from nvidia.cheminformatics.chemvisualize import ChemVisualization
+from nvidia.cheminformatics.utils.fileio import initialize_logfile, log_results
 
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
@@ -161,13 +165,25 @@ To create cache:
                             dest='num_clusters',
                             type=int,
                             default=7,
-                            help='Numer of clusters(KMEANS)')
+                            help='Numer of clusters (KMEANS)')
 
         parser.add_argument('-c', '--cache_directory',
                             dest='cache_directory',
                             type=str,
                             default=None,
                             help='Location to pick fingerprint from')
+
+        parser.add_argument('--n_gpu',
+                            dest='n_gpu',
+                            type=int,
+                            default=2,
+                            help='Number of GPUs to use')
+
+        parser.add_argument('--n_cpu',
+                            dest='n_cpu',
+                            type=int,
+                            default=12,
+                            help='Number of CPU workers to use')
 
         parser.add_argument('-d', '--debug',
                             dest='debug',
@@ -179,6 +195,8 @@ To create cache:
 
         if args.debug:
             logger.setLevel(logging.DEBUG)
+
+        initialize_logfile()
 
         rmm.reinitialize(managed_memory=True)
         cupy.cuda.set_allocator(rmm.rmm_cupy_allocator)
@@ -193,16 +211,22 @@ To create cache:
                                   enable_tcp_over_ucx=enable_tcp_over_ucx,
                                   enable_nvlink=enable_nvlink,
                                   enable_infiniband=enable_infiniband)
+
+            CUDA_VISIBLE_DEVICES = cuda_visible_devices(0, range(args.n_gpu)).split(',')
+            CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
+            logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
+
             cluster = LocalCUDACluster(protocol="ucx",
                                        dashboard_address=':9001',
                                        # TODO: automate visible device list
-                                       CUDA_VISIBLE_DEVICES=[0, 1],
+                                       CUDA_VISIBLE_DEVICES=CUDA_VISIBLE_DEVICES,
                                        enable_tcp_over_ucx=enable_tcp_over_ucx,
                                        enable_nvlink=enable_nvlink,
                                        enable_infiniband=enable_infiniband)
         else:
+            logger.info('Using {} CPUs ...'.format(args.n_cpu))
             cluster = LocalCluster(dashboard_address=':9001',
-                                   n_workers=12,
+                                   n_workers=args.n_cpu,
                                    threads_per_worker=4)
 
         client = Client(cluster)
@@ -234,12 +258,18 @@ To create cache:
         if args.benchmark:
             if not args.cpu:
                 mol_df = mol_df.compute()
+                n_cpu, n_gpu = 0, args.n_gpu
+            else:
+                n_cpu, n_gpu = args.n_cpu, 0
             print(mol_df.head())
 
-            logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(
-                datetime.now() - task_start_time))
-            logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(
-                datetime.now() - start_time))
+            runtime = datetime.now() - task_start_time
+            logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
+            log_results(task_start_time, 'gpu', 'workflow', runtime, n_cpu, n_gpu)
+
+            runtime = datetime.now() - start_time
+            logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(runtime))
+            log_results(task_start_time, 'gpu', 'total', runtime, n_cpu, n_gpu)
         else:
 
             logger.info("Starting interactive visualization...")

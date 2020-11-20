@@ -212,7 +212,7 @@ To create cache:
                                   enable_nvlink=enable_nvlink,
                                   enable_infiniband=enable_infiniband)
 
-            CUDA_VISIBLE_DEVICES = cuda_visible_devices(0, range(args.n_gpu)).split(',')
+            CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(args.n_gpu)).split(',')
             CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
             logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
 

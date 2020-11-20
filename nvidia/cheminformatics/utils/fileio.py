@@ -33,6 +33,6 @@ def log_results(date, benchmark_type, step, time, n_cpu=0, n_gpu=0, benchmark_fi
     out_list = [date, benchmark_type, step, time, n_cpu, n_gpu]
     out_fmt = ','.join(['{}'] * len(out_list)) + '\n'
 
-    with open(BENCHMARK_FILE, 'a') as fh:
+    with open(benchmark_file, 'a') as fh:
         out_string = out_fmt.format(*out_list)
         fh.write(out_string)

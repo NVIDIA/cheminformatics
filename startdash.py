@@ -14,132 +14,283 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
+from nvidia.cheminformatics.utils.fileio import initialize_logfile
+import os
+import sys
+import atexit
 import logging
-import multiprocessing
 
 import logging
-from datetime import datetime
-
-from dask.distributed import Client, LocalCluster
-import dask.dataframe as dd
-
-import cudf
-import cupy
-import cuml
-
-import numpy as np
-
-import sklearn.cluster
-import sklearn.decomposition
-import umap
-
-import chemvisualize
-
-from nvidia.cheminformatics.chemutil import morgan_fingerprint
-from nvidia.cheminformatics.chembldata import ChEmblData
-
 import warnings
+import argparse
+
+from datetime import datetime
+from dask_cuda.local_cuda_cluster import cuda_visible_devices
+
+import rmm
+import cupy
+import dask_cudf
+import dask
+
+from dask_cuda import initialize, LocalCUDACluster
+from dask.distributed import Client, LocalCluster
+
+from nvidia.cheminformatics.workflow import CpuWorkflow, GpuWorkflow
+from nvidia.cheminformatics.chembldata import ChEmblData
+from nvidia.cheminformatics.chemvisualize import ChemVisualization
+from nvidia.cheminformatics.utils.fileio import initialize_logfile, log_results
+
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
 
 logging.basicConfig(level=logging.INFO)
 
-logger = logging.getLogger('nv_chem_viz')
+logger = logging.getLogger('nvidia.cheminformatics')
 formatter = logging.Formatter(
-        '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
+    '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
-MAX_MOLECULES=1000
-ENABLE_GPU = True
-PCA_COMPONENTS = 64
+BATCH_SIZE = 5000
+
+FINGER_PRINT_FILES = 'filter_*.h5'
+
+client = None
+cluster = None
 
 
-if __name__=='__main__':
+@atexit.register
+def closing():
+    if cluster:
+        cluster.close()
+    if client:
+        client.close()
 
-    chem_data = ChEmblData()
-    # start dask cluster
-    logger.info('Starting dash cluster...')
-    cluster = LocalCluster(dashboard_address=':9001', n_workers=12)
-    client = Client(cluster)
 
-    logger.info('Fetching molecules from database...')
-    mol_df = chem_data.fetch_props(1000)
-    mol_df = mol_df.astype({'mol_id': np.float32})
+class Launcher(object):
 
-    start = time.time()
-    logger.info('Initializing Morgan fingerprints...')
+    def __init__(self):
+        parser = argparse.ArgumentParser(
+            description='Nvidia Cheminformatics',
+            usage='''
+    start <command> [<args>]
 
-    finger_prints = dd.from_pandas(
-        mol_df, npartitions=multiprocessing.cpu_count() * 4).map_partitions(
-            lambda df: df.apply(
-                (lambda row: morgan_fingerprint(row.canonical_smiles, molregno=row.mol_id)),
-                axis=1),
-        meta=tuple).compute()
+Following commands are supported:
+   cache      : Create cache
+   analyze    : Start Jupyter notebook in a container
 
-    logger.info(time.time() - start)
+To start dash:
+    ./start analyze
 
-    start = time.time()
-    logger.info('Copying data into cuDF...')
-    # fp_arrays = cupy.stack(finger_prints).astype(np.float32)
-    df_fingerprints = cudf.DataFrame(finger_prints)
-    df_fingerprints.rename(columns={0: 'mol_id'}, inplace=True)
-    logger.info(time.time() - start)
+To create cache:
+    ./start cache -p
+''')
 
-    # prepare one set of clusters
-    if PCA_COMPONENTS:
-        task_start_time = datetime.now()
-        if ENABLE_GPU:
-            pca = cuml.PCA(n_components=PCA_COMPONENTS)
+        parser.add_argument('command', help='Subcommand to run')
+        args = parser.parse_args(sys.argv[1:2])
+
+        if not hasattr(self, args.command):
+            print('Unrecognized command')
+            parser.print_help()
+            exit(1)
+
+        getattr(self, args.command)()
+
+    def cache(self):
+        """
+        Create Cache
+        """
+        parser = argparse.ArgumentParser(description='Create cache')
+        parser.add_argument('-c', '--cache_directory',
+                            dest='cache_directory',
+                            type=str,
+                            default='./.cache_dir',
+                            help='Location to create fingerprint cache')
+        parser.add_argument('-d', '--debug',
+                            dest='debug',
+                            action='store_true',
+                            default=False,
+                            help='Show debug message')
+
+        args = parser.parse_args(sys.argv[2:])
+
+        if args.debug:
+            logger.setLevel(logging.DEBUG)
+
+        cluster = LocalCluster(dashboard_address=':9001',
+                               n_workers=12,
+                               threads_per_worker=4)
+        client = Client(cluster)
+
+        with client:
+            task_start_time = datetime.now()
+
+            if not os.path.exists(args.cache_directory):
+                logger.info('Creating folder %s...' % args.cache_directory)
+                os.makedirs(args.cache_directory)
+
+            chem_data = ChEmblData()
+            chem_data.save_fingerprints(
+                os.path.join(args.cache_directory, FINGER_PRINT_FILES))
+
+            logger.info('Fingerprint generated in (hh:mm:ss.ms) {}'.format(
+                datetime.now() - task_start_time))
+
+    def analyze(self):
+        """
+        Start analysis
+        """
+        parser = argparse.ArgumentParser(description='Analyze')
+
+        parser.add_argument('--cpu',
+                            dest='cpu',
+                            action='store_true',
+                            default=False,
+                            help='Use CPU')
+
+        parser.add_argument('-b', '--benchmark',
+                            dest='benchmark',
+                            action='store_true',
+                            default=False,
+                            help='Execute for benchmark')
+
+        parser.add_argument('-p', '--pca_comps',
+                            dest='pca_comps',
+                            type=int,
+                            default=64,
+                            help='Numer of PCA components')
+
+        parser.add_argument('-n', '--num_clusters',
+                            dest='num_clusters',
+                            type=int,
+                            default=7,
+                            help='Numer of clusters (KMEANS)')
+
+        parser.add_argument('-c', '--cache_directory',
+                            dest='cache_directory',
+                            type=str,
+                            default=None,
+                            help='Location to pick fingerprint from')
+
+        parser.add_argument('-m', '--n_mol',
+                            dest='n_mol',
+                            type=int,
+                            default=100000,
+                            help='Number of molecules for analysis. Use negative numbers for using the whole dataset.')
+
+        parser.add_argument('--n_gpu',
+                            dest='n_gpu',
+                            type=int,
+                            default=2,
+                            help='Number of GPUs to use')
+
+        parser.add_argument('--n_cpu',
+                            dest='n_cpu',
+                            type=int,
+                            default=12,
+                            help='Number of CPU workers to use')
+
+        parser.add_argument('-d', '--debug',
+                            dest='debug',
+                            action='store_true',
+                            default=False,
+                            help='Show debug message')
+
+        args = parser.parse_args(sys.argv[2:])
+
+        if args.debug:
+            logger.setLevel(logging.DEBUG)
+
+        initialize_logfile()
+
+        rmm.reinitialize(managed_memory=True)
+        cupy.cuda.set_allocator(rmm.rmm_cupy_allocator)
+
+        enable_tcp_over_ucx = True
+        enable_nvlink = False
+        enable_infiniband = False
+
+        logger.info('Starting dash cluster...')
+        if not args.cpu:
+            initialize.initialize(create_cuda_context=True,
+                                  enable_tcp_over_ucx=enable_tcp_over_ucx,
+                                  enable_nvlink=enable_nvlink,
+                                  enable_infiniband=enable_infiniband)
+
+            CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(args.n_gpu)).split(',')
+            CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
+            logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
+
+            cluster = LocalCUDACluster(protocol="ucx",
+                                       dashboard_address=':9001',
+                                       # TODO: automate visible device list
+                                       CUDA_VISIBLE_DEVICES=CUDA_VISIBLE_DEVICES,
+                                       enable_tcp_over_ucx=enable_tcp_over_ucx,
+                                       enable_nvlink=enable_nvlink,
+                                       enable_infiniband=enable_infiniband)
         else:
-            pca = sklearn.decomposition.PCA(n_components=PCA_COMPONENTS)
+            logger.info('Using {} CPUs ...'.format(args.n_cpu))
+            cluster = LocalCluster(dashboard_address=':9001',
+                                   n_workers=args.n_cpu,
+                                   threads_per_worker=2)
 
-        df_fingerprints = pca.fit_transform(df_fingerprints)
-        logger.info('Runtime PCA time (hh:mm:ss.ms) {}'.format(
-            datetime.now() - task_start_time))
-    else:
-        pca = False
-        logger.info('PCA has been skipped')
+        client = Client(cluster)
 
-    task_start_time = datetime.now()
-    n_clusters = 7
-    if ENABLE_GPU:
-        kmeans_float = cuml.KMeans(n_clusters=n_clusters)
-    else:
-        kmeans_float = sklearn.cluster.KMeans(n_clusters=n_clusters)
-    kmeans_float.fit(df_fingerprints)
-    logger.info('Runtime Kmeans time (hh:mm:ss.ms) {}'.format(
-        datetime.now() - task_start_time))
+        start_time = datetime.now()
+        task_start_time = datetime.now()
+        chem_data = ChEmblData()
+        if args.cache_directory is None:
+            logger.info('Reading molecules from database...')
+            mol_df = chem_data.fetch_all_props(num_recs=args.n_mol,
+                                               batch_size=BATCH_SIZE)
+        else:
+            hdf_path = os.path.join(args.cache_directory, FINGER_PRINT_FILES)
+            logger.info('Reading molecules from %s...' % hdf_path)
+            mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
 
-    # UMAP
-    task_start_time = datetime.now()
-    if ENABLE_GPU:
-        umap = cuml.UMAP(n_neighbors=100,
-                    a=1.0,
-                    b=1.0,
-                    learning_rate=1.0)
-    else:
-        umap = umap.UMAP()
+            if args.n_mol > 0:
+                mol_df = mol_df.head(args.n_mol, compute=False)
 
-    Xt = umap.fit_transform(df_fingerprints)
-    logger.info('Runtime UMAP time (hh:mm:ss.ms) {}'.format(
-        datetime.now() - task_start_time))
+        print('mol_df.shape', mol_df.shape, args.n_mol)
+        task_start_time = datetime.now()
+        if not args.cpu:
+            workflow = GpuWorkflow(client,
+                                   pca_comps=args.pca_comps,
+                                   n_clusters=args.num_clusters)
+        else:
+            workflow = CpuWorkflow(client,
+                                   pca_comps=args.pca_comps,
+                                   n_clusters=args.num_clusters)
 
-    if ENABLE_GPU:
-        df_fingerprints.add_column('x', Xt[0].to_array())
-        df_fingerprints.add_column('y', Xt[1].to_array())
-        df_fingerprints.add_column('cluster', kmeans_float.labels_)
-    else:
-        df_fingerprints['x'] = Xt[:,0]
-        df_fingerprints['y'] = Xt[:,1]
-        df_fingerprints['cluster'] = kmeans_float.labels_
+        mol_df = workflow.execute(mol_df)
 
-    # start dash
-    v = chemvisualize.ChemVisualization(
-        df_fingerprints.copy(),
-        n_clusters,
-        cudf.from_pandas(mol_df),
-        enable_gpu=ENABLE_GPU,
-        pca_model=PCA_COMPONENTS)
+        if args.benchmark:
+            if not args.cpu:
+                mol_df = mol_df.compute()
+                n_cpu, n_gpu = 0, args.n_gpu
+            else:
+                n_cpu, n_gpu = args.n_cpu, 0
 
-    logger.info('navigate to https://localhost:5000')
-    v.start('0.0.0.0')
+            runtime = datetime.now() - task_start_time
+            logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
+            log_results(task_start_time, 'gpu', 'workflow', runtime, n_cpu, n_gpu)
+
+            runtime = datetime.now() - start_time
+            logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(runtime))
+            log_results(task_start_time, 'gpu', 'total', runtime, n_cpu, n_gpu)
+        else:
+
+            logger.info("Starting interactive visualization...")
+            v = ChemVisualization(
+                    mol_df,
+                    workflow,
+                    gpu=not args.cpu)
+
+            logger.info('navigate to https://localhost:5001')
+            v.start('0.0.0.0', port=5001)
+
+
+def main():
+    Launcher()
+
+
+if __name__ == '__main__':
+    main()

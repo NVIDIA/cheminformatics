@@ -16,3 +16,4 @@ __pycache__
 dask-worker-space
 ./data
 .npm
+.cache_dir

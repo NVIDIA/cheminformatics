@@ -268,10 +268,7 @@ To create cache:
                 n_cpu, n_gpu = 0, args.n_gpu
             else:
                 n_cpu, n_gpu = args.n_cpu, 0
-<<<<<<< HEAD
-=======
             print(mol_df.head())
->>>>>>> f270c5e... Num CPU/GPU set by user and logging
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))

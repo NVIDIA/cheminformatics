@@ -268,7 +268,7 @@ To create cache:
                 n_cpu, n_gpu = 0, args.n_gpu
             else:
                 n_cpu, n_gpu = args.n_cpu, 0
-            print(mol_df.head())
+            print('mol dataframe', mol_df.head())
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))

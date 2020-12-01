@@ -101,53 +101,69 @@ class GpuWorkflow:
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
 
-    # def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
+    def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
 
-    #     print('Shape of input dataframe', gdf.shape)
-    #     if gdf.shape[0] == 0:
-    #         return None
+        # Before reclustering remove all columns that may interfere
+        # ids = gdf['id']
+        # chembl_ids = gdf['chembl_id']
 
-    #     # Before reclustering remove all columns that may interfere
-    #     ids = gdf['id']
-    #     chembl_ids = gdf['chembl_id']
+        # gdf.drop(['x', 'y', 'cluster', 'id', 'chembl_id'],
+        #          axis=1, inplace=True)
+        gdf = gdf.drop(['x', 'y', 'cluster', 'id', 'filter_col'], axis=1)
 
-    #     gdf.drop(['x', 'y', 'cluster', 'id', 'chembl_id'],
-    #              axis=1, inplace=True)
-    #     if new_figerprints is not None and new_chembl_ids is not None:
-    #         # Add new figerprints and chEmblIds before reclustering
-    #         if self.pca_comps:
-    #             new_figerprints = self.pca.transform(new_figerprints)
+        if new_figerprints is not None and new_chembl_ids is not None:
+            # Add new figerprints and chEmblIds before reclustering
+            if self.pca_comps:
+                new_figerprints = self.pca.transform(new_figerprints)
 
-    #         fp_df = cudf.DataFrame(new_figerprints,
-    #                                 index=[idx for idx in range(
-    #                                     self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
-    #                                 columns=gdf.columns)
+            fp_df = cudf.DataFrame(new_figerprints,
+                                    index=[idx for idx in range(
+                                        self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
+                                    columns=gdf.columns)
 
-    #         gdf = gdf.append(fp_df, ignore_index=True)
-    #         # Update original dataframe for it to work on reload
-    #         fp_df['id'] = fp_df.index
-    #         self.orig_df = self.orig_df.append(fp_df, ignore_index=True)
-    #         chembl_ids = chembl_ids.append(
-    #             cudf.Series(new_chembl_ids), ignore_index=True)
-    #         ids = ids.append(fp_df['id'], ignore_index=True)
-    #         self.chembl_ids.extend(new_chembl_ids)
+            gdf = gdf.append(fp_df, ignore_index=True)
+            # Update original dataframe for it to work on reload
+            fp_df['id'] = fp_df.index
+            self.orig_df = self.orig_df.append(fp_df, ignore_index=True)
+            chembl_ids = chembl_ids.append(
+                cudf.Series(new_chembl_ids), ignore_index=True)
+            ids = ids.append(fp_df['id'], ignore_index=True), 'id', 'chembl_id'
+            self.chembl_ids.extend(new_chembl_ids)
 
-    #         del fp_df
+            del fp_df
 
-    #     kmeans_float = cuml.KMeans(n_clusters=self.n_clusters)
+        kmeans_cuml = cuDaskKMeans(client=self.client, 
+                                   n_clusters=self.n_clusters)
+        kmeans_cuml.fit(gdf)
+        kmeans_labels = kmeans_cuml.predict(gdf)
 
-    #     kmeans_float.fit(gdf)
-    #     Xt = self.umap.fit_transform(gdf)
+        local_model = cuUMAP()
+        X_train = gdf.compute()
+        local_model.fit(X_train)
 
-    #     # Add back the column required for plotting and to correlating data
-    #     # between re-clustering
-    #     gdf.add_column('x', Xt[0].to_array())
-    #     gdf.add_column('y', Xt[1].to_array())
-    #     gdf.add_column('cluster', kmeans_float.labels_.to_gpu_array())
-    #     gdf.add_column('chembl_id', chembl_ids)
-    #     gdf.add_column('id', ids)
+        umap_model = cuDaskUMAP(local_model,
+                                 n_neighbors=100,
+                                 a=1.0,
+                                 b=1.0,
+                                 learning_rate=1.0,
+                                 client=self.client)
+        Xt = umap_model.transform(gdf)
 
-    #     return gdf
+
+        # Add back the column required for plotting and to correlating data
+        # between re-clustering
+        gdf['x'] = Xt[0]
+        gdf['y'] = Xt[1]
+        gdf['cluster'] = kmeans_labels
+        gdf['id'] = gdf.index
+
+        # gdf.add_column('y', Xt[1].to_array())
+        # gdf.add_column('cluster', kmeans_labels)
+
+        # gdf.add_column('chembl_id', chembl_ids)
+        # gdf.add_column('id', ids)
+        print('Workflow: recluster ', gdf.head())
+        return gdf
 
 
     def execute(self, mol_df):

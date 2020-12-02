@@ -26,14 +26,15 @@ logger = logging.getLogger(__name__)
 
 class ChEmblData(object, metaclass=Singleton):
 
-    CHEMBL_DB='file:/data/db/chembl_27.db?mode=ro'
+    def __init__(self, db_file='/data/db/chembl_27.db'):
+        self.chembl_db = 'file:%s?mode=ro' % db_file
 
     def fetch_props_by_molregno(self, molregnos):
         """
         Returns compound properties and structure filtered by ChEMBL ids along
         with a list of columns.
         """
-        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
             select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos)))
             logger.info(select_stmt)
@@ -49,7 +50,7 @@ class ChEmblData(object, metaclass=Singleton):
         """
         select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos.values_host)))
         df = pandas.read_sql(select_stmt, 
-                             sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True), 
+                             sqlite3.connect(self.chembl_db, uri=True), 
                              index_col='molregno')
 
         if gpu:
@@ -60,7 +61,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def fetch_molecule_cnt(self):
         logger.debug('Finding number of molecules...')
-        with closing(sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT count(*)
@@ -93,7 +94,7 @@ class ChEmblData(object, metaclass=Singleton):
             LIMIT %d, %d
         ''' % (start, batch_size)
         df = pandas.read_sql(select_stmt,
-                            sqlite3.connect(ChEmblData.CHEMBL_DB, uri=True),
+                            sqlite3.connect(self.chembl_db, uri=True),
                             index_col='molregno')
 
         df['fp'] = df.apply(lambda row: morgan_fingerprint(

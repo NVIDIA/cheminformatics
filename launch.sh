@@ -152,7 +152,6 @@ fi
 DOCKER_CMD="docker run \
 	--network host \
 	${PARAM_RUNTIME} \
-	--user $(id -u):$(gid -g) \
 	-p ${JUPYTER_PORT}:8888 \
 	-p ${DASK_PORT}:${DASK_PORT} \
 	-p ${PLOTLY_PORT}:5000 \

@@ -249,7 +249,6 @@ To create cache:
             if args.n_mol > 0:
                 mol_df = mol_df.head(args.n_mol, compute=False)
 
-        print('mol_df.shape', mol_df.shape, args.n_mol)
         task_start_time = datetime.now()
         if not args.cpu:
             workflow = GpuWorkflow(client,
@@ -268,7 +267,6 @@ To create cache:
                 n_cpu, n_gpu = 0, args.n_gpu
             else:
                 n_cpu, n_gpu = args.n_cpu, 0
-            print('mol dataframe', mol_df.head())
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))

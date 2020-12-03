@@ -123,69 +123,9 @@ class ChemVisualization:
             State('north_star', 'value'))(self.handle_mark_north_star)
 
     def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
-        return self.workflow.re_cluster(gdf, new_figerprints=None, new_chembl_ids=None)
-
-        # print('Shape of input dataframe', gdf.shape)
-        # if gdf.shape[0] == 0:
-        #     return None
-
-        # # Before reclustering remove all columns that may interfere
-        # ids = gdf['id']
-        # chembl_ids = gdf['chembl_id']
-
-        # gdf.drop(['x', 'y', 'cluster', 'id', 'chembl_id'],
-        #          axis=1, inplace=True)
-        # if new_figerprints is not None and new_chembl_ids is not None:
-        #     # Add new figerprints and chEmblIds before reclustering
-        #     if self.pca:
-        #         new_figerprints = self.pca.transform(new_figerprints)
-
-        #     if self.enable_gpu:
-        #         fp_df = cudf.DataFrame(new_figerprints,
-        #                                index=[idx for idx in range(
-        #                                    self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
-        #                                columns=gdf.columns)
-        #     else:
-        #         fp_df = pandas.DataFrame(new_figerprints,
-        #                                  index=[idx for idx in range(
-        #                                      self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
-        #                                  columns=gdf.columns)
-
-        #     gdf = gdf.append(fp_df, ignore_index=True)
-        #     # Update original dataframe for it to work on reload
-        #     fp_df['id'] = fp_df.index
-        #     self.orig_df = self.orig_df.append(fp_df, ignore_index=True)
-        #     chembl_ids = chembl_ids.append(
-        #         cudf.Series(new_chembl_ids), ignore_index=True)
-        #     ids = ids.append(fp_df['id'], ignore_index=True)
-        #     self.chembl_ids.extend(new_chembl_ids)
-
-        #     del fp_df
-
-        # if self.enable_gpu:
-        #     kmeans_float = cuml.KMeans(n_clusters=self.n_clusters)
-        # else:
-        #     kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
-
-        # kmeans_float.fit(gdf)
-        # Xt = self.umap.fit_transform(gdf)
-
-        # # Add back the column required for plotting and to correlating data
-        # # between re-clustering
-        # if self.enable_gpu:
-        #     gdf.add_column('x', Xt[0].to_array())
-        #     gdf.add_column('y', Xt[1].to_array())
-        #     gdf.add_column('cluster', kmeans_float.labels_.to_gpu_array())
-        #     gdf.add_column('chembl_id', chembl_ids)
-        #     gdf.add_column('id', ids)
-        # else:
-        #     gdf['x'] = Xt[:, 0]
-        #     gdf['y'] = Xt[:, 1]
-        #     gdf['cluster'] = kmeans_float.labels_
-        #     gdf['chembl_id'] = chembl_ids
-        #     gdf['id'] = ids
-
-        # return gdf
+        return self.workflow.re_cluster(gdf, 
+                                        new_figerprints=None, 
+                                        new_chembl_ids=None)
 
     def recluster_nofilter(self, df, gradient_prop, north_stars=None):
         tdf = self.re_cluster(df)
@@ -195,24 +135,17 @@ class ChemVisualization:
                                  gradient_prop=gradient_prop, north_stars=north_stars)
 
     def recluster_selected_clusters(self, df, values, gradient_prop, north_stars=None):
-        print('recluster_selected_clusters: values', values)
-        print('recluster_selected_clusters: df', df.head())
         df_clusters = df['cluster'].isin(values)
         # filters = df_clusters.values
-        print('df_clusters.head() ', df_clusters.head())
         
         df['filter_col'] = df_clusters
         tdf = df.query('filter_col == True')
-        print('tdf.head() ', tdf.head())
-        print('tdf.shape ', tdf.shape)
-        print('df.shape ', df.shape)
 
-        # tdf = df[filters]
         tdf = self.re_cluster(tdf)
         print('tdf.head() - Post recluster ', tdf.head())
         if tdf is not None:
             self.df = tdf
-        return self.create_graph(self.df, color_col='cluster',
+        return self.create_graph(tdf, color_col='cluster',
                                  gradient_prop=gradient_prop, north_stars=north_stars)
 
     def recluster_selected_points(self, df, values, gradient_prop, north_stars=None):

@@ -52,14 +52,15 @@ class CpuWorkflow:
 
         logger.info('PCA...')
         n_cpu = len(self.client.cluster.workers)
-        print('WORKERS', n_cpu)
+        logger.info('WORKERS %d' % n_cpu)
 
         if self.pca_comps:
             task_start_time = datetime.now()
             pca = sklearn.decomposition.PCA(n_components=self.pca_comps)
             df_fingerprints = pca.fit_transform(mol_df)
             runtime = datetime.now() - task_start_time
-            logger.info('### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
+            logger.info(
+                '### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
             log_results(task_start_time, 'cpu', 'pca', runtime, n_cpu=n_cpu)
         else:
             df_fingerprints = mol_df.copy()
@@ -103,23 +104,28 @@ class GpuWorkflow:
 
     def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
 
+        n_gpu = len(self.client.cluster.workers)
+        logger.info('WORKERS %d' % n_gpu)
+        print('re_cluster - start\n', gdf.head())
         # Before reclustering remove all columns that may interfere
-        # ids = gdf['id']
-        # chembl_ids = gdf['chembl_id']
+        if 'id' in gdf.columns:
+            gdf = gdf.drop(['x', 'y', 'cluster', 'id'], axis=1)
 
-        # gdf.drop(['x', 'y', 'cluster', 'id', 'chembl_id'],
-        #          axis=1, inplace=True)
-        gdf = gdf.drop(['x', 'y', 'cluster', 'id', 'filter_col'], axis=1)
+        if 'filter_col' in gdf.columns:
+            gdf = gdf.drop(['filter_col'], axis=1)
+
+        print('re_cluster - start\n', gdf.head())
 
         if new_figerprints is not None and new_chembl_ids is not None:
             # Add new figerprints and chEmblIds before reclustering
             if self.pca_comps:
                 new_figerprints = self.pca.transform(new_figerprints)
 
-            fp_df = cudf.DataFrame(new_figerprints,
-                                    index=[idx for idx in range(
-                                        self.orig_df.shape[0], self.orig_df.shape[0] + len(new_figerprints))],
-                                    columns=gdf.columns)
+            fp_df = cudf.DataFrame(
+                new_figerprints,
+                index=[idx for idx in range(self.orig_df.shape[0],
+                                            self.orig_df.shape[0] + len(new_figerprints))],
+                columns=gdf.columns)
 
             gdf = gdf.append(fp_df, ignore_index=True)
             # Update original dataframe for it to work on reload
@@ -132,44 +138,53 @@ class GpuWorkflow:
 
             del fp_df
 
-        kmeans_cuml = cuDaskKMeans(client=self.client, 
+        task_start_time = datetime.now()
+        kmeans_cuml = cuDaskKMeans(client=self.client,
                                    n_clusters=self.n_clusters)
         kmeans_cuml.fit(gdf)
         kmeans_labels = kmeans_cuml.predict(gdf)
+        runtime = datetime.now() - task_start_time
+        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {}'.format(runtime))
+        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_gpu=n_gpu)
 
+        task_start_time = datetime.now()
         local_model = cuUMAP()
         X_train = gdf.compute()
         local_model.fit(X_train)
 
         umap_model = cuDaskUMAP(local_model,
-                                 n_neighbors=100,
-                                 a=1.0,
-                                 b=1.0,
-                                 learning_rate=1.0,
-                                 client=self.client)
+                                n_neighbors=100,
+                                a=1.0,
+                                b=1.0,
+                                learning_rate=1.0,
+                                client=self.client)
         Xt = umap_model.transform(gdf)
+        runtime = datetime.now() - task_start_time
+        logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
+        log_results(task_start_time, 'gpu', 'umap', runtime, n_gpu=n_gpu)
 
+        print('Xt', Xt.head())
+        print('kmeans_labels', kmeans_labels.head())
+        print('type(Xt)', type(Xt))
+        print('type(gdf)', type(gdf))
+        print('type(kmeans_labels)', type(kmeans_labels))
 
         # Add back the column required for plotting and to correlating data
         # between re-clustering
+        print('Workflow: before recluster\n', gdf.shape)
+        print('Workflow: before recluster\n', gdf.head())
         gdf['x'] = Xt[0]
         gdf['y'] = Xt[1]
         gdf['cluster'] = kmeans_labels
         gdf['id'] = gdf.index
 
-        # gdf.add_column('y', Xt[1].to_array())
-        # gdf.add_column('cluster', kmeans_labels)
-
-        # gdf.add_column('chembl_id', chembl_ids)
-        # gdf.add_column('id', ids)
-        print('Workflow: recluster ', gdf.head())
+        print('Workflow: recluster\n', gdf.shape)
+        print('Workflow: recluster\n', gdf.head())
         return gdf
-
 
     def execute(self, mol_df):
         logger.info("Executing GPU workflow...")
         n_gpu = len(self.client.cluster.workers)
-        print('WORKERS', n_gpu)
 
         mol_df = dask_cudf.from_dask_dataframe(mol_df)
         mol_df = mol_df.persist()
@@ -180,41 +195,11 @@ class GpuWorkflow:
             pca = cuDaskPCA(client=self.client, n_components=self.pca_comps)
             df_fingerprints = pca.fit_transform(mol_df)
             runtime = datetime.now() - task_start_time
-            logger.info('### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
+            logger.info(
+                '### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
             log_results(task_start_time, 'gpu', 'pca', runtime, n_gpu=n_gpu)
         else:
             df_fingerprints = mol_df.copy()
 
-        logger.info('KMeans...')
-        task_start_time = datetime.now()
-        kmeans_cuml = cuDaskKMeans(client=self.client, n_clusters=self.n_clusters)
-        kmeans_cuml.fit(df_fingerprints)
-        kmeans_labels = kmeans_cuml.predict(df_fingerprints)
-        runtime = datetime.now() - task_start_time
-        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {}'.format(runtime))
-        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_gpu=n_gpu)
-
-        logger.info('UMAP...')
-        task_start_time = datetime.now()
-        local_model = cuUMAP()
-        X_train = df_fingerprints.compute()
-        local_model.fit(X_train)
-
-        umap_model = cuDaskUMAP(local_model,
-                                 n_neighbors=100,
-                                 a=1.0,
-                                 b=1.0,
-                                 learning_rate=1.0,
-                                 client=self.client)
-        Xt = umap_model.transform(df_fingerprints)
-
-        mol_df['x'] = Xt[0]
-        mol_df['y'] = Xt[1]
-        mol_df['cluster'] = kmeans_labels
-        runtime = datetime.now() - task_start_time
-        logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
-        log_results(task_start_time, 'gpu', 'umap', runtime, n_gpu=n_gpu)
-
-        print(mol_df.head())
-
+        mol_df = self.re_cluster(df_fingerprints)
         return mol_df

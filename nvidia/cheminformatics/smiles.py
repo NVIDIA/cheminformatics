@@ -25,6 +25,7 @@ class BaseTransformation(ABC):
 
 class RemoveSalt(BaseTransformation):
     def __init__(self, remover=SaltRemover()):
+        self.name = __class__.__name__.split('.')[-1]
         self.remover = remover
 
     def transform(self, data):
@@ -33,7 +34,7 @@ class RemoveSalt(BaseTransformation):
 
 class PreprocessSmiles(BaseTransformation):
     def __init__(self):
-        pass
+        self.name = __class__.__name__.split('.')[-1]
 
     def transform(self, data):
         return filter_smiles(data)

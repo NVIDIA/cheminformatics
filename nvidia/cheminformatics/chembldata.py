@@ -15,7 +15,7 @@ from nvidia.cheminformatics.smiles import RemoveSalt, PreprocessSmiles
 from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
 
 SMILES_TRANSFORMS = [RemoveSalt(), PreprocessSmiles()]
-FINGERPRINT_SELECTION = MorganFingerprint # TODO DELETE ME
+FINGERPRINT_SELECTION = Embeddings
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -104,16 +104,24 @@ class ChEmblData(object, metaclass=Singleton):
                             sqlite3.connect(self.chembl_db, uri=True),
                             index_col='molregno')
 
+        # Smiles -> Smiles transformation and filtering
         df['transformed_smiles'] = df['canonical_smiles']
+        if smiles_transforms is not None:
+            if len(smiles_transforms) > 0:
+                for xf in smiles_transforms:
+                    df['transformed_smiles'] = df['transformed_smiles'].map(xf.transform)
+                    df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
+
+        # Conversion to fingerprints or embeddings
         transformation = transformation_function(**transformation_kwargs)
-        df['fp'] = df.apply(lambda row: transformation.transform(row.transformed_smiles), axis=1)
+        return_df = list(map(transformation.transform, df['transformed_smiles']))
 
+        # TODO this is behavior specific to a fingerprint class and should be refactored
         if transformation.name == 'MorganFingerprint':
-            return_df = df['fp'].str.split(pat=', ', n=len(transformation)+1, expand=True)
-        else:
-            return_df = pandas.DataFrame(df['fp'], columns=pandas.RangeIndex(start=0, stop=len(transformation)))
-
-        return return_df.astype('float32')
+            return_df = [x.split(', ') for x in return_df]
+        
+        return_df = pandas.DataFrame(return_df, columns=pandas.RangeIndex(start=0, stop=len(transformation))).astype('float32')
+        return return_df
 
     def fetch_all_props(self, num_recs=None, batch_size=30000, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
         """

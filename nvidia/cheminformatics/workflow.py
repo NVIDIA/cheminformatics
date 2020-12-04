@@ -102,19 +102,22 @@ class GpuWorkflow:
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
 
-    def re_cluster(self, gdf, new_figerprints=None, new_chembl_ids=None):
+    def re_cluster(self, gdf, 
+                   new_figerprints=None, 
+                   new_chembl_ids=None,
+                   n_clusters = None):
+
+        if n_clusters is not None:
+            self.n_clusters = n_clusters
 
         n_gpu = len(self.client.cluster.workers)
         logger.info('WORKERS %d' % n_gpu)
-        print('re_cluster - start\n', gdf.head())
         # Before reclustering remove all columns that may interfere
         if 'id' in gdf.columns:
             gdf = gdf.drop(['x', 'y', 'cluster', 'id'], axis=1)
 
         if 'filter_col' in gdf.columns:
             gdf = gdf.drop(['filter_col'], axis=1)
-
-        print('re_cluster - start\n', gdf.head())
 
         if new_figerprints is not None and new_chembl_ids is not None:
             # Add new figerprints and chEmblIds before reclustering
@@ -163,23 +166,13 @@ class GpuWorkflow:
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
         log_results(task_start_time, 'gpu', 'umap', runtime, n_gpu=n_gpu)
 
-        print('Xt', Xt.head())
-        print('kmeans_labels', kmeans_labels.head())
-        print('type(Xt)', type(Xt))
-        print('type(gdf)', type(gdf))
-        print('type(kmeans_labels)', type(kmeans_labels))
-
         # Add back the column required for plotting and to correlating data
         # between re-clustering
-        print('Workflow: before recluster\n', gdf.shape)
-        print('Workflow: before recluster\n', gdf.head())
         gdf['x'] = Xt[0]
         gdf['y'] = Xt[1]
         gdf['cluster'] = kmeans_labels
         gdf['id'] = gdf.index
 
-        print('Workflow: recluster\n', gdf.shape)
-        print('Workflow: recluster\n', gdf.head())
         return gdf
 
     def execute(self, mol_df):

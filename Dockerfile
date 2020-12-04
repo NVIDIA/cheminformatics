@@ -16,7 +16,8 @@ RUN /opt/conda/envs/rapids/bin/pip install \
     dash_html_components \
     progressbar2 \
     tables \
-    sqlalchemy
+    sqlalchemy && \
+    pip install --ignore-installed --upgrade tensorflow==1.13.1 tensorflow-gpu==1.13.1
 
 # misc python packages
 RUN conda install -n rapids pywget
@@ -27,6 +28,11 @@ RUN conda install -n rapids -c plotly plotly=4.9.0
 # Copy source code
 RUN mkdir -p /opt/nvidia/cheminfomatics/
 WORKDIR /opt/nvidia/cheminfomatics/
+RUN git clone git@github.com:jrwnter/cddd.git && \
+    cd cddd && \
+    /opt/conda/envs/rapids/bin/pip install -e . && \
+    ./download_default_model.sh
+    
 
 COPY launch.sh /opt/nvidia/cheminfomatics/
 COPY *.py /opt/nvidia/cheminfomatics/

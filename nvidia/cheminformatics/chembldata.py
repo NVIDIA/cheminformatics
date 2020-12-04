@@ -106,9 +106,14 @@ class ChEmblData(object, metaclass=Singleton):
 
         df['transformed_smiles'] = df['canonical_smiles']
         transformation = transformation_function(**transformation_kwargs)
-        df['fp'] = df.apply(lambda row: transformation.transform(row.canonical_smiles), axis=1)
+        df['fp'] = df.apply(lambda row: transformation.transform(row.transformed_smiles), axis=1)
 
-        return df['fp'].str.split(pat=', ', n=len(transformation)+1, expand=True).astype('float32')
+        if transformation.name == 'MorganFingerprint':
+            return_df = df['fp'].str.split(pat=', ', n=len(transformation)+1, expand=True)
+        else:
+            return_df = pandas.DataFrame(df['fp'], columns=pandas.RangeIndex(start=0, stop=len(transformation)))
+
+        return return_df.astype('float32')
 
     def fetch_all_props(self, num_recs=None, batch_size=30000, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
         """

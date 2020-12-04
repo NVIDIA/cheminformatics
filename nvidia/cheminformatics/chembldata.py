@@ -7,8 +7,9 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
-from nvidia.cheminformatics.fingerprint import MorganFingerprint
+from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
 
+FINGERPRINT_SELECTION = Embeddings # TODO DELETE ME
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -76,7 +77,7 @@ class ChEmblData(object, metaclass=Singleton):
             return cur.fetchone()[0]
 
     @delayed
-    def fetch_molecular_props(self, start, batch_size=30000, transformation_function=MorganFingerprint, **transformation_kwargs):
+    def fetch_molecular_props(self, start, batch_size=30000, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
         records in a dataframe.
@@ -102,7 +103,7 @@ class ChEmblData(object, metaclass=Singleton):
 
         return df['fp'].str.split(pat=', ', n=len(transformation)+1, expand=True).astype('float32')
 
-    def fetch_all_props(self, num_recs=None, batch_size=30000, transformation_function=MorganFingerprint, **transformation_kwargs):
+    def fetch_all_props(self, num_recs=None, batch_size=30000, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
         records in a dataframe.

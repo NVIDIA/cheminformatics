@@ -1,3 +1,7 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
+import tensorflow as tf
+
 import logging
 from abc import ABC
 from enum import Enum
@@ -23,7 +27,7 @@ class BaseTransformation(ABC):
         return NotImplemented
 
     def transform_many(self, data):
-        return map(self.transform, data)
+        return list(map(self.transform, data))
 
     def __len__(self):
         return NotImplemented
@@ -58,7 +62,7 @@ class Embeddings(BaseTransformation):
     def transform(self, data):
         if isinstance(data, str):
             data = [data]
-        return self.func.seq_to_emb(data)
+        return self.func.seq_to_emb(data).squeeze()
 
     def __len__(self):
         return self.func.hparams.emb_size

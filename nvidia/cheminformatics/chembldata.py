@@ -1,5 +1,9 @@
+import warnings
+warnings.filterwarnings("ignore", message=r"deprecated", category=FutureWarning)
+
 import cudf
 import pandas
+from pandas.api.types import is_string_dtype
 import sqlite3
 import logging
 
@@ -7,9 +11,11 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
+from nvidia.cheminformatics.smiles import RemoveSalt, PreprocessSmiles
 from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
 
-FINGERPRINT_SELECTION = Embeddings # TODO DELETE ME
+SMILES_TRANSFORMS = [RemoveSalt(), PreprocessSmiles()]
+FINGERPRINT_SELECTION = MorganFingerprint # TODO DELETE ME
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -77,7 +83,7 @@ class ChEmblData(object, metaclass=Singleton):
             return cur.fetchone()[0]
 
     @delayed
-    def fetch_molecular_props(self, start, batch_size=30000, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
+    def fetch_molecular_props(self, start, batch_size=30000, smiles_transforms=SMILES_TRANSFORMS, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
         records in a dataframe.
@@ -98,6 +104,7 @@ class ChEmblData(object, metaclass=Singleton):
                             sqlite3.connect(self.chembl_db, uri=True),
                             index_col='molregno')
 
+        df['transformed_smiles'] = df['canonical_smiles']
         transformation = transformation_function(**transformation_kwargs)
         df['fp'] = df.apply(lambda row: transformation.transform(row.canonical_smiles), axis=1)
 

@@ -23,7 +23,8 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State, ALL
 
-from nvidia.cheminformatics.chembldata import ChEmblData, morgan_fingerprint
+from nvidia.cheminformatics.chembldata import ChEmblData
+from nvidia.cheminformatics.fingerprint import MorganFingerprint
 
 
 logger = logging.getLogger(__name__)
@@ -758,7 +759,9 @@ class ChemVisualization:
                 for i in range(0, ldf.shape[0]):
                     smiles.append(
                         ldf.iloc[i]['canonical_smiles'].to_array()[0])
-                results = list(map(morgan_fingerprint, smiles))
+
+                morgan_fingerprint = MorganFingerprint()
+                results = list(morgan_fingerprint.transform_many(smiles))
                 fingerprints = cupy.stack(results).astype(np.float32)
                 tdf = self.re_cluster(self.df, fingerprints, missing_chembl)
                 if tdf:

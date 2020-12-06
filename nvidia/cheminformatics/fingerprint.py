@@ -1,4 +1,7 @@
 import logging
+
+import pandas as pd
+
 from abc import ABC
 from enum import Enum
 from rdkit import Chem
@@ -27,7 +30,7 @@ class BaseTransformation(ABC):
 
     def __len__(self):
         return NotImplemented
-    
+
 
 class MorganFingerprint(BaseTransformation):
 
@@ -37,28 +40,35 @@ class MorganFingerprint(BaseTransformation):
         self.kwargs.update(kwargs)
         self.func = AllChem.GetMorganFingerprintAsBitVect
 
-    def transform(self, data):
-        m = Chem.MolFromSmiles(data)
-        fp = self.func(m, **self.kwargs)
-        return ', '.join(list(fp.ToBitString()))
+    def transform(self, df):
+        df['fp'] = df.apply(lambda row:
+                            self.func(row.canonical_smiles, self.kwargs),
+                            axis=1)
+
+        return df['fp'].str.split(pat=', ',
+                                  n=len(self)+1,
+                                  expand=True).astype('float32')
 
     def __len__(self):
         return self.kwargs['nBits']
-        
+
 
 class Embeddings(BaseTransformation):
     MODEL_DIR = '/workspace/cddd/default_model'
 
-    def __init__(self, use_gpu=True, cpu_threads=5, **kwargs):
+    def __init__(self, use_gpu=True, cpu_threads=12, **kwargs):
         self.name = __class__.__name__.split('.')[-1]
         self.kwargs = TransformationDefaults[self.name].value
         self.kwargs.update(kwargs)
         self.func = InferenceModel(self.MODEL_DIR, use_gpu=use_gpu, cpu_threads=cpu_threads)
 
-    def transform(self, data):
-        if isinstance(data, str):
-            data = [data]
-        return self.func.seq_to_emb(data)
+    def transform(self, df):
+        smiles = df['canonical_smiles'].tolist()
+        smiles_embedding = self.func.seq_to_emb(smiles)
+
+        result_df = pd.DataFrame.from_records(smiles_embedding)
+        result_df.index = df.index
+        return result_df
 
     def __len__(self):
         return self.func.hparams.emb_size
@@ -70,4 +80,3 @@ def morgan_fingerprint(smiles, radius=2, nBits=512):
     fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, nBits=nBits)
 
     return ', '.join(list(fp.ToBitString()))
-

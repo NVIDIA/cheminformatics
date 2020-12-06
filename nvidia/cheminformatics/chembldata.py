@@ -50,10 +50,9 @@ class ChEmblData(object, metaclass=Singleton):
         dataframe.
         """
         select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos.values_host)))
-        df = pandas.read_sql(select_stmt, 
-                             sqlite3.connect(self.chembl_db, uri=True), 
+        df = pandas.read_sql(select_stmt,
+                             sqlite3.connect(self.chembl_db, uri=True),
                              index_col='molregno')
-
         if gpu:
             return cudf.from_pandas(df)
         else:
@@ -77,7 +76,11 @@ class ChEmblData(object, metaclass=Singleton):
             return cur.fetchone()[0]
 
     @delayed
-    def fetch_molecular_props(self, start, batch_size=30000, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
+    def fetch_molecular_props(self,
+                              start,
+                              batch_size=30000,
+                              transformation_function=FINGERPRINT_SELECTION,
+                              **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
         records in a dataframe.
@@ -99,11 +102,14 @@ class ChEmblData(object, metaclass=Singleton):
                             index_col='molregno')
 
         transformation = transformation_function(**transformation_kwargs)
-        df['fp'] = df.apply(lambda row: transformation.transform(row.canonical_smiles), axis=1)
+        result_df = transformation.transform(df)
+        return result_df
 
-        return df['fp'].str.split(pat=', ', n=len(transformation)+1, expand=True).astype('float32')
-
-    def fetch_all_props(self, num_recs=None, batch_size=30000, transformation_function=FINGERPRINT_SELECTION, **transformation_kwargs):
+    def fetch_all_props(self,
+                        num_recs=None,
+                        batch_size=30000,
+                        transformation_function=FINGERPRINT_SELECTION,
+                        **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
         records in a dataframe.
@@ -121,7 +127,10 @@ class ChEmblData(object, metaclass=Singleton):
         for start in range(0, num_recs, batch_size):
             bsize = min(num_recs - start, batch_size)
             dls.append(self.fetch_molecular_props(
-                start, batch_size=bsize, transformation_function=transformation_function, **transformation_kwargs))
+                                start,
+                                batch_size=bsize,
+                                transformation_function=FINGERPRINT_SELECTION,
+                                **transformation_kwargs))
 
         return dataframe.from_delayed(dls, meta=meta_df)
 

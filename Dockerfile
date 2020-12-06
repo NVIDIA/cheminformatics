@@ -25,7 +25,6 @@ RUN conda install -n rapids pywget
 RUN conda install -n rapids -c plotly plotly=4.9.0
 
 RUN /opt/conda/envs/rapids/bin/pip install --ignore-installed --upgrade \
-        tensorflow==1.15.4 \
         tensorflow-gpu==1.15.4
 
 # Copy source code
@@ -35,7 +34,6 @@ RUN git clone https://github.com/jrwnter/cddd.git && \
     cd cddd && \
     /opt/conda/envs/rapids/bin/pip install -e . && \
     ./download_default_model.sh
-    
 
 COPY launch.sh /opt/nvidia/cheminfomatics/
 COPY *.py /opt/nvidia/cheminfomatics/

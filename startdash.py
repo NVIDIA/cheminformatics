@@ -25,7 +25,7 @@ import warnings
 import argparse
 
 from datetime import datetime
-from dask_cuda.local_cuda_cluster import cuda_visible_devices
+from dask_cuda.local_cuda_cluster import cuda_visible_devices, get_n_gpus
 
 import rmm
 import cupy
@@ -179,7 +179,7 @@ To create cache:
         parser.add_argument('--n_gpu',
                             dest='n_gpu',
                             type=int,
-                            default=2,
+                            default=-1,
                             help='Number of GPUs to use')
 
         parser.add_argument('--n_cpu',
@@ -214,8 +214,12 @@ To create cache:
                                   enable_tcp_over_ucx=enable_tcp_over_ucx,
                                   enable_nvlink=enable_nvlink,
                                   enable_infiniband=enable_infiniband)
+            if args.n_gpu == -1:
+                n_gpu = get_n_gpus() - 1
+            else:
+                n_gpu = args.n_gpu
 
-            CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(args.n_gpu)).split(',')
+            CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(n_gpu)).split(',')
             CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
             logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
 
@@ -247,7 +251,7 @@ To create cache:
             mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
 
             if args.n_mol > 0:
-                mol_df = mol_df.head(args.n_mol, compute=False)
+                mol_df = mol_df.head(args.n_mol, compute=False, npartitions=-1)
 
         task_start_time = datetime.now()
         if not args.cpu:

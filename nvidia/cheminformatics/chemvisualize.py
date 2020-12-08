@@ -35,6 +35,7 @@ external_stylesheets = [
 main_fig_height = 700
 CHEMBL_DB = '/data/db/chembl_27.db'
 PAGE_SIZE = 10
+DOT_SIZE = 5
 IMP_PROPS = [
     'alogp',
     'aromatic_rings',
@@ -170,6 +171,7 @@ class ChemVisualization:
         # df['molregno'] = df.index
         # ldf = df.merge(self.prop_df, on='molregno')
         ldf = df.compute()
+        print('Size of the data for plotting graph', ldf.shape)
 
         #TODO: Convert chembl_to molregno
         moi_molregno = []
@@ -192,8 +194,8 @@ class ChemVisualization:
 
             df_size = moi_filter
             # Compute size of northstar and normal points
-            df_shape = moi_filter.copy()
-            moi_filter = (moi_filter * 18) + 3
+            df_shape = df_size.copy()
+            df_size = (df_size * 18) + DOT_SIZE
             df_shape = df_shape * 2
 
             fig.add_trace(go.Scattergl({
@@ -204,7 +206,7 @@ class ChemVisualization:
                 'mode': 'markers',
                 'showlegend': False,
                 'marker': {
-                    'size': moi_filter.to_array(),
+                    'size': df_size.to_array(),
                     'symbol': df_shape.to_array(),
                     'color': ldf[gradient_prop].to_array(),
                     'colorscale': 'Viridis',
@@ -234,7 +236,7 @@ class ChemVisualization:
 
                 # Compute size of northstar and normal points
                 df_shape = df_size.copy()
-                df_size = (df_size * 18) + 4
+                df_size = (df_size * 18) + DOT_SIZE
                 df_shape = df_shape * 2
                 if self.enable_gpu:
                     scatter_trace = go.Scattergl({
@@ -387,24 +389,24 @@ class ChemVisualization:
                                    style={'marginLeft': 6, }),
                     ], style={'marginLeft': 0, 'marginTop': 18, }),
 
-                    html.Div(id='section_nclusters', children=[
-                        html.Label([
-                            "Set number of clusters",
-                            dcc.Dropdown(id='sl_nclusters',
-                                         multi=False,
-                                         options=[{"label": p, "value": p}
-                                                  for p in range(2, 10)],
-                                         value=self.n_clusters
-                                         ),
-                        ], style={'marginTop': 6})],
-                    ),
+                    html.Div(children=[
+                        dcc.Markdown("Set number of clusters")], 
+                        style={'marginTop': 18, 'marginLeft': 6},
+                        className='row'),
+
+                    html.Div(children=[
+                        dcc.Input(id='sl_nclusters', value=self.n_clusters)], 
+                        style={'marginLeft': 6},
+                        className='row'),
 
                     html.Div(children=[
                         dcc.Markdown("""
                             **Cluster Selection**
 
                             Click a point to select a cluster.
-                        """)], style={'marginTop': 18, }),
+                        """)], 
+                        style={'marginTop': 18, 'marginLeft': 6},
+                        className='row'),
 
                     html.Div(className='row', children=[
                         dcc.Input(id='selected_clusters', type='text'),
@@ -624,7 +626,7 @@ class ChemVisualization:
         comp_id, event_type = \
             dash.callback_context.triggered[0]['prop_id'].split('.')
 
-        self.n_clusters = sl_nclusters
+        self.n_clusters = int(sl_nclusters)
 
         if comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks':
             if not curr_clusters:

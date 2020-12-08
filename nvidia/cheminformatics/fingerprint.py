@@ -54,7 +54,7 @@ class MorganFingerprint(BaseTransformation):
 
 
 class Embeddings(BaseTransformation):
-    MODEL_DIR = '/workspace/cddd/default_model'
+    MODEL_DIR = '/opt/nvidia/cheminfomatics/cddd/default_model'
 
     def __init__(self, use_gpu=True, cpu_threads=12, **kwargs):
         self.name = __class__.__name__.split('.')[-1]

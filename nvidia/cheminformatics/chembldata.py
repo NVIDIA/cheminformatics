@@ -7,9 +7,9 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
-from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
+from nvidia.cheminformatics.fingerprint import Embeddings
 
-FINGERPRINT_SELECTION = Embeddings # TODO DELETE ME
+FINGERPRINT_SELECTION = Embeddings
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -27,8 +27,11 @@ logger = logging.getLogger(__name__)
 
 class ChEmblData(object, metaclass=Singleton):
 
-    def __init__(self, db_file='/data/db/chembl_27.db'):
+    def __init__(self, 
+                 db_file='/data/db/chembl_27.db', 
+                 fp_type=Embeddings):
         self.chembl_db = 'file:%s?mode=ro' % db_file
+        self.fp_type = fp_type
 
     def fetch_props_by_molregno(self, molregnos):
         """
@@ -96,7 +99,6 @@ class ChEmblData(object, metaclass=Singleton):
     def fetch_molecular_props(self,
                               start,
                               batch_size=30000,
-                              transformation_function=FINGERPRINT_SELECTION,
                               **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
@@ -118,14 +120,13 @@ class ChEmblData(object, metaclass=Singleton):
                             sqlite3.connect(self.chembl_db, uri=True),
                             index_col='molregno')
 
-        transformation = transformation_function(**transformation_kwargs)
+        transformation = self.fp_type(**transformation_kwargs)
         result_df = transformation.transform(df)
         return result_df
 
     def fetch_all_props(self,
                         num_recs=None,
                         batch_size=30000,
-                        transformation_function=FINGERPRINT_SELECTION,
                         **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
@@ -136,7 +137,7 @@ class ChEmblData(object, metaclass=Singleton):
         if not num_recs or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
-        transformation = transformation_function(**transformation_kwargs)
+        transformation = self.fp_type(**transformation_kwargs)
         prop_meta = {i: pandas.Series([], dtype='float32') for i in range(len(transformation))}
         meta_df = pandas.DataFrame(prop_meta)
 
@@ -146,7 +147,6 @@ class ChEmblData(object, metaclass=Singleton):
             dls.append(self.fetch_molecular_props(
                                 start,
                                 batch_size=bsize,
-                                transformation_function=FINGERPRINT_SELECTION,
                                 **transformation_kwargs))
 
         return dataframe.from_delayed(dls, meta=meta_df)

@@ -38,13 +38,17 @@ class MorganFingerprint(BaseTransformation):
         self.name = __class__.__name__.split('.')[-1]
         self.kwargs = TransformationDefaults[self.name].value
         self.kwargs.update(kwargs)
-        self.func = AllChem.GetMorganFingerprintAsBitVect
+
+    def _morgan_fingerprint(self, smiles, radius=2, nBits=512):
+        m = Chem.MolFromSmiles(smiles)
+        fp = AllChem.GetMorganFingerprintAsBitVect(m, radius, nBits=nBits)
+        return ', '.join(list(fp.ToBitString()))
 
     def transform(self, df):
-        df['fp'] = df.apply(lambda row:
-                            self.func(row.canonical_smiles, self.kwargs),
-                            axis=1)
-
+        df['fp'] = df.apply(
+            lambda row:
+            self._morgan_fingerprint(row.canonical_smiles, **self.kwargs),
+            axis=1)
         return df['fp'].str.split(pat=', ',
                                   n=len(self)+1,
                                   expand=True).astype('float32')
@@ -72,11 +76,3 @@ class Embeddings(BaseTransformation):
 
     def __len__(self):
         return self.func.hparams.emb_size
-
-
-### DEPRECATED ###
-def morgan_fingerprint(smiles, radius=2, nBits=512):
-    m = Chem.MolFromSmiles(smiles)
-    fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, nBits=nBits)
-
-    return ', '.join(list(fp.ToBitString()))

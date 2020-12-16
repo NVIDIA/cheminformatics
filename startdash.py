@@ -25,7 +25,8 @@ import warnings
 import argparse
 
 from datetime import datetime
-from dask_cuda.local_cuda_cluster import cuda_visible_devices, get_n_gpus
+from dask_cuda.local_cuda_cluster import cuda_visible_devices
+from dask_cuda.utils import get_n_gpus
 
 import rmm
 import cupy
@@ -37,7 +38,7 @@ from dask.distributed import Client, LocalCluster
 
 from nvidia.cheminformatics.workflow import CpuWorkflow, GpuWorkflow
 from nvidia.cheminformatics.chembldata import ChEmblData
-from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
+# from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization # TODO: Rajesh this is broken from the refactor
 from nvidia.cheminformatics.utils.fileio import initialize_logfile, log_results
 
 warnings.filterwarnings('ignore', 'Expected ')

@@ -1,6 +1,6 @@
 # Copyright 2020 NVIDIA Corporation
 # SPDX-License-Identifier: Apache-2.0
-FROM rapidsai/rapidsai:cuda10.1-runtime-ubuntu18.04-py3.7
+FROM rapidsai/rapidsai:0.15-cuda10.1-runtime-ubuntu18.04-py3.7
 
 # install to rapids virtual environment
 RUN conda install -c rdkit -n rapids rdkit

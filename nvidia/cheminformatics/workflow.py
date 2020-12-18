@@ -27,6 +27,7 @@ from datetime import datetime
 import dask_cudf
 import dask_ml
 
+import cupy
 from cuml.manifold import UMAP as cuUMAP
 from cuml.dask.decomposition import PCA as cuDaskPCA
 from cuml.dask.cluster import KMeans as cuDaskKMeans
@@ -172,10 +173,14 @@ class GpuWorkflow:
         Xt = umap_model.transform(gdf)
         runtime = datetime.now() - task_start_time
 
+        # Sample to calculate spearman's rho
         n_indexes = 5000
-        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
-        dist_array_tani = tanimoto_calculate(X_train.iloc[indexes])
-        dist_array_eucl = pairwise_distances(Xt.iloc[indexes])
+        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False, seed=0)
+        X_train_sample = cupy.fromDlpack(X_train.to_dlpack())[indexes]
+        Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
+        dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)
+        dist_array_eucl = pairwise_distances(Xt_sample)
+
         spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl).mean()
 
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {} with {} of {}'.format(runtime, 'spearman_rho', spearman_mean))

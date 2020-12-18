@@ -175,7 +175,7 @@ class GpuWorkflow:
 
         # Sample to calculate spearman's rho
         n_indexes = 5000
-        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False, seed=0)
+        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
         X_train_sample = cupy.fromDlpack(X_train.to_dlpack())[indexes]
         Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
         dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)

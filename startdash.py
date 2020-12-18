@@ -38,7 +38,7 @@ from dask.distributed import Client, LocalCluster
 
 from nvidia.cheminformatics.workflow import CpuWorkflow, GpuWorkflow
 from nvidia.cheminformatics.chembldata import ChEmblData
-# from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization # TODO: Rajesh this is broken from the refactor
+from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
 from nvidia.cheminformatics.utils.fileio import initialize_logfile, log_results
 
 warnings.filterwarnings('ignore', 'Expected ')

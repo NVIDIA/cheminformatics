@@ -75,12 +75,10 @@ class CpuWorkflow:
         # kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
         kmeans_float = dask_ml.cluster.KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
-        kmeans_labels = kmeans_float.labels_
-        runtime = datetime.now() - task_start_time
 
-        silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
-        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
-        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_gpu=n_gpu, metric_name='silhouette_score', metric_value=silhouette_score)
+        runtime = datetime.now() - task_start_time
+        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {}'.format(runtime))
+        log_results(task_start_time, 'cpu', 'kmeans', runtime, n_cpu=n_cpu)
 
         logger.info('UMAP...')
         task_start_time = datetime.now()
@@ -91,7 +89,7 @@ class CpuWorkflow:
         mol_df = mol_df.compute()
         mol_df['x'] = Xt[:, 0]
         mol_df['y'] = Xt[:, 1]
-        mol_df['cluster'] = kmeans_labels
+        mol_df['cluster'] = kmeans_float.labels_
         runtime = datetime.now() - task_start_time
         
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
@@ -110,8 +108,8 @@ class GpuWorkflow:
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
 
-    def re_cluster(self, gdf, 
-                   new_figerprints=None, 
+    def re_cluster(self, gdf,
+                   new_figerprints=None,
                    new_chembl_ids=None,
                    n_clusters = None):
 
@@ -153,7 +151,7 @@ class GpuWorkflow:
         kmeans_cuml = cuDaskKMeans(client=self.client,
                                    n_clusters=self.n_clusters)
         kmeans_cuml.fit(gdf)
-        kmeans_labels = kmeans_cuml.labels_
+        kmeans_labels = kmeans_cuml.predict(gdf)
         runtime = datetime.now() - task_start_time
 
         silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)

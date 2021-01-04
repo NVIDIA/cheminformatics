@@ -34,7 +34,7 @@ def compute_norms(data, norms):
             value = j + 1
             data[i][j] = value
             norms[i] = norms[i] + (value**2)
-    
+
     if norms[i] != 0:
         norms[i] = math.sqrt(norms[i])
 
@@ -51,28 +51,55 @@ def compute_tanimoto_matix(data, norms, dist_array, calc_distance=False):
     """
     x = cuda.grid(1)
     rows = len(data)
-    
+
     i = x // rows
     j = x % rows
-    
+
     if i == j:
         dist_array[i][j] = 0 if calc_distance else 1
         return
-    
+
     a = data[i]
     b = data[j]
-    
+
     prod = 0
-    for k in range(len(data[i])):
+    for k in range(len(a)):
         prod = prod + (a[k] * b[k])
-        
+
     a_norm = norms[i]
     b_norm = norms[j]
-    
+
     tanimoto_calc = (prod / ((a_norm**2 + b_norm**2) - prod))
     tanimoto_calc = 1 - tanimoto_calc if calc_distance else tanimoto_calc
     dist_array[i][j] = tanimoto_calc
-    
+
+
+@cuda.jit
+def compute_rdkit_tanimoto_matix(data, dist_array, calc_distance=False):
+    x = cuda.grid(1)
+    rows = len(data)
+
+    i = x // rows
+    j = x % rows
+
+    if i == j:
+        dist_array[i][j] = 0 if calc_distance else 1
+        return
+
+    a = data[i]
+    b = data[j]
+
+    intersections = 0
+    total = 0
+    for k in range(len(a)):
+        if a[k] and b[k]:
+            intersections += 1
+            total += 2
+        elif a[k] or b[k]:
+            total += 1
+
+    dist_array[i][j] = intersections / (total - intersections)
+
 
 def tanimoto_calculate(fp, calc_distance=False):
     """Calculate tanimoto similarity or distance
@@ -84,9 +111,11 @@ def tanimoto_calculate(fp, calc_distance=False):
     Returns:
         array: pairwise tanimoto distance
     """
-    norms = cupy.zeros(fp.shape[0])
-    compute_norms.forall(norms.shape[0], 1)(fp, norms)
 
     dist_array = cupy.zeros((fp.shape[0], fp.shape[0]), cupy.float32)
-    compute_tanimoto_matix.forall(fp.shape[0] * fp.shape[0], 1)(fp, norms, dist_array, calc_distance)
+    compute_rdkit_tanimoto_matix.forall(fp.shape[0] * fp.shape[0], 1)(fp,
+                                                                dist_array,
+                                                                calc_distance)
+    if calc_distance:
+        dist_array = 1 - dist_array
     return dist_array

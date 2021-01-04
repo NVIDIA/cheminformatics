@@ -1,6 +1,19 @@
 #!/bin/bash
-# Copyright 2020 NVIDIA Corporation
+#
+# Copyright (c) 2020, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 ###############################################################################
 #
@@ -125,8 +138,31 @@ fi
 #          shouldn't need to make changes beyond this point
 #
 ###############################################################################
+# Compare Docker version to find Nvidia Container Toolkit support.              
+# Please refer https://github.com/NVIDIA/nvidia-docker                          
+DOCKER_VERSION_WITH_GPU_SUPPORT="19.03.0"                                       
+DOCKER_VERSION=$(docker version | grep -i version | head -1 | awk '{print $2'}) 
 
-DOCKER_CMD="docker run --network host --gpus all --user $(id -u):$(id -g) -p ${JUPYTER_PORT}:8888 -p ${DASK_PORT}:${DASK_PORT} -p ${PLOTLY_PORT}:5000 -v ${PROJECT_PATH}:/workspace -v ${DATA_PATH}:/data --shm-size=1g --ulimit memlock=-1 --ulimit stack=67108864 -e HOME=/workspace -e TF_CPP_MIN_LOG_LEVEL=3 -w /workspace"
+PARAM_RUNTIME="--runtime=nvidia"
+if [ "$DOCKER_VERSION_WITH_GPU_SUPPORT" == "$(echo -e "$DOCKER_VERSION\n$DOCKER_VERSION_WITH_GPU_SUPPORT" | sort -V | head -1)" ]; 
+then
+    PARAM_RUNTIME="--gpus all"
+fi
+
+DOCKER_CMD="docker run \
+	--network host \
+	${PARAM_RUNTIME} \
+	-p ${JUPYTER_PORT}:8888 \
+	-p ${DASK_PORT}:${DASK_PORT} \
+	-p ${PLOTLY_PORT}:5000 \
+	-v ${PROJECT_PATH}:/workspace \
+	-v ${DATA_PATH}:/data \
+	--shm-size=1g \
+	--ulimit memlock=-1 \
+	--ulimit stack=67108864 \
+	-e HOME=/workspace \
+	-e TF_CPP_MIN_LOG_LEVEL=3 \
+	-w /workspace"
 
 build() {
 	docker build -t ${CONT} .

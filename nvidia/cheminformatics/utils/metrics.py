@@ -19,6 +19,8 @@ import cudf
 import cupy
 import pandas
 import numpy
+
+import dask_cudf
 from sklearn.metrics import silhouette_score
 from scipy.stats import spearmanr
 
@@ -41,6 +43,13 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
         arraylib = cupy
         dflib = cudf
         AsArray = cupy.asnumpy
+
+        # Convert dask_cudf objects to cudf objects.
+        if isinstance(embeddings, dask_cudf.core.DataFrame):
+            embeddings = embeddings.compute()
+
+        if isinstance(clusters, dask_cudf.core.Series):
+            clusters = clusters.compute()
     else:
         arraylib = numpy
         dflib = pandas
@@ -88,6 +97,9 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
         matrix: ranked correlation coeffcients for data
     """
 
+    data_matrix1 = cupy.asnumpy(data_matrix1)
+    data_matrix2 = cupy.asnumpy(data_matrix2)
+    
     n_samples = data_matrix1.shape[0]
     data_matrix_argsort = data_matrix1.argsort(axis=1)
     mask_top_k = (data_matrix_argsort > 0) & (data_matrix_argsort <= top_k).reshape(n_samples, -1)

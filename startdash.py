@@ -25,7 +25,8 @@ import warnings
 import argparse
 
 from datetime import datetime
-from dask_cuda.local_cuda_cluster import cuda_visible_devices, get_n_gpus
+from dask_cuda.local_cuda_cluster import cuda_visible_devices
+from dask_cuda.utils import get_n_gpus
 
 import rmm
 import cupy

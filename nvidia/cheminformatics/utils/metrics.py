@@ -14,18 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import math
 import cudf
 import cupy
 import pandas
 import numpy
-import dask_cudf
 
+import dask_cudf
 from sklearn.metrics import silhouette_score
 from scipy.stats import spearmanr
 
-logger = logging.getLogger(__name__)
 
 def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_gpu=True):
     """Calculate silhouette score in batches on the CPU. Compatible with data on GPU or CPU
@@ -109,9 +107,12 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
     data_matrix1_top_k = data_matrix1[mask_top_k].reshape(n_samples, -1)
     data_matrix2_top_k = data_matrix2[mask_top_k].reshape(n_samples, -1)
 
-    # TODO remove logging -- values are fine
-    logger.info('data_matrix1_top_k', data_matrix1_top_k.shape, data_matrix1_top_k[0, :5])
-    logger.info('data_matrix2_top_k', data_matrix2_top_k.shape, data_matrix2_top_k[0, :5])
+   # Includes Dask and cupy and cudf
+    if hasattr(data_matrix1_top_k, 'device'):
+        data_matrix1_top_k = cupy.asnumpy(data_matrix1_top_k)
+
+    if hasattr(data_matrix2_top_k, 'device'):
+        data_matrix2_top_k = cupy.asnumpy(data_matrix2_top_k)
 
     rho_values = numpy.array([spearmanr(x, y).correlation 
                               for x,y in zip(data_matrix1_top_k, data_matrix2_top_k)])

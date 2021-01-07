@@ -7,9 +7,7 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
-from nvidia.cheminformatics.fingerprint import Embeddings
-
-FINGERPRINT_SELECTION = Embeddings
+from nvidia.cheminformatics.fingerprint import MorganFingerprint
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -29,7 +27,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def __init__(self, 
                  db_file='/data/db/chembl_27.db', 
-                 fp_type=Embeddings):
+                 fp_type=MorganFingerprint):
         self.chembl_db = 'file:%s?mode=ro' % db_file
         self.fp_type = fp_type
 

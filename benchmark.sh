@@ -32,5 +32,5 @@ fi
 ./startdash.py analyze -b --cache ${CACHE_DIR} --n_gpu 6
 ./startdash.py analyze -b --cache ${CACHE_DIR} --n_gpu 7
 
-./startdash.py analyze -b --cache ${CACHE_DIR} --cpu --n_cpu 12
+./startdash.py analyze -b --cache ${CACHE_DIR} --cpu --n_cpu 39
 

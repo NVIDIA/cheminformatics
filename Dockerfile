@@ -16,7 +16,8 @@ RUN /opt/conda/envs/rapids/bin/pip install \
     dash_html_components \
     progressbar2 \
     tables \
-    sqlalchemy
+    sqlalchemy \
+    openpyxl
 
 # misc python packages
 RUN conda install -n rapids pywget

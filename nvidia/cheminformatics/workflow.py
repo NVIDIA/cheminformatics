@@ -27,6 +27,8 @@ from datetime import datetime
 import dask_cudf
 import dask_ml
 
+from dask_ml.cluster import KMeans as dask_KMeans
+
 import cupy
 from cuml.manifold import UMAP as cuUMAP
 from cuml.dask.decomposition import PCA as cuDaskPCA
@@ -45,9 +47,11 @@ class CpuWorkflow:
 
     def __init__(self,
                  client,
+                 n_molecules,
                  pca_comps=64,
                  n_clusters=7,):
         self.client = client
+        self.n_molecules = n_molecules
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
 
@@ -67,21 +71,22 @@ class CpuWorkflow:
             runtime = datetime.now() - task_start_time
             logger.info(
                 '### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'cpu', 'pca', runtime, n_workers=n_cpu, metric_name='', metric_value='')
+            log_results(task_start_time, 'cpu', 'pca', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='', metric_value='')
         else:
             df_fingerprints = mol_df.copy()
 
         logger.info('KMeans...')
         task_start_time = datetime.now()
         # kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
-        kmeans_float = dask_ml.cluster.KMeans(n_clusters=self.n_clusters)
+        kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
         kmeans_labels = kmeans_float.labels_
         runtime = datetime.now() - task_start_time
 
-        silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
+        #silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
+        silhouette_score = 0.0
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
-        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_workers=n_cpu, metric_name='silhouette_score', metric_value=silhouette_score)
+        log_results(task_start_time, 'cpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='silhouette_score', metric_value=silhouette_score)
 
         logger.info('UMAP...')
         task_start_time = datetime.now()
@@ -96,7 +101,7 @@ class CpuWorkflow:
         runtime = datetime.now() - task_start_time
         
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
-        log_results(task_start_time, 'cpu', 'umap', runtime, n_workers=n_cpu, metric_name='', metric_value='')
+        log_results(task_start_time, 'cpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='', metric_value='')
 
         return mol_df
 
@@ -105,9 +110,11 @@ class GpuWorkflow:
 
     def __init__(self,
                  client,
+                 n_molecules,
                  pca_comps=64,
                  n_clusters=7,):
         self.client = client
+        self.n_molecules = n_molecules
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
 
@@ -160,7 +167,7 @@ class GpuWorkflow:
         # silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)
         silhouette_score = 0.0
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
-        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_workers=n_gpu, metric_name='silhouette_score', metric_value=silhouette_score)
+        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='silhouette_score', metric_value=silhouette_score)
 
         task_start_time = datetime.now()
         local_model = cuUMAP()
@@ -186,7 +193,7 @@ class GpuWorkflow:
         spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl).mean()
 
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {} with {} of {}'.format(runtime, 'spearman_rho', spearman_mean))
-        log_results(task_start_time, 'gpu', 'umap', runtime, n_workers=n_gpu, metric_name='spearman_rho', metric_value=spearman_mean)
+        log_results(task_start_time, 'gpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='spearman_rho', metric_value=spearman_mean)
 
         # Add back the column required for plotting and to correlating data
         # between re-clustering
@@ -212,7 +219,7 @@ class GpuWorkflow:
             runtime = datetime.now() - task_start_time
             logger.info(
                 '### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'gpu', 'pca', runtime, n_workers=n_gpu, metric_name='', metric_value='')
+            log_results(task_start_time, 'gpu', 'pca', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='', metric_value='')
         else:
             df_fingerprints = mol_df.copy()
 

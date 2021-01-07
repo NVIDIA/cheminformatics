@@ -24,10 +24,10 @@ def initialize_logfile(benchmark_file=BENCHMARK_FILE):
 
     if not os.path.exists(benchmark_file):
         with open(benchmark_file, 'w') as fh:
-            fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_workers,metric_name,metric_value\n')
+            fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_molecules,n_workers,metric_name,metric_value\n')
 
 
-def log_results(date, benchmark_type, step, time, n_workers, metric_name='', metric_value='', benchmark_file=BENCHMARK_FILE):
+def log_results(date, benchmark_type, step, time, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=BENCHMARK_FILE):
     """Log benchmark results to a file"""
 
     out_list = [date, benchmark_type, step, time, n_workers, metric_name, metric_value]

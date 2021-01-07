@@ -258,10 +258,12 @@ To create cache:
         task_start_time = datetime.now()
         if not args.cpu:
             workflow = GpuWorkflow(client,
+                                   n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters)
         else:
             workflow = CpuWorkflow(client,
+                                   n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters)
 

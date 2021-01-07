@@ -27,6 +27,8 @@ from datetime import datetime
 import dask_cudf
 import dask_ml
 
+from dask_ml.cluster import KMeans as dask_KMeans
+
 import cupy
 from cuml.manifold import UMAP as cuUMAP
 from cuml.dask.decomposition import PCA as cuDaskPCA
@@ -74,7 +76,7 @@ class CpuWorkflow:
         logger.info('KMeans...')
         task_start_time = datetime.now()
         # kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
-        kmeans_float = dask_ml.cluster.KMeans(n_clusters=self.n_clusters)
+        kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
         kmeans_labels = kmeans_float.labels_
         runtime = datetime.now() - task_start_time

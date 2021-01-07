@@ -269,17 +269,17 @@ To create cache:
         if args.benchmark:
             if not args.cpu:
                 mol_df = mol_df.compute()
-                n_cpu, n_gpu = 0, args.n_gpu
+                n_workers = args.n_gpu
             else:
-                n_cpu, n_gpu = args.n_cpu, 0
+                n_workers = args.n_cpu
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'gpu', 'workflow', runtime, n_cpu, n_gpu)
+            log_results(task_start_time, 'gpu', 'workflow', runtime, n_workers, metric_name='', metric_value='')
 
             runtime = datetime.now() - start_time
             logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'gpu', 'total', runtime, n_cpu, n_gpu)
+            log_results(task_start_time, 'gpu', 'total', runtime, n_workers, metric_name='', metric_value='')
         else:
 
             logger.info("Starting interactive visualization...")

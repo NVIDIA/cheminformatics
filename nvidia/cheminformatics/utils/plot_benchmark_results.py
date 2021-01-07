@@ -56,12 +56,13 @@ def prepare_benchmark_df(benchmark_file, xlsx_file, step_type_dict, step_type_ca
     bench_time_df = bench_df.pivot(index=['benchmark_type', 'n_workers', 'n_molecules'], columns=['step_type', 'step'], values='time')
     bench_time_df[('stats','total')] = bench_time_df.sum(axis=1)
 
+    # TODO this may be unreliable in some cases where same number of molecules are tested twice -- use groupby and average?
     if np.isnan(cpu_baseline_index[1]):
         bench_time_df[('stats','acceleration')] = np.NaN
     else:
         bench_time_df[('stats','acceleration')] = bench_time_df.loc[cpu_baseline_index, ('stats','total')] / bench_time_df[('stats','total')]
 
-    bench_time_df.to_xlsx(xlsx_file)
+    bench_time_df.to_excel(xlsx_file)
     return bench_time_df
 
 

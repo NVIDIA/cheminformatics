@@ -34,7 +34,6 @@ def compute_norms(data, norms):
             value = j + 1
             data[i][j] = value
             norms[i] = norms[i] + (value**2)
-
     if norms[i] != 0:
         norms[i] = math.sqrt(norms[i])
 

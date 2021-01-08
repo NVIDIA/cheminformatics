@@ -81,8 +81,7 @@ class CpuWorkflow:
         kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
 
-        #silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
-        silhouette_score = 0.0
+        silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
         log_results(task_start_time, 'cpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='silhouette_score', metric_value=silhouette_score)
 
@@ -161,9 +160,8 @@ class GpuWorkflow:
         kmeans_cuml.fit(gdf)
         kmeans_labels = kmeans_cuml.predict(gdf)
         runtime = datetime.now() - task_start_time
-
-        # silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)
-        silhouette_score = 0.0
+        
+        silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
         log_results(task_start_time, 'gpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='silhouette_score', metric_value=silhouette_score)
 

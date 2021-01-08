@@ -24,8 +24,11 @@ import dask_cudf
 from sklearn.metrics import silhouette_score
 from scipy.stats import spearmanr
 
+import logging
+logger = logging.getLogger(__name__)
 
-def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_gpu=True):
+
+def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, downsample_size=500000, on_gpu=True):
     """Calculate silhouette score in batches on the CPU. Compatible with data on GPU or CPU
 
     Args:
@@ -33,6 +36,7 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
         clusters (cudf.DataFrame or cupy.ndarray): cluster values for each data point
         batch_size (int, optional): Size for batching. Defaults to 5000.
         seed (int, optional): Random seed. Defaults to 0.
+        downsample_size (int, optional): Limit on size of data used for silhouette score. Defaults to 500000.
         on_gpu (bool, optional): Input data is on GPU. Defaults to True.
 
     Returns:
@@ -60,6 +64,11 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
         embeddings, clusters = input_data
         return silhouette_score(AsArray(embeddings), AsArray(clusters))
 
+    # Drop null values
+    mask = embeddings.notnull().any(axis=1)
+    embeddings = embeddings[mask]
+    clusters = clusters[mask]
+
     # Shuffle on GPU
     combined = dflib.DataFrame(embeddings) if not isinstance(embeddings, dflib.DataFrame) else embeddings
     embeddings_columns = combined.columns
@@ -67,7 +76,10 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
 
     clusters = dflib.Series(clusters, name=cluster_column)
     combined[cluster_column] = clusters
-    combined = combined.sample(n=len(combined), replace=False, random_state=seed) # shuffle via sampling
+
+    n_data = min(len(combined), downsample_size)
+    logger.info('Calculating silhouette score on {} molecules with batch size of {}...'.format(n_data, batch_size))
+    combined = combined.sample(n=n_data, replace=False, random_state=seed) # shuffle via sampling
 
     embeddings = combined[embeddings_columns]
     clusters = combined[cluster_column]

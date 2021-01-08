@@ -254,13 +254,16 @@ To create cache:
             if args.n_mol > 0:
                 mol_df = mol_df.head(args.n_mol, compute=False, npartitions=-1)
 
+        n_molecules = len(mol_df)
         task_start_time = datetime.now()
         if not args.cpu:
             workflow = GpuWorkflow(client,
+                                   n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters)
         else:
             workflow = CpuWorkflow(client,
+                                   n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters)
 
@@ -269,17 +272,19 @@ To create cache:
         if args.benchmark:
             if not args.cpu:
                 mol_df = mol_df.compute()
-                n_cpu, n_gpu = 0, args.n_gpu
+                n_workers = args.n_gpu
+                runtype = 'gpu'
             else:
-                n_cpu, n_gpu = args.n_cpu, 0
+                n_workers = args.n_cpu
+                runtype = 'cpu'
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'gpu', 'workflow', runtime, n_cpu, n_gpu)
+            log_results(task_start_time, runtype, 'workflow', runtime, n_molecules, n_workers, metric_name='', metric_value='')
 
             runtime = datetime.now() - start_time
             logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'gpu', 'total', runtime, n_cpu, n_gpu)
+            log_results(task_start_time, runtype, 'total', runtime, n_molecules, n_workers, metric_name='', metric_value='')
         else:
 
             logger.info("Starting interactive visualization...")

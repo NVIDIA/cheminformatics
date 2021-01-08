@@ -80,7 +80,7 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
     n_chunks = int(math.ceil(len(embeddings) / batch_size))
     embeddings_chunked = arraylib.array_split(embeddings, n_chunks)
     clusters_chunked = arraylib.array_split(clusters, n_chunks)
-    
+
     # Calculate scores on batches and return the average
     scores = list(map(_silhouette_scores, zip(embeddings_chunked, clusters_chunked)))
     return numpy.array(scores).mean()
@@ -99,7 +99,7 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
 
     data_matrix1 = cupy.asnumpy(data_matrix1)
     data_matrix2 = cupy.asnumpy(data_matrix2)
-    
+
     n_samples = data_matrix1.shape[0]
     data_matrix_argsort = data_matrix1.argsort(axis=1)
     mask_top_k = (data_matrix_argsort > 0) & (data_matrix_argsort <= top_k).reshape(n_samples, -1)
@@ -107,7 +107,7 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
     data_matrix1_top_k = data_matrix1[mask_top_k].reshape(n_samples, -1)
     data_matrix2_top_k = data_matrix2[mask_top_k].reshape(n_samples, -1)
 
-    # Includes Dask and cupy and cudf
+   # Includes Dask and cupy and cudf
     if hasattr(data_matrix1_top_k, 'device'):
         data_matrix1_top_k = cupy.asnumpy(data_matrix1_top_k)
 

@@ -80,8 +80,6 @@ class CpuWorkflow:
         # kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
         kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
-        kmeans_labels = kmeans_float.labels_
-        runtime = datetime.now() - task_start_time
 
         #silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
         silhouette_score = 0.0
@@ -97,7 +95,7 @@ class CpuWorkflow:
         mol_df = mol_df.compute()
         mol_df['x'] = Xt[:, 0]
         mol_df['y'] = Xt[:, 1]
-        mol_df['cluster'] = kmeans_labels
+        mol_df['cluster'] = kmeans_float.labels_
         runtime = datetime.now() - task_start_time
         
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
@@ -161,7 +159,7 @@ class GpuWorkflow:
         kmeans_cuml = cuDaskKMeans(client=self.client,
                                    n_clusters=self.n_clusters)
         kmeans_cuml.fit(gdf)
-        kmeans_labels = kmeans_cuml.labels_
+        kmeans_labels = kmeans_cuml.predict(gdf)
         runtime = datetime.now() - task_start_time
 
         # silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)

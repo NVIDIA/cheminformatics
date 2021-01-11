@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,8 +23,7 @@ import matplotlib
 
 # default input and out files
 BENCHMARK_FILE = 'benchmark.csv'
-XLSX_FILE = 'benchmark.xlsx'
-PLOT_FILE = 'benchmark.png'
+#### TODO FIX ME PATH WITH ARGS ####
 
 # defaults to categorize steps for sorting
 STEP_TYPE_DICT = {'dim_reduction': ['pca', 'svd'],
@@ -37,7 +38,7 @@ STEP_TYPE_CAT = pd.CategoricalDtype(
 NV_PALETTE = ['#86B637', '#8F231C', '#3D8366', '#541E7D', '#1B36B6']
 
 
-def prepare_benchmark_df(benchmark_file, xlsx_file, step_type_dict, step_type_cat):
+def prepare_benchmark_df(benchmark_file, step_type_dict=STEP_TYPE_DICT, step_type_cat=STEP_TYPE_CAT):
     """Read and prepare the benchmark data as a dataframe"""
 
     # Load and format data
@@ -86,12 +87,15 @@ def prepare_benchmark_df(benchmark_file, xlsx_file, step_type_dict, step_type_ca
     # Do the normalization
     bench_time_df[('stats', 'acceleration')] = bench_time_df[(
         'stats', 'total')].div(norm_df).pow(-1)
-    bench_time_df.to_excel(xlsx_file)
+
+    basename = os.path.splitext(benchmark_file)[0]
+    bench_time_df.to_excel(basename + '.xlsx')
+    # bench_time_df.to_markdown(basename + '.md') # TODO FIX ME
 
     return bench_time_df
 
 
-def prepare_acceleration_stacked_plot(df, plot_file, palette=NV_PALETTE):
+def prepare_acceleration_stacked_plot(df, palette=NV_PALETTE):
     """Prepare single plot of acceleration as stacked bars (by molecule) and hardware workers"""
 
     grouper = df['stats'].groupby(level='n_molecules')
@@ -140,13 +144,15 @@ def prepare_acceleration_stacked_plot(df, plot_file, palette=NV_PALETTE):
 
     ax.legend(title='Num Molecules')
     plt.tight_layout()
-    fig.savefig(plot_file, dpi=300)
+
+    basename = os.path.splitext(benchmark_file)[0]
+    fig.savefig(basename + '.png', dpi=300)
     return
 
 
 if __name__ == '__main__':
 
     # Read and prepare the dataframe then plot
-    bench_df = prepare_benchmark_df(benchmark_file=BENCHMARK_FILE, xlsx_file=XLSX_FILE,
-                                    step_type_dict=STEP_TYPE_DICT, step_type_cat=STEP_TYPE_CAT)
-    prepare_acceleration_stacked_plot(bench_df, plot_file=PLOT_FILE)
+    bench_df = prepare_benchmark_df(benchmark_file=BENCHMARK_FILE, step_type_dict=STEP_TYPE_DICT, 
+                                    step_type_cat=STEP_TYPE_CAT)
+    prepare_acceleration_stacked_plot(bench_df)

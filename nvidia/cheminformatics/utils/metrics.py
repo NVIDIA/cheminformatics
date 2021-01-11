@@ -20,6 +20,7 @@ import cupy
 import pandas
 import numpy
 
+import dask
 import dask_cudf
 from sklearn.metrics import silhouette_score
 from scipy.stats import spearmanr
@@ -47,13 +48,6 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, dow
         arraylib = cupy
         dflib = cudf
         AsArray = cupy.asnumpy
-
-        # Convert dask_cudf objects to cudf objects.
-        if isinstance(embeddings, dask_cudf.core.DataFrame):
-            embeddings = embeddings.compute()
-
-        if isinstance(clusters, dask_cudf.core.Series):
-            clusters = clusters.compute()
     else:
         arraylib = numpy
         dflib = pandas
@@ -64,18 +58,24 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, dow
         embeddings, clusters = input_data
         return silhouette_score(AsArray(embeddings), AsArray(clusters))
 
-    # Drop null values
-    mask = embeddings.notnull().any(axis=1)
-    embeddings = embeddings[mask]
-    clusters = clusters[mask]
+    # Compute dask objects
+    if isinstance(embeddings, dask_cudf.core.DataFrame) | isinstance(embeddings, dask.array.core.Array):
+        embeddings = embeddings.compute()
 
-    # Shuffle on GPU
+    if isinstance(clusters, dask_cudf.core.Series) | isinstance(clusters, dask.array.core.Array):
+        clusters = clusters.compute()
+
+    # Shuffle
     combined = dflib.DataFrame(embeddings) if not isinstance(embeddings, dflib.DataFrame) else embeddings
     embeddings_columns = combined.columns
     cluster_column = 'clusters'
 
     clusters = dflib.Series(clusters, name=cluster_column)
     combined[cluster_column] = clusters
+
+    # Drop null values
+    mask = combined.notnull().any(axis=1)
+    combined = combined[mask]
 
     n_data = min(len(combined), downsample_size)
     logger.info('Calculating silhouette score on {} molecules with batch size of {}...'.format(n_data, batch_size))

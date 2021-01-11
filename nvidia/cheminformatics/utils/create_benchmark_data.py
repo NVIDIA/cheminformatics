@@ -17,10 +17,12 @@
 import os
 import pandas as pd
 import sqlite3
+import cudf
+import numpy as np
 from nvidia.cheminformatics.fingerprint import MorganFingerprint
 
 CHEMBL_DB_PATH = '/data/db/chembl_27.db'
-DATA_BENCHMARK_DIR = '/workspace/nvidia/cheminformatics/data'
+DATA_BENCHMARK_DIR = '/workspace/tests/data'
 
 
 def fetch_approved_drugs(chembl_db_path=CHEMBL_DB_PATH):
@@ -69,10 +71,25 @@ def calc_morgan_figerprints(benchmark_df, smiles_col='canonical_smiles'):
 
 if __name__ == '__main__':
 
-    benchmark_df = fetch_approved_drugs()
+    benchmark_df = fetch_approved_drugs().set_index('molregno').sort_index()
+    benchmark_df.index = benchmark_df.index.astype(np.int64)
+
     # TODO: benchmark SMILES have not been canonicalized. Should this be done?
     fp = calc_morgan_figerprints(benchmark_df)
+    fp.columns = fp.columns.astype(np.int64)
+    fp.index = fp.index.astype(np.int64)
+    for col in fp.columns:
+        fp[col] = fp[col].astype(np.float32)
 
     # Write results
-    benchmark_df.reset_index().to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_approved_drugs.csv'), index=False)
-    fp.reset_index().to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_approved_drugs.csv'), index=False)
+    benchmark_df.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_approved_drugs.csv'))
+    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_approved_drugs.csv'))
+    fp_hdf5 = cudf.DataFrame(fp)
+    fp_hdf5.to_hdf(os.path.join(DATA_BENCHMARK_DIR, 'filter_00.h5', 'fingerprints', format='table'))
+
+
+# df_test = cudf.read_csv('tests/data/fingerprints_approved_drugs.csv',
+#                     dtype=np.float32).set_index('molregno').sort_index()
+# df_test.columns = df_test.columns.astype(np.int64)
+# df_test.index = df_test.index.astype(np.int64)
+# df_test.to_hdf('tests/data/filter_00.h5', 'fingerprints', format='table')

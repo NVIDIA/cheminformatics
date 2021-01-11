@@ -30,7 +30,7 @@ def initialize_logfile(benchmark_file=BENCHMARK_FILE):
 def log_results(date, benchmark_type, step, time, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=BENCHMARK_FILE):
     """Log benchmark results to a file"""
 
-    out_list = [date, benchmark_type, step, time, n_workers, metric_name, metric_value]
+    out_list = [date, benchmark_type, step, time, n_molecules, n_workers, metric_name, metric_value]
     out_fmt = ','.join(['{}'] * len(out_list)) + '\n'
 
     with open(benchmark_file, 'a') as fh:

@@ -20,7 +20,7 @@ import tempfile
 import os
 import sys
 import shlex
-import shutil
+import glob
 import pandas as pd
 
 # Define paths for the tests
@@ -28,46 +28,61 @@ _this_directory = os.path.dirname(os.path.realpath(__file__))
 _parent_directory = os.path.dirname(_this_directory)
 _data_dir = os.path.join(_this_directory, 'data')
 
-sys.path.insert(0, _parent_directory) # TODO better way to add this to the path
+sys.path.insert(0, _parent_directory) # TODO better way to add this directory to the path
 from startdash import Launcher
 from nvidia.cheminformatics.utils.plot_benchmark_results import prepare_benchmark_df, prepare_acceleration_stacked_plot
 
-# Output directory and parameters
+# Output directory
 temp_dir = tempfile.mkdtemp()
-benchmark_file = os.path.join(temp_dir, 'benchmark.csv')
 
 # Parameter lists
-run_benchmark_params = [(_data_dir, 'gpu',  1, -1, benchmark_file),
-                        (_data_dir, 'cpu', 19, -1, benchmark_file)]
-load_benchmark_params = [(benchmark_file)]
+run_benchmark_params = [ ([{'test_type': 'gpu', 'n_workers':  1, 'n_mol': -1}, 
+                           {'test_type': 'cpu', 'n_workers': 19, 'n_mol': -1}], _data_dir, temp_dir) ]
+load_benchmark_params = [(temp_dir)]
 
-@pytest.mark.parametrize('data_dir, test_type, n_workers, n_mol, benchmark_file', run_benchmark_params)
-def test_run_benchmark(data_dir, test_type, n_workers, n_mol, benchmark_file):
+@pytest.mark.parametrize('benchmark_config_list, data_dir, output_dir', run_benchmark_params)
+def test_run_benchmark(benchmark_config_list, data_dir, output_dir):
 
-    # Create run command and inject into sys.argv
-    command = f'startdash.py analyze -b --cache {data_dir} '
-    if test_type == 'cpu':
-        command += f'--{test_type} '
-    command += f'--n_{test_type} {n_workers} --n_mol {n_mol} --output_path {benchmark_file}'
+    temp_file = tempfile.NamedTemporaryFile(prefix='benchmark_', suffix='.csv', dir=output_dir, delete=False).name
+    
+    if os.path.exists(temp_file):
+        os.remove(temp_file)
 
-    sys_argv = shlex.split(command)
-    with unittest.mock.patch('sys.argv', sys_argv):
-        Launcher()
+    for config in benchmark_config_list:
+        test_type = config['test_type']
+        n_workers = config['n_workers']
+        n_mol = config['n_mol']
+        
+        # Create run command and inject into sys.argv
+        command = f'startdash.py analyze -b --cache {data_dir} '
+        if test_type == 'cpu':
+            command += f'--{test_type} '
+        command += f'--n_{test_type} {n_workers} --n_mol {n_mol} --output_path {temp_file}'
 
-    print(benchmark_file)
-    assert os.path.exists(benchmark_file)
-    benchmark_results = pd.read_csv(benchmark_file)
+        sys_argv = shlex.split(command)
+        with unittest.mock.patch('sys.argv', sys_argv):
+            Launcher()
+
+    assert os.path.exists(temp_file)
+    benchmark_results = pd.read_csv(temp_file)
     nrows, ncols = benchmark_results.shape
     assert nrows >= 5
     assert ncols == 8
+    # TODO add test for metrics and values
 
-@pytest.mark.parametrize('benchmark_file', load_benchmark_params)
-def test_load_benchmark(benchmark_file):
-    df = prepare_benchmark_df(benchmark_file)
-    print(df.columns)
 
-    basename = os.path.splitext(benchmark_file)[0]
-    excel_file = basename + '.xlsx'
-    md_file = basename + '.md'
-    assert os.path.exists(excel_file)
-    #assert os.path.exists(md_file) # TODO FIX ME
+@pytest.mark.parametrize('output_dir', load_benchmark_params)
+def test_load_benchmarks(output_dir):
+
+    csv_path = os.path.join(output_dir, 'benchmark_*.csv')
+    for benchmark_file in glob.glob(csv_path):
+        df = prepare_benchmark_df(benchmark_file)
+        basename = os.path.splitext(benchmark_file)[0]
+        excel_file = basename + '.xlsx'
+        assert os.path.exists(excel_file)
+        # md_file = basename + '.md'
+        # assert os.path.exists(md_file) # TODO add this when markdown export is fixed
+        
+        png_file = basename + '.png'
+        prepare_acceleration_stacked_plot(df, output_path=png_file)
+        assert os.path.exists(png_file)

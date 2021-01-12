@@ -16,8 +16,9 @@
 
 export PATH=/opt/conda/envs/rapids/bin:$PATH
 
-BENCHMARK_DIR='benchmark'
+BENCHMARK_DIR='/workspace/benchmark'
 BENCHMARK_PATH=${BENCHMARK_DIR}/benchmark.csv
+PLOT_PATH=${BENCHMARK_DIR}/benchmark.png
 CLEAN_BENCHMARK=0
 
 CACHE_DIR='/data/db'
@@ -58,4 +59,4 @@ for n_molecules in ${N_MOLECULES[*]}; do
 done
 
 # Plot the results
-python nvidia/cheminformatics/utils/plot_benchmark_results.py  --output_path $BENCHMARK_PATH
+python nvidia/cheminformatics/utils/plot_benchmark_results.py --benchmark_file $BENCHMARK_PATH --output_path $PLOT_PATH

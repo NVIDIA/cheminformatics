@@ -86,10 +86,3 @@ if __name__ == '__main__':
     fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_approved_drugs.csv'))
     fp_hdf5 = cudf.DataFrame(fp)
     fp_hdf5.to_hdf(os.path.join(DATA_BENCHMARK_DIR, 'filter_00.h5', 'fingerprints', format='table'))
-
-
-# df_test = cudf.read_csv('tests/data/fingerprints_approved_drugs.csv',
-#                     dtype=np.float32).set_index('molregno').sort_index()
-# df_test.columns = df_test.columns.astype(np.int64)
-# df_test.index = df_test.index.astype(np.int64)
-# df_test.to_hdf('tests/data/filter_00.h5', 'fingerprints', format='table')

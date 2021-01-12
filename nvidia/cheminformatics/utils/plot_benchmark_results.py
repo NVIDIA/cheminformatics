@@ -14,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import sys
 
 # default input and out files
 BENCHMARK_FILE = 'benchmark.csv'
-XLSX_FILE = 'benchmark.xlsx'
-PLOT_FILE = 'benchmark.png'
 
 # defaults to categorize steps for sorting
 STEP_TYPE_DICT = {'dim_reduction': ['pca', 'svd'],
@@ -37,7 +38,24 @@ STEP_TYPE_CAT = pd.CategoricalDtype(
 NV_PALETTE = ['#86B637', '#8F231C', '#3D8366', '#541E7D', '#1B36B6']
 
 
-def prepare_benchmark_df(benchmark_file, xlsx_file, step_type_dict, step_type_cat):
+def parse_args():
+    parser = argparse.ArgumentParser(description='Analyze and plot benchmark data')
+    parser.add_argument('-b', '--benchmark_file',
+                        dest='benchmark_file',
+                        type=str,
+                        default='/workspace/benchmark/benchmark.csv',
+                        help='Path to the CSV file containing benchmark results')
+    parser.add_argument('-o', '--output_path',
+                        dest='output_path',
+                        type=str,
+                        default='/workspace/benchmark/benchmark.png',
+                        help='Output directory for plot')
+
+    args = parser.parse_args(sys.argv)
+    return args
+
+
+def prepare_benchmark_df(benchmark_file, step_type_dict=STEP_TYPE_DICT, step_type_cat=STEP_TYPE_CAT):
     """Read and prepare the benchmark data as a dataframe"""
 
     # Load and format data
@@ -86,12 +104,15 @@ def prepare_benchmark_df(benchmark_file, xlsx_file, step_type_dict, step_type_ca
     # Do the normalization
     bench_time_df[('stats', 'acceleration')] = bench_time_df[(
         'stats', 'total')].div(norm_df).pow(-1)
-    bench_time_df.to_excel(xlsx_file)
+
+    basename = os.path.splitext(benchmark_file)[0]
+    bench_time_df.to_excel(basename + '.xlsx')
+    # bench_time_df.to_markdown(basename + '.md') # TODO fix markdown export
 
     return bench_time_df
 
 
-def prepare_acceleration_stacked_plot(df, plot_file, palette=NV_PALETTE):
+def prepare_acceleration_stacked_plot(df, output_path, palette=NV_PALETTE):
     """Prepare single plot of acceleration as stacked bars (by molecule) and hardware workers"""
 
     grouper = df['stats'].groupby(level='n_molecules')
@@ -140,13 +161,15 @@ def prepare_acceleration_stacked_plot(df, plot_file, palette=NV_PALETTE):
 
     ax.legend(title='Num Molecules')
     plt.tight_layout()
-    fig.savefig(plot_file, dpi=300)
+    fig.savefig(output_path, dpi=300)
     return
 
 
 if __name__ == '__main__':
 
+    args = parse_args()
+
     # Read and prepare the dataframe then plot
-    bench_df = prepare_benchmark_df(benchmark_file=BENCHMARK_FILE, xlsx_file=XLSX_FILE,
-                                    step_type_dict=STEP_TYPE_DICT, step_type_cat=STEP_TYPE_CAT)
-    prepare_acceleration_stacked_plot(bench_df, plot_file=PLOT_FILE)
+    bench_df = prepare_benchmark_df(benchmark_file=args.benchmark_file, step_type_dict=STEP_TYPE_DICT, 
+                                    step_type_cat=STEP_TYPE_CAT)
+    prepare_acceleration_stacked_plot(bench_df, output_path=args.output_path)

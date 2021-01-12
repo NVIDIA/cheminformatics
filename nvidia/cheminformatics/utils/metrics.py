@@ -20,12 +20,16 @@ import cupy
 import pandas
 import numpy
 
+import dask
 import dask_cudf
 from sklearn.metrics import silhouette_score
 from scipy.stats import spearmanr
 
+import logging
+logger = logging.getLogger(__name__)
 
-def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_gpu=True):
+
+def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, downsample_size=500000, on_gpu=True):
     """Calculate silhouette score in batches on the CPU. Compatible with data on GPU or CPU
 
     Args:
@@ -33,6 +37,7 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
         clusters (cudf.DataFrame or cupy.ndarray): cluster values for each data point
         batch_size (int, optional): Size for batching. Defaults to 5000.
         seed (int, optional): Random seed. Defaults to 0.
+        downsample_size (int, optional): Limit on size of data used for silhouette score. Defaults to 500000.
         on_gpu (bool, optional): Input data is on GPU. Defaults to True.
 
     Returns:
@@ -43,13 +48,6 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
         arraylib = cupy
         dflib = cudf
         AsArray = cupy.asnumpy
-
-        # Convert dask_cudf objects to cudf objects.
-        if isinstance(embeddings, dask_cudf.core.DataFrame):
-            embeddings = embeddings.compute()
-
-        if isinstance(clusters, dask_cudf.core.Series):
-            clusters = clusters.compute()
     else:
         arraylib = numpy
         dflib = pandas
@@ -60,14 +58,28 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, on_
         embeddings, clusters = input_data
         return silhouette_score(AsArray(embeddings), AsArray(clusters))
 
-    # Shuffle on GPU
+    # Compute dask objects
+    if isinstance(embeddings, dask_cudf.core.DataFrame) | isinstance(embeddings, dask.array.core.Array):
+        embeddings = embeddings.compute()
+
+    if isinstance(clusters, dask_cudf.core.Series) | isinstance(clusters, dask.array.core.Array):
+        clusters = clusters.compute()
+
+    # Shuffle
     combined = dflib.DataFrame(embeddings) if not isinstance(embeddings, dflib.DataFrame) else embeddings
     embeddings_columns = combined.columns
     cluster_column = 'clusters'
 
     clusters = dflib.Series(clusters, name=cluster_column)
     combined[cluster_column] = clusters
-    combined = combined.sample(n=len(combined), replace=False, random_state=seed) # shuffle via sampling
+
+    # Drop null values
+    mask = combined.notnull().any(axis=1)
+    combined = combined[mask]
+
+    n_data = min(len(combined), downsample_size)
+    logger.info('Calculating silhouette score on {} molecules with batch size of {}...'.format(n_data, batch_size))
+    combined = combined.sample(n=n_data, replace=False, random_state=seed) # shuffle via sampling
 
     embeddings = combined[embeddings_columns]
     clusters = combined[cluster_column]

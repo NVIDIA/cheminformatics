@@ -17,7 +17,8 @@ RUN /opt/conda/envs/rapids/bin/pip install \
     progressbar2 \
     tables \
     sqlalchemy \
-    openpyxl
+    openpyxl \
+    tabulate
 
 # misc python packages
 RUN conda install -n rapids pywget

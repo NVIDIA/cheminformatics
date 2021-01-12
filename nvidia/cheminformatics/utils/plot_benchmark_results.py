@@ -20,6 +20,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import sys
 
 # default input and out files
 BENCHMARK_FILE = 'benchmark.csv'
@@ -36,6 +37,23 @@ STEP_TYPE_CAT = pd.CategoricalDtype(
     ['dim_reduction', 'clustering', 'embedding', 'workflow', 'stats'], ordered=True)
 
 NV_PALETTE = ['#86B637', '#8F231C', '#3D8366', '#541E7D', '#1B36B6']
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Analyze and plot benchmark data')
+    parser.add_argument('-b', '--benchmark_file',
+                        dest='benchmark_file',
+                        type=str,
+                        default='/workspace/benchmark/benchmark.csv',
+                        help='Path to the CSV file containing benchmark results')
+    parser.add_argument('-o', '--output_path',
+                        dest='output_path',
+                        type=str,
+                        default='/workspace/benchmark/benchmark.png',
+                        help='Output directory for plot')
+
+    args = parser.parse_args(sys.argv)
+    return args
 
 
 def prepare_benchmark_df(benchmark_file, step_type_dict=STEP_TYPE_DICT, step_type_cat=STEP_TYPE_CAT):
@@ -90,12 +108,12 @@ def prepare_benchmark_df(benchmark_file, step_type_dict=STEP_TYPE_DICT, step_typ
 
     basename = os.path.splitext(benchmark_file)[0]
     bench_time_df.to_excel(basename + '.xlsx')
-    # bench_time_df.to_markdown(basename + '.md') # TODO FIX ME
+    # bench_time_df.to_markdown(basename + '.md') # TODO fix markdown export
 
     return bench_time_df
 
 
-def prepare_acceleration_stacked_plot(df, palette=NV_PALETTE):
+def prepare_acceleration_stacked_plot(df, output_path, palette=NV_PALETTE):
     """Prepare single plot of acceleration as stacked bars (by molecule) and hardware workers"""
 
     grouper = df['stats'].groupby(level='n_molecules')
@@ -144,15 +162,15 @@ def prepare_acceleration_stacked_plot(df, palette=NV_PALETTE):
 
     ax.legend(title='Num Molecules')
     plt.tight_layout()
-
-    basename = os.path.splitext(benchmark_file)[0]
-    fig.savefig(basename + '.png', dpi=300)
+    fig.savefig(output_path, dpi=300)
     return
 
 
 if __name__ == '__main__':
 
+    args = parse_args()
+
     # Read and prepare the dataframe then plot
-    bench_df = prepare_benchmark_df(benchmark_file=BENCHMARK_FILE, step_type_dict=STEP_TYPE_DICT, 
+    bench_df = prepare_benchmark_df(benchmark_file=args.benchmark_file, step_type_dict=STEP_TYPE_DICT, 
                                     step_type_cat=STEP_TYPE_CAT)
-    prepare_acceleration_stacked_plot(bench_df)
+    prepare_acceleration_stacked_plot(bench_df, output_path=args.output_path)

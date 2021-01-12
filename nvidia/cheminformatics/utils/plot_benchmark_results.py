@@ -24,7 +24,6 @@ import sys
 
 # default input and out files
 BENCHMARK_FILE = 'benchmark.csv'
-#### TODO FIX ME PATH WITH ARGS ####
 
 # defaults to categorize steps for sorting
 STEP_TYPE_DICT = {'dim_reduction': ['pca', 'svd'],

@@ -14,10 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
+import sys
 
 # default input and out files
 BENCHMARK_FILE = 'benchmark.csv'
@@ -149,6 +152,8 @@ def prepare_acceleration_stacked_plot(df, palette=NV_PALETTE):
 
 
 if __name__ == '__main__':
+
+    args = parse_args()
 
     # Read and prepare the dataframe then plot
     bench_df = prepare_benchmark_df(benchmark_file=BENCHMARK_FILE, step_type_dict=STEP_TYPE_DICT, 

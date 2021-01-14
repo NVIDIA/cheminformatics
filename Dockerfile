@@ -18,7 +18,8 @@ RUN /opt/conda/envs/rapids/bin/pip install \
     tables \
     sqlalchemy \
     openpyxl \
-    tabulate
+    tabulate \
+    autopep8
 
 # misc python packages
 RUN conda install -n rapids pywget

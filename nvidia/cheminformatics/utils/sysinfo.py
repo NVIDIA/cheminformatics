@@ -16,8 +16,11 @@
 
 import pynvml as nv
 import psutil
+from collections import Counter
 
 def get_machine_config():
+    """Get machine config for CPU and GPU(s)"""
+
     # CPU config
     physical_cores = psutil.cpu_count(logical=False)
     logical_cores = psutil.cpu_count(logical=True)
@@ -38,7 +41,7 @@ def get_machine_config():
     gpu_devices, gpu_mems = [], []
     for i in range(deviceCount):
         handle = nv.nvmlDeviceGetHandleByIndex(i)
-        gpu_devices.append(nv.nvmlDeviceGetName(handle))
+        gpu_devices.append(nv.nvmlDeviceGetName(handle).decode("utf-8"))
         gpu_mem = nv.nvmlDeviceGetMemoryInfo(handle).total  / (1024.0 **3)
         gpu_mems.append(gpu_mem)
 
@@ -46,3 +49,18 @@ def get_machine_config():
                     'min_freq_MHz': cpufreq_min, 'max_freq_MHz': cpufreq_max, 'cur_freq_MHz': cpufreq_cur,
                     'total_mem_GB': mem_total, 'avail_mem_GB': mem_avail},
             'gpu': {'devices': gpu_devices, 'mem_GB': gpu_mems}}
+
+
+def print_machine_config(config):
+    """Printable version of config"""
+    cpu_cores = config['cpu']['physical_cores']
+    cpu_freq = int(round(config['cpu']['max_freq_MHz'], 0))
+    ram = int(round(config['cpu']['total_mem_GB'], 0))
+    cpu_config_message = f'{cpu_freq} MHz CPU with {cpu_cores} cores, {ram} GB RAM'
+
+    gpu_devices = Counter([(x, int(round(y, 0))) for x,y in zip(config['gpu']['devices'], config['gpu']['mem_GB'])])
+    gpu_config_message = ''
+    for (handle, mem), count in gpu_devices.items():
+        gpu_config_message += f'{count} x {handle} GPU(s)'
+
+    return ', '.join([cpu_config_message, gpu_config_message])

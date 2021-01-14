@@ -19,7 +19,7 @@ export PATH=/opt/conda/envs/rapids/bin:$PATH
 BENCHMARK_DIR='/workspace/benchmark'
 BENCHMARK_PATH=${BENCHMARK_DIR}/benchmark.csv
 PLOT_PATH=${BENCHMARK_DIR}/benchmark.png
-CLEAN_BENCHMARK=0
+CLEAN_BENCHMARK=1
 
 CACHE_DIR='/data/db'
 REBUILD_CACHE=0

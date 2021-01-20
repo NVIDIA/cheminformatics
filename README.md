@@ -56,4 +56,9 @@ Navigate a browser to:
 https://0.0.0.0:5000
 ```
 
+### Acceleration
+
+The latest benchmarks reside in the [benchmarks](benchmarks) directory. The files are available in [markdown](benchmarks/benchmark.md) and [Excel](benchmarks/benchmark.xlsx). A [plot](benchmarks/benchmark.png) is also available.
+
+
 

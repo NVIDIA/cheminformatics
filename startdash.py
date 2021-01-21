@@ -179,6 +179,7 @@ To create cache:
 
         parser.add_argument('-o', '--output_path',
                             dest='output_path',
+                            default=".",
                             type=str,
                             help='Output path for benchmark results')
 

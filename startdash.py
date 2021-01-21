@@ -262,18 +262,20 @@ To create cache:
 
         n_molecules = len(mol_df)
         task_start_time = datetime.now()
+
+        benchmark_file = os.path.join(args.output_path, 'benchmark.csv')
         if not args.cpu:
             workflow = GpuWorkflow(client,
                                    n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters,
-                                   benchmark_file=args.output_path)
+                                   benchmark_file=benchmark_file)
         else:
             workflow = CpuWorkflow(client,
                                    n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters,
-                                   benchmark_file=args.output_path)
+                                   benchmark_file=benchmark_file)
 
         mol_df = workflow.execute(mol_df)
 

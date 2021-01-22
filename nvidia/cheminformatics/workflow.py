@@ -191,7 +191,7 @@ class GpuWorkflow:
         runtime = datetime.now() - task_start_time
 
         # Sample to calculate spearman's rho
-        n_indexes = 5000
+        n_indexes = min(5000, X_train.shape[0])
         indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
         X_train_sample = cupy.fromDlpack(mol_df.compute().to_dlpack())[indexes]
         Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]

@@ -26,7 +26,7 @@ from datetime import datetime
 
 import dask_cudf
 import dask_ml
-
+from dask import dataframe as dd
 from dask_ml.cluster import KMeans as dask_KMeans
 
 import cupy
@@ -35,10 +35,14 @@ from cuml.dask.decomposition import PCA as cuDaskPCA
 from cuml.dask.cluster import KMeans as cuDaskKMeans
 from cuml.dask.manifold import UMAP as cuDaskUMAP
 from cuml.metrics import pairwise_distances
+from cuml.random_projection import SparseRandomProjection
+from cuml.cluster import KMeans
 
 import sklearn.cluster
 import sklearn.decomposition
 import umap
+import cudf
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -121,7 +125,7 @@ class GpuWorkflow:
         self.n_clusters = n_clusters
         self.benchmark_file = benchmark_file
 
-    def re_cluster(self, gdf,
+    def re_cluster(self, mol_df, gdf,
                    new_figerprints=None,
                    new_chembl_ids=None,
                    n_clusters = None):
@@ -140,6 +144,7 @@ class GpuWorkflow:
 
         if new_figerprints is not None and new_chembl_ids is not None:
             # Add new figerprints and chEmblIds before reclustering
+            mol_df.append(new_figerprints, ignore_index=True)
             if self.pca_comps:
                 new_figerprints = self.pca.transform(new_figerprints)
 
@@ -188,7 +193,7 @@ class GpuWorkflow:
         # Sample to calculate spearman's rho
         n_indexes = 5000
         indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
-        X_train_sample = cupy.fromDlpack(X_train.to_dlpack())[indexes]
+        X_train_sample = cupy.fromDlpack(mol_df.compute().to_dlpack())[indexes]
         Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
         dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)
         dist_array_eucl = pairwise_distances(Xt_sample)
@@ -225,100 +230,5 @@ class GpuWorkflow:
         else:
             df_fingerprints = mol_df.copy()
 
-        mol_df = self.re_cluster(df_fingerprints)
-        return mol_df
-
-
-class GpuWorkflowRandomProjection:
-
-    def __init__(self,
-                 client,
-                 n_molecules,
-                 n_clusters=8):
-
-        self.client = client
-        self.n_molecules = n_molecules
-        self.n_clusters = n_clusters
-        self.embedding = SparseRandomProjection(n_components=2)
-
-    def re_cluster(self, mol_df, gdf,
-                   new_figerprints=None,
-                   new_chembl_ids=None,
-                   n_clusters = None):
-
-        if n_clusters is not None:
-            self.n_clusters = n_clusters
-
-        n_gpu = len(self.client.cluster.workers)
-        logger.info('WORKERS %d' % n_gpu)
-        # Before reclustering remove all columns that may interfere
-        if 'id' in gdf.columns:
-            gdf = gdf.drop(['x', 'y', 'cluster', 'id'], axis=1)
-
-        if 'filter_col' in gdf.columns:
-            gdf = gdf.drop(['filter_col'], axis=1)
-
-        if new_figerprints is not None and new_chembl_ids is not None:
-            # Add new figerprints and chEmblIds before reclustering
-            mol_df.append(new_figerprints, ignore_index=True)
-            new_figerprints = self.embedding.transform(new_figerprints)
-
-            fp_df = cudf.DataFrame(
-                new_figerprints,
-                index=[idx for idx in range(self.orig_df.shape[0],
-                                            self.orig_df.shape[0] + len(new_figerprints))],
-                columns=gdf.columns)
-
-            gdf = gdf.append(fp_df, ignore_index=True)
-            # Update original dataframe for it to work on reload
-            fp_df['id'] = fp_df.index
-            self.orig_df = self.orig_df.append(fp_df, ignore_index=True)
-            chembl_ids = chembl_ids.append(
-                cudf.Series(new_chembl_ids), ignore_index=True)
-            ids = ids.append(fp_df['id'], ignore_index=True), 'id', 'chembl_id'
-            self.chembl_ids.extend(new_chembl_ids)
-
-            del fp_df
-
-        task_start_time = datetime.now()
-        kmeans_cuml = KMeans(n_clusters=self.n_clusters)
-        kmeans_cuml.fit(gdf)
-        kmeans_labels = kmeans_cuml.predict(gdf)
-        runtime = datetime.now() - task_start_time
-
-        # silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)
-        silhouette_score = 0.0
-        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
-        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='silhouette_score', metric_value=silhouette_score, benchmark_file=self.benchmark_file)
-
-        # Sample to calculate spearman's rho
-        n_indexes = 5000
-        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
-        X_train_sample = cupy.fromDlpack(mol_df.to_dlpack())[indexes]
-        Xt_sample = gdf[indexes]
-        dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)
-        dist_array_eucl = pairwise_distances(Xt_sample)
-        spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl).mean()
-
-        gdf['x'] = gdf[:, 0]
-        gdf['y'] = gdf[:, 1]
-        gdf['cluster'] = kmeans_labels
-        gdf['id'] = mol_df.index
-
-        return gdf
-
-    def execute(self, mol_df):
-        logger.info("Executing GPU workflow...")
-        n_gpu = len(self.client.cluster.workers)
-        mol_df = dask_cudf.from_dask_dataframe(mol_df)
-        mol_df = mol_df.persist()
-
-        logger.info('SparseRandomProjection...')
-        task_start_time = datetime.now()
-        df_fingerprints = self.embedding.fit_transform(cupy.fromDlpack(mol_df.compute().to_dlpack()))
-        runtime = datetime.now() - task_start_time
-
-        logger.info('### Runtime Sparse Random Projection time (hh:mm:ss.ms) {}'.format(runtime))
-        log_results(task_start_time, 'gpu', 'random_proj', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='', metric_value='', benchmark_file=self.benchmark_file)
         mol_df = self.re_cluster(mol_df, df_fingerprints)
         return mol_df

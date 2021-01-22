@@ -49,12 +49,12 @@ fi
 for n_molecules in ${N_MOLECULES[*]}; do
     for n_gpus in ${N_GPUS[*]}; do
         echo "Benchmarking $n_molecules molecules on $n_gpus GPUs"
-        python startdash.py analyze -b --cache ${CACHE_DIR} --n_gpu $n_gpus --n_mol $n_molecules --output_path $BENCHMARK_PATH
+        python startdash.py analyze -b --cache ${CACHE_DIR} --n_gpu $n_gpus --n_mol $n_molecules --output_dir $BENCHMARK_DIR
     done
 
     for n_cpus in ${N_CPUS[*]}; do
         echo "Benchmarking $n_molecules molecules on $n_cpus CPU cores"
-        python startdash.py analyze -b --cache ${CACHE_DIR} --cpu --n_cpu $n_cpus --n_mol $n_molecules --output_path $BENCHMARK_PATH
+        python startdash.py analyze -b --cache ${CACHE_DIR} --cpu --n_cpu $n_cpus --n_mol $n_molecules --output_dir $BENCHMARK_DIR
     done
 done
 

@@ -18,6 +18,7 @@ import pytest
 import unittest
 import tempfile
 import os
+import shutil
 import sys
 import shlex
 import glob
@@ -40,13 +41,13 @@ run_benchmark_params = [ ([{'test_type': 'gpu', 'n_workers':  1, 'n_mol': -1},
                            {'test_type': 'cpu', 'n_workers': 19, 'n_mol': -1}], _data_dir, temp_dir) ]
 load_benchmark_params = [(temp_dir)]
 
+
 @pytest.mark.parametrize('benchmark_config_list, data_dir, output_dir', run_benchmark_params)
 def test_run_benchmark(benchmark_config_list, data_dir, output_dir):
 
-    temp_file = tempfile.NamedTemporaryFile(prefix='benchmark_', suffix='.csv', dir=output_dir, delete=False).name
-    
-    if os.path.exists(temp_file):
-        os.remove(temp_file)
+    output_file = os.path.join(output_dir, 'benchmark.csv')
+    if os.path.exists(output_file):
+        os.remove(output_file)
 
     for config in benchmark_config_list:
         test_type = config['test_type']
@@ -57,18 +58,21 @@ def test_run_benchmark(benchmark_config_list, data_dir, output_dir):
         command = f'startdash.py analyze -b --cache {data_dir} '
         if test_type == 'cpu':
             command += f'--{test_type} '
-        command += f'--n_{test_type} {n_workers} --n_mol {n_mol} --output_path {temp_file}'
+        command += f'--n_{test_type} {n_workers} --n_mol {n_mol} --output_dir {output_dir}'
 
         sys_argv = shlex.split(command)
         with unittest.mock.patch('sys.argv', sys_argv):
             Launcher()
 
+    # Filename is set in workflow -- move to create randomized name
+    temp_file = tempfile.NamedTemporaryFile(prefix='benchmark_', suffix='.csv', dir=output_dir, delete=False).name
+    shutil.move(output_file, temp_file)
     assert os.path.exists(temp_file)
-    benchmark_results = pd.read_csv(temp_file)
+    
+    benchmark_results = pd.read_csv(temp_file, comment='#')
     nrows, ncols = benchmark_results.shape
-    assert nrows >= 5
+    assert nrows == len(benchmark_config_list) * 5
     assert ncols == 8
-    # TODO add test for metrics and values
 
 
 @pytest.mark.parametrize('output_dir', load_benchmark_params)
@@ -76,13 +80,16 @@ def test_load_benchmarks(output_dir):
 
     csv_path = os.path.join(output_dir, 'benchmark_*.csv')
     for benchmark_file in glob.glob(csv_path):
-        df = prepare_benchmark_df(benchmark_file)
+        df, machine_config = prepare_benchmark_df(benchmark_file)
         basename = os.path.splitext(benchmark_file)[0]
         excel_file = basename + '.xlsx'
         assert os.path.exists(excel_file)
-        # md_file = basename + '.md'
-        # assert os.path.exists(md_file) # TODO add this when markdown export is fixed
+        md_file = basename + '.md'
+        assert os.path.exists(md_file)
         
         png_file = basename + '.png'
-        prepare_acceleration_stacked_plot(df, output_path=png_file)
+        prepare_acceleration_stacked_plot(df, machine_config, output_path=png_file)
         assert os.path.exists(png_file)
+
+
+# TODO add test for metrics and values

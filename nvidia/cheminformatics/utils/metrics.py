@@ -119,7 +119,7 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
     data_matrix1_top_k = data_matrix1[mask_top_k].reshape(n_samples, -1)
     data_matrix2_top_k = data_matrix2[mask_top_k].reshape(n_samples, -1)
 
-   # Includes Dask and cupy and cudf
+    # Includes Dask and cupy and cudf
     if hasattr(data_matrix1_top_k, 'device'):
         data_matrix1_top_k = cupy.asnumpy(data_matrix1_top_k)
 

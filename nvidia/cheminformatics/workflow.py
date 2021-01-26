@@ -114,7 +114,7 @@ class CpuWorkflow:
         Xt_sample = cupy.array(X_train[indexes])
         dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
         dist_array_eucl = pairwise_distances(Xt_sample)
-        spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl, top_k=10)
+        spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl, top_k=100)
 
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {} with {} of {}'.format(runtime, 'spearman_rho', spearman_mean))
         log_results(task_start_time, 'gpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='spearman_rho', metric_value=spearman_mean, benchmark_file=self.benchmark_file)
@@ -219,7 +219,7 @@ class GpuWorkflow:
         Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
         dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
         dist_array_eucl = pairwise_distances(Xt_sample)
-        spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl, top_k=10)
+        spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl, top_k=100)
 
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {} with {} of {}'.format(runtime, 'spearman_rho', spearman_mean))
         log_results(task_start_time, 'gpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='spearman_rho', metric_value=spearman_mean, benchmark_file=self.benchmark_file)

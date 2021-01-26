@@ -54,12 +54,16 @@ class CpuWorkflow:
                  n_molecules,
                  pca_comps=64,
                  n_clusters=7,
-                 benchmark_file='./benchmark.csv'):
+                 benchmark_file='./benchmark.csv',
+                 seed=0):
+
         self.client = client
         self.n_molecules = n_molecules
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
         self.benchmark_file = benchmark_file
+        self.seed = seed
+        self.n_spearman = 5000
 
     def execute(self, mol_df):
         logger.info("Executing CPU workflow...")
@@ -89,24 +93,37 @@ class CpuWorkflow:
         kmeans_labels = kmeans_float.predict(df_fingerprints)
         runtime = datetime.now() - task_start_time
 
-        silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
+        silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False, seed=self.seed)
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
         log_results(task_start_time, 'cpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='silhouette_score', metric_value=silhouette_score, benchmark_file=self.benchmark_file)
 
         logger.info('UMAP...')
         task_start_time = datetime.now()
-        umap_model = umap.UMAP()
-
-        Xt = umap_model.fit_transform(df_fingerprints)
-        # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
-        mol_df = mol_df.compute()
-        mol_df['x'] = Xt[:, 0]
-        mol_df['y'] = Xt[:, 1]
-        mol_df['cluster'] = kmeans_float.labels_
+        umap_model = umap.UMAP() # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
+        X_train = umap_model.fit_transform(df_fingerprints)
         runtime = datetime.now() - task_start_time
 
-        logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
-        log_results(task_start_time, 'cpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='', metric_value='', benchmark_file=self.benchmark_file)
+        # Sample to calculate spearman's rho
+        # Currently this converts indexes to 
+        mol_df = mol_df.compute()
+
+        n_indexes = min(self.n_spearman, X_train.shape[0])
+        numpy.random.seed(self.seed)
+        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
+        fp_sample = cupy.array(mol_df.iloc[indexes])
+        Xt_sample = cupy.array(X_train[indexes])
+        dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
+        dist_array_eucl = pairwise_distances(Xt_sample)
+        spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl, top_k=10)
+
+        logger.info('### Runtime UMAP time (hh:mm:ss.ms) {} with {} of {}'.format(runtime, 'spearman_rho', spearman_mean))
+        log_results(task_start_time, 'gpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='spearman_rho', metric_value=spearman_mean, benchmark_file=self.benchmark_file)
+
+        # Add back the column required for plotting and to correlating data
+        # between re-clustering
+        mol_df['x'] = X_train[:, 0]
+        mol_df['y'] = X_train[:, 1]
+        mol_df['cluster'] = kmeans_float.labels_
 
         return mol_df
 
@@ -118,12 +135,15 @@ class GpuWorkflow:
                  n_molecules,
                  pca_comps=64,
                  n_clusters=7,
-                 benchmark_file='./benchmark.csv'):
+                 benchmark_file='./benchmark.csv',
+                 seed=0):
         self.client = client
         self.n_molecules = n_molecules
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
         self.benchmark_file = benchmark_file
+        self.seed = seed
+        self.n_spearman = 5000
 
     def re_cluster(self, mol_df, gdf,
                    new_figerprints=None,
@@ -172,10 +192,11 @@ class GpuWorkflow:
         kmeans_labels = kmeans_cuml.predict(gdf)
         runtime = datetime.now() - task_start_time
 
-        silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)
+        silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True, seed=self.seed)
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
         log_results(task_start_time, 'gpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='silhouette_score', metric_value=silhouette_score, benchmark_file=self.benchmark_file)
 
+        logger.info('UMAP...')
         task_start_time = datetime.now()
         local_model = cuUMAP()
         X_train = gdf.compute()
@@ -191,11 +212,12 @@ class GpuWorkflow:
         runtime = datetime.now() - task_start_time
 
         # Sample to calculate spearman's rho
-        n_indexes = min(5000, X_train.shape[0])
+        n_indexes = min(self.n_spearman, X_train.shape[0])
+        numpy.random.seed(self.seed)
         indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
-        X_train_sample = cupy.fromDlpack(mol_df.compute().to_dlpack())[indexes]
+        fp_sample = cupy.fromDlpack(mol_df.compute().to_dlpack())[indexes]
         Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
-        dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)
+        dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
         dist_array_eucl = pairwise_distances(Xt_sample)
         spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl, top_k=10)
 

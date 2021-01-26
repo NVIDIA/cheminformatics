@@ -163,7 +163,7 @@ To create cache:
                             dest='num_clusters',
                             type=int,
                             default=7,
-                            help='Numer of clusters (KMEANS)')
+                            help='Numer of clusters')
 
         parser.add_argument('-c', '--cache_directory',
                             dest='cache_directory',

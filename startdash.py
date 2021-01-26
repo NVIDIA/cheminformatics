@@ -177,10 +177,11 @@ To create cache:
                             default=100000,
                             help='Number of molecules for analysis. Use negative numbers for using the whole dataset.')
 
-        parser.add_argument('-o', '--output_path',
-                            dest='output_path',
+        parser.add_argument('-o', '--output_dir',
+                            dest='output_dir',
+                            default=".",
                             type=str,
-                            help='Output path for benchmark results')
+                            help='Output directory for benchmark results')
 
         parser.add_argument('--n_gpu',
                             dest='n_gpu',
@@ -205,7 +206,8 @@ To create cache:
         if args.debug:
             logger.setLevel(logging.DEBUG)
 
-        initialize_logfile(args.output_path)
+        benchmark_file = os.path.join(args.output_dir, 'benchmark.csv')
+        initialize_logfile(benchmark_file)
 
         rmm.reinitialize(managed_memory=True)
         cupy.cuda.set_allocator(rmm.rmm_cupy_allocator)
@@ -261,18 +263,19 @@ To create cache:
 
         n_molecules = len(mol_df)
         task_start_time = datetime.now()
+
         if not args.cpu:
             workflow = GpuWorkflow(client,
                                    n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters,
-                                   benchmark_file=args.output_path)
+                                   benchmark_file=benchmark_file)
         else:
             workflow = CpuWorkflow(client,
                                    n_molecules,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters,
-                                   benchmark_file=args.output_path)
+                                   benchmark_file=benchmark_file)
 
         mol_df = workflow.execute(mol_df)
 
@@ -287,11 +290,11 @@ To create cache:
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, runtype, 'workflow', runtime, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=args.output_path)
+            log_results(task_start_time, runtype, 'workflow', runtime, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=benchmark_file)
 
             runtime = datetime.now() - start_time
             logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, runtype, 'total', runtime, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=args.output_path)
+            log_results(task_start_time, runtype, 'total', runtime, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=benchmark_file)
         else:
 
             logger.info("Starting interactive visualization...")

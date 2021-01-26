@@ -138,13 +138,13 @@ fi
 #          shouldn't need to make changes beyond this point
 #
 ###############################################################################
-# Compare Docker version to find Nvidia Container Toolkit support.              
-# Please refer https://github.com/NVIDIA/nvidia-docker                          
-DOCKER_VERSION_WITH_GPU_SUPPORT="19.03.0"                                       
-DOCKER_VERSION=$(docker version | grep -i version | head -1 | awk '{print $2'}) 
+# Compare Docker version to find Nvidia Container Toolkit support.
+# Please refer https://github.com/NVIDIA/nvidia-docker
+DOCKER_VERSION_WITH_GPU_SUPPORT="19.03.0"
+DOCKER_VERSION=$(docker version | grep -i version | head -1 | awk '{print $2'})
 
 PARAM_RUNTIME="--runtime=nvidia"
-if [ "$DOCKER_VERSION_WITH_GPU_SUPPORT" == "$(echo -e "$DOCKER_VERSION\n$DOCKER_VERSION_WITH_GPU_SUPPORT" | sort -V | head -1)" ]; 
+if [ "$DOCKER_VERSION_WITH_GPU_SUPPORT" == "$(echo -e "$DOCKER_VERSION\n$DOCKER_VERSION_WITH_GPU_SUPPORT" | sort -V | head -1)" ];
 then
     PARAM_RUNTIME="--gpus all"
 fi
@@ -216,11 +216,11 @@ dash() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
-	        python3 startdash.py
+	        python3 startdash.py analyze
 	else
 		dbSetup "${DATA_PATH}/db"
 		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CONT} python startdash.py
+		${DOCKER_CMD} -it ${CONT} python startdash.py analyze
 	fi
 	exit
 }

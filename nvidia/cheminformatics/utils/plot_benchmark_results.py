@@ -128,7 +128,7 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
 
     grouper = df['stats'].groupby(level='n_molecules')
     n_groups = len(grouper)
-    n_rows = 2
+    n_rows = min(2, n_groups)
     n_cols = int(n_groups / n_rows + 0.5)
 
     fig, axList = plt.subplots(nrows=n_rows, ncols=n_cols)

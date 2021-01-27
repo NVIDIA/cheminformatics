@@ -34,7 +34,6 @@ class BaseTransformation(ABC):
     def __len__(self):
         return NotImplemented
 
-
 class MorganFingerprint(BaseTransformation):
 
     def __init__(self, **kwargs):
@@ -50,7 +49,6 @@ class MorganFingerprint(BaseTransformation):
 
     def __len__(self):
         return self.kwargs['nBits']
-
 
 class Embeddings(BaseTransformation):
     MODEL_DIR = '/workspace/cddd/default_model'

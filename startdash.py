@@ -25,7 +25,7 @@ import warnings
 import argparse
 
 from datetime import datetime
-from dask_cuda.local_cuda_cluster import cuda_visible_devices
+from dask_cuda.local_cuda_cluster import cuda_visible_devices, get_n_gpus
 
 import rmm
 import cupy
@@ -37,7 +37,7 @@ from dask.distributed import Client, LocalCluster
 
 from nvidia.cheminformatics.workflow import CpuWorkflow, GpuWorkflow
 from nvidia.cheminformatics.chembldata import ChEmblData
-from nvidia.cheminformatics.chemvisualize import ChemVisualization
+from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
 from nvidia.cheminformatics.utils.fileio import initialize_logfile, log_results
 
 warnings.filterwarnings('ignore', 'Expected ')
@@ -49,9 +49,6 @@ logger = logging.getLogger('nvidia.cheminformatics')
 formatter = logging.Formatter(
     '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
-# Positive number for # of molecules to select and negative number for using
-# all available molecules
-MAX_MOLECULES = 100000
 BATCH_SIZE = 5000
 
 FINGER_PRINT_FILES = 'filter_*.h5'
@@ -173,10 +170,16 @@ To create cache:
                             default=None,
                             help='Location to pick fingerprint from')
 
+        parser.add_argument('-m', '--n_mol',
+                            dest='n_mol',
+                            type=int,
+                            default=100000,
+                            help='Number of molecules for analysis. Use negative numbers for using the whole dataset.')
+
         parser.add_argument('--n_gpu',
                             dest='n_gpu',
                             type=int,
-                            default=2,
+                            default=-1,
                             help='Number of GPUs to use')
 
         parser.add_argument('--n_cpu',
@@ -211,8 +214,12 @@ To create cache:
                                   enable_tcp_over_ucx=enable_tcp_over_ucx,
                                   enable_nvlink=enable_nvlink,
                                   enable_infiniband=enable_infiniband)
+            if args.n_gpu == -1:
+                n_gpu = get_n_gpus() - 1
+            else:
+                n_gpu = args.n_gpu
 
-            CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(args.n_gpu)).split(',')
+            CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(n_gpu)).split(',')
             CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
             logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
 
@@ -236,12 +243,15 @@ To create cache:
         chem_data = ChEmblData()
         if args.cache_directory is None:
             logger.info('Reading molecules from database...')
-            mol_df = chem_data.fetch_all_props(num_recs=MAX_MOLECULES,
+            mol_df = chem_data.fetch_all_props(num_recs=args.n_mol,
                                                batch_size=BATCH_SIZE)
         else:
             hdf_path = os.path.join(args.cache_directory, FINGER_PRINT_FILES)
             logger.info('Reading molecules from %s...' % hdf_path)
             mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
+
+            if args.n_mol > 0:
+                mol_df = mol_df.head(args.n_mol, compute=False, npartitions=-1)
 
         task_start_time = datetime.now()
         if not args.cpu:
@@ -261,7 +271,6 @@ To create cache:
                 n_cpu, n_gpu = 0, args.n_gpu
             else:
                 n_cpu, n_gpu = args.n_cpu, 0
-            print(mol_df.head())
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
@@ -273,14 +282,13 @@ To create cache:
         else:
 
             logger.info("Starting interactive visualization...")
-            print('mol_df', mol_df.shape)
-            # v = ChemVisualization(
-            #         mol_df,
-            #         workflow,
-            #         gpu=not args.cpu)
+            v = ChemVisualization(
+                    mol_df,
+                    workflow,
+                    gpu=not args.cpu)
 
-            # logger.info('navigate to https://localhost:5000')
-            # v.start('0.0.0.0')
+            logger.info('navigate to https://localhost:5001')
+            v.start('0.0.0.0', port=5001)
 
 
 def main():

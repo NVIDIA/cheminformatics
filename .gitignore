@@ -17,3 +17,4 @@ dask-worker-space
 ./data
 .npm
 .cache_dir
+benchmark.csv

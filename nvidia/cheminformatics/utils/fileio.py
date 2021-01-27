@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import os
+from .sysinfo import get_machine_config, print_machine_config
 
 BENCHMARK_FILE = './benchmark.csv'
 
@@ -22,15 +23,19 @@ BENCHMARK_FILE = './benchmark.csv'
 def initialize_logfile(benchmark_file=BENCHMARK_FILE):
     """Initialize benchmark file with header if needed"""
 
+    config = get_machine_config()
+    config_message = print_machine_config(config)
+
     if not os.path.exists(benchmark_file):
         with open(benchmark_file, 'w') as fh:
-            fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_cpu,n_gpu\n')
+            fh.write(f'# {config_message}\n')
+            fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_molecules,n_workers,metric_name,metric_value\n')
 
 
-def log_results(date, benchmark_type, step, time, n_cpu=0, n_gpu=0, benchmark_file=BENCHMARK_FILE):
+def log_results(date, benchmark_type, step, time, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=BENCHMARK_FILE):
     """Log benchmark results to a file"""
 
-    out_list = [date, benchmark_type, step, time, n_cpu, n_gpu]
+    out_list = [date, benchmark_type, step, time, n_molecules, n_workers, metric_name, metric_value]
     out_fmt = ','.join(['{}'] * len(out_list)) + '\n'
 
     with open(benchmark_file, 'a') as fh:

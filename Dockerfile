@@ -16,7 +16,10 @@ RUN /opt/conda/envs/rapids/bin/pip install \
     dash_html_components \
     progressbar2 \
     tables \
-    sqlalchemy && \
+    sqlalchemy \
+    openpyxl \
+    tabulate \
+    autopep8 && \
     /opt/conda/envs/rapids/bin/pip install --ignore-installed --upgrade tensorflow==1.13.1 tensorflow-gpu==1.13.1
 
 # misc python packages

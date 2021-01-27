@@ -1,7 +1,10 @@
-import logging
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import tensorflow as tf
 
 import pandas as pd
 
+import logging
 from abc import ABC
 from enum import Enum
 from rdkit import Chem
@@ -26,7 +29,7 @@ class BaseTransformation(ABC):
         return NotImplemented
 
     def transform_many(self, data):
-        return map(self.transform, data)
+        return list(map(self.transform, data))
 
     def __len__(self):
         return NotImplemented
@@ -38,41 +41,39 @@ class MorganFingerprint(BaseTransformation):
         self.name = __class__.__name__.split('.')[-1]
         self.kwargs = TransformationDefaults[self.name].value
         self.kwargs.update(kwargs)
+        self.func = AllChem.GetMorganFingerprintAsBitVect
 
-    def _morgan_fingerprint(self, smiles, radius=2, nBits=512):
-        m = Chem.MolFromSmiles(smiles)
-        fp = AllChem.GetMorganFingerprintAsBitVect(m, radius, nBits=nBits)
+    def transform(self, data):
+        m = Chem.MolFromSmiles(data)
+        fp = self.func(m, **self.kwargs)
         return ', '.join(list(fp.ToBitString()))
-
-    def transform(self, df):
-        df['fp'] = df.apply(
-            lambda row:
-            self._morgan_fingerprint(row.canonical_smiles, **self.kwargs),
-            axis=1)
-        return df['fp'].str.split(pat=', ',
-                                  n=len(self)+1,
-                                  expand=True).astype('float32')
 
     def __len__(self):
         return self.kwargs['nBits']
 
 
 class Embeddings(BaseTransformation):
-    MODEL_DIR = '/opt/nvidia/cheminfomatics/cddd/default_model'
+    MODEL_DIR = '/workspace/cddd/default_model'
 
-    def __init__(self, use_gpu=True, cpu_threads=12, **kwargs):
+    def __init__(self, use_gpu=True, cpu_threads=5, **kwargs):
         self.name = __class__.__name__.split('.')[-1]
         self.kwargs = TransformationDefaults[self.name].value
         self.kwargs.update(kwargs)
         self.func = InferenceModel(self.MODEL_DIR, use_gpu=use_gpu, cpu_threads=cpu_threads)
 
-    def transform(self, df):
-        smiles = df['canonical_smiles'].tolist()
-        smiles_embedding = self.func.seq_to_emb(smiles)
-
-        result_df = pd.DataFrame.from_records(smiles_embedding)
-        result_df.index = df.index
-        return result_df
+    def transform(self, data):
+        if isinstance(data, str):
+            data = [data]
+        return self.func.seq_to_emb(data).squeeze()
 
     def __len__(self):
         return self.func.hparams.emb_size
+
+
+### DEPRECATED ###
+def morgan_fingerprint(smiles, radius=2, nBits=512):
+    m = Chem.MolFromSmiles(smiles)
+    fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, nBits=nBits)
+
+    return ', '.join(list(fp.ToBitString()))
+

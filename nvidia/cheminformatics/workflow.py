@@ -52,15 +52,13 @@ class CpuWorkflow:
 
         logger.info('PCA...')
         n_cpu = len(self.client.cluster.workers)
-        logger.info('WORKERS %d' % n_cpu)
 
         if self.pca_comps:
             task_start_time = datetime.now()
             pca = sklearn.decomposition.PCA(n_components=self.pca_comps)
             df_fingerprints = pca.fit_transform(mol_df)
             runtime = datetime.now() - task_start_time
-            logger.info(
-                '### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
+            logger.info('### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
             log_results(task_start_time, 'cpu', 'pca', runtime, n_cpu=n_cpu)
         else:
             df_fingerprints = mol_df.copy()
@@ -70,7 +68,6 @@ class CpuWorkflow:
         # kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
         kmeans_float = dask_ml.cluster.KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
-
         runtime = datetime.now() - task_start_time
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {}'.format(runtime))
         log_results(task_start_time, 'cpu', 'kmeans', runtime, n_cpu=n_cpu)
@@ -185,14 +182,42 @@ class GpuWorkflow:
         logger.info('PCA...')
         if self.pca_comps:
             task_start_time = datetime.now()
-            pca = cuDaskPCA(client=self.client, n_components=self.pca_comps)
+            pca = PCA(client=self.client, n_components=self.pca_comps)
             df_fingerprints = pca.fit_transform(mol_df)
             runtime = datetime.now() - task_start_time
-            logger.info(
-                '### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
+            logger.info('### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
             log_results(task_start_time, 'gpu', 'pca', runtime, n_gpu=n_gpu)
         else:
             df_fingerprints = mol_df.copy()
 
-        mol_df = self.re_cluster(df_fingerprints)
+        logger.info('KMeans...')
+        task_start_time = datetime.now()
+        kmeans_cuml = cuKMeans(client=self.client, n_clusters=self.n_clusters)
+        kmeans_cuml.fit(df_fingerprints)
+        kmeans_labels = kmeans_cuml.predict(df_fingerprints)
+        runtime = datetime.now() - task_start_time
+        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {}'.format(runtime))
+        log_results(task_start_time, 'gpu', 'kmeans', runtime, n_gpu=n_gpu)
+
+        logger.info('UMAP...')
+        task_start_time = datetime.now()
+        local_model = cuUMAP()
+        X_train = df_fingerprints.compute()
+        local_model.fit(X_train)
+
+        umap_model = Dist_cuUMAP(local_model,
+                                 n_neighbors=100,
+                                 a=1.0,
+                                 b=1.0,
+                                 learning_rate=1.0,
+                                 client=self.client)
+        Xt = umap_model.transform(df_fingerprints)
+
+        mol_df['x'] = Xt[0]
+        mol_df['y'] = Xt[1]
+        mol_df['cluster'] = kmeans_labels
+        runtime = datetime.now() - task_start_time
+        logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
+        log_results(task_start_time, 'gpu', 'umap', runtime, n_gpu=n_gpu)
+
         return mol_df

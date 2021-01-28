@@ -50,9 +50,6 @@ logger = logging.getLogger('nvidia.cheminformatics')
 formatter = logging.Formatter(
     '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
-BATCH_SIZE = 5000
-
-FINGER_PRINT_FILES = 'filter_*.h5'
 
 client = None
 cluster = None
@@ -67,6 +64,10 @@ def closing():
 
 
 class Launcher(object):
+    """
+    Application launcher. This class can execute the workflows in headless (for
+    benchmarking and testing) and with UI.
+    """
 
     def __init__(self):
         parser = argparse.ArgumentParser(

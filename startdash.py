@@ -242,7 +242,7 @@ To create cache:
             logger.info('Using {} CPUs ...'.format(args.n_cpu))
             cluster = LocalCluster(dashboard_address=':9001',
                                    n_workers=args.n_cpu,
-                                   threads_per_worker=2)
+                                   threads_per_worker=4)
 
         client = Client(cluster)
 

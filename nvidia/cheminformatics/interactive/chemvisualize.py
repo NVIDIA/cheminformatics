@@ -4,13 +4,10 @@
 import json
 import base64
 import logging
-import pandas
 from rdkit import Chem
 from rdkit.Chem import Draw
 import numpy as np
 
-import cudf
-import cuml
 import cupy
 
 import sklearn.cluster
@@ -23,7 +20,6 @@ import dash_core_components as dcc
 import dash_html_components as html
 from dash.dependencies import Input, Output, State, ALL
 
-from nvidia.cheminformatics.chembldata import ChEmblData
 from nvidia.cheminformatics.fingerprint import MorganFingerprint
 
 

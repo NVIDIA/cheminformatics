@@ -14,10 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import logging
 from datetime import datetime
-from typing import List
 
 import numpy
 import sklearn.cluster
@@ -26,9 +24,9 @@ import sklearn.decomposition
 import umap
 import cudf
 import cupy
-
 import dask
 import dask_cudf
+from functools import singledispatch
 from dask_ml.cluster import KMeans as dask_KMeans
 
 from cuml.manifold import UMAP as cuUMAP
@@ -37,52 +35,19 @@ from cuml.dask.cluster import KMeans as cuDaskKMeans
 from cuml.dask.manifold import UMAP as cuDaskUMAP
 from cuml.metrics import pairwise_distances
 
-from nvidia.cheminformatics.chembldata import ChEmblData
 from nvidia.cheminformatics.utils.fileio import log_results
 from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+from nvidia.cheminformatics.data import ClusterWfDAO
+from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
+from nvidia.cheminformatics.utils.fileio import MaticsLogger
 
 logger = logging.getLogger(__name__)
-
-FINGER_PRINT_FILES = 'filter_*.h5'
-
-
-class ClusterWfDAO(object):
-
-    def fetch_data(self, n_molecules:int, cache_directory:str=None):
-        """
-        Fetch molecular properties from database/cache into a dask array.
-        """
-        pass
-
-    def fetch_new_molecules(self, new_molecules: List):
-        pass
-
-
-class ChemblClusterWfDao(ClusterWfDAO):
-
-    def fetch_data(self, n_molecules:int, cache_directory:str=None):
-        chem_data = ChEmblData()
-        if cache_directory:
-            hdf_path = os.path.join(cache_directory, FINGER_PRINT_FILES)
-            logger.info('Reading molecules from %s...' % hdf_path)
-            mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
-
-            if n_molecules > 0:
-                mol_df = mol_df.head(n_molecules, compute=False, npartitions=-1)
-        else:
-            logger.info('Reading molecules from database...')
-            mol_df = chem_data.fetch_all_props(num_recs=n_molecules)
-
-        return mol_df
-
-    def fetch_new_molecules(self, new_molecules: List):
-        pass
 
 
 class BaseClusterWorkflow:
 
-    def cluster(self):
+    def cluster(self, embedding, cache_directory):
         """
         Runs clustering workflow on the data fetched from database/cache.
         """
@@ -96,65 +61,138 @@ class BaseClusterWorkflow:
         """
         pass
 
-    def compute_qa_matrix():
+    def compute_qa_matric(self):
+        """
+        Collects all quality matrix and log.
+        """
         pass
+
+
+@singledispatch
+def _gpu_cluster_wrapper(embedding, n_pca, self):
+    return NotImplemented
+
+@_gpu_cluster_wrapper.register(dask.dataframe.core.DataFrame)
+def _(embedding, n_pca, self):
+    embedding = dask_cudf.from_dask_dataframe(embedding)
+    return self._cluster(embedding, n_pca)
+
+@_gpu_cluster_wrapper.register(cudf.DataFrame)
+def _(embedding, n_pca, self):
+    embedding = dask_cudf.from_cudf(embedding)
+    return self._cluster(embedding, n_pca)
 
 
 class GpuWorkflow(BaseClusterWorkflow):
 
     def __init__(self,
-                 n_molecules:int,
-                 dao:ClusterWfDAO,
+                 n_molecules: int,
+                 dao: ClusterWfDAO = ChemblClusterWfDao(),
                  client=None,
                  pca_comps=64,
                  n_clusters=7,
                  benchmark_file='./benchmark.csv'):
         self.client = client
+        self.dao = dao
         self.n_molecules = n_molecules
         self.pca_comps = pca_comps
         self.n_clusters = n_clusters
         self.benchmark_file = benchmark_file
 
-    def execute(self):
+        self.df_embedding = None
+
+    def _cluster(self, embedding, n_pca):
+
+        # Before reclustering remove all columns that may interfere
+        for col in ['x', 'y', 'cluster', 'id', 'filter_col']:
+            if col in embedding.columns:
+                embedding = embedding.drop([col], axis=1)
+
+        if n_pca:
+            with MaticsLogger(self.client, 'pca', 'gpu',
+                              self.benchmark_file, self.n_molecules) as ml:
+                pca = cuDaskPCA(client=self.client, n_components=n_pca)
+                embedding = pca.fit_transform(embedding)
+
+        with MaticsLogger(self.client, 'kmeans', 'gpu',
+                          self.benchmark_file, self.n_molecules) as ml:
+            kmeans_cuml = cuDaskKMeans(client=self.client,
+                                       n_clusters=self.n_clusters)
+            kmeans_cuml.fit(embedding)
+            kmeans_labels = kmeans_cuml.predict(embedding)
+
+            ml.metric_name='silhouette_score'
+            ml.metric_value = batched_silhouette_scores(embedding,
+                                                        kmeans_labels,
+                                                        on_gpu=True)
+
+        with MaticsLogger(self.client, 'umap', 'gpu',
+                          self.benchmark_file, self.n_molecules) as ml:
+            X_train = embedding.compute()
+
+            local_model = cuUMAP()
+            local_model.fit(X_train)
+
+            umap_model = cuDaskUMAP(local_model,
+                                    n_neighbors=100,
+                                    a=1.0,
+                                    b=1.0,
+                                    learning_rate=1.0,
+                                    client=self.client)
+            Xt = umap_model.transform(embedding)
+
+            # Sample to calculate spearman's rho
+            n_indexes = min(5000, X_train.shape[0])
+            indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])),
+                                          size=n_indexes,
+                                          replace=False)
+
+            X_train_sample = cupy.fromDlpack(embedding.compute().to_dlpack())[indexes]
+            Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
+            dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)
+            dist_array_eucl = pairwise_distances(Xt_sample)
+
+            ml.metric_name='spearman_rho',
+            ml.metric_value = spearman_rho(dist_array_tani, dist_array_eucl).mean()
+
+        # Add back the column required for plotting and to correlating data
+        # between re-clustering
+        embedding['x'] = Xt[0]
+        embedding['y'] = Xt[1]
+        embedding['cluster'] = kmeans_labels
+        embedding['id'] = embedding.index
+
+        return embedding
+
+    def cluster(self,
+                df_molecular_embedding=None,
+                cache_directory=None):
+
         logger.info("Executing GPU workflow...")
 
-        mol_df = self.fetch_data()
-        print(type(mol_df))
-        print(mol_df)
+        if df_molecular_embedding is None:
+            df_molecular_embedding = self.dao.fetch_molecular_embedding(
+                self.n_molecules,
+                cache_directory=cache_directory)
+            df_molecular_embedding = df_molecular_embedding.persist()
 
-        mol_df = dask_cudf.from_dask_dataframe(mol_df)
-        mol_df = mol_df.persist()
-
-        logger.info('PCA...')
-        if self.pca_comps:
-            task_start_time = datetime.now()
-            pca = cuDaskPCA(client=self.client, n_components=self.pca_comps)
-            df_fingerprints = pca.fit_transform(mol_df)
-            runtime = datetime.now() - task_start_time
-            logger.info('### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'gpu', 'pca', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='', metric_value='', benchmark_file=self.benchmark_file)
-        else:
-            df_fingerprints = mol_df.copy()
-
-        mol_df = self.re_cluster(mol_df, df_fingerprints)
-        return mol_df
+        self.df_embedding = _gpu_cluster_wrapper(df_molecular_embedding,
+                                                 self.pca_comps,
+                                                 self)
+        return self.df_embedding
 
     def re_cluster(self, mol_df, gdf,
                    new_figerprints=None,
                    new_chembl_ids=None,
-                   n_clusters = None):
+                   n_clusters=None):
 
         if n_clusters is not None:
             self.n_clusters = n_clusters
 
-        n_gpu = len(self.client.cluster.workers)
-        logger.info('WORKERS %d' % n_gpu)
         # Before reclustering remove all columns that may interfere
-        if 'id' in gdf.columns:
-            gdf = gdf.drop(['x', 'y', 'cluster', 'id'], axis=1)
-
-        if 'filter_col' in gdf.columns:
-            gdf = gdf.drop(['filter_col'], axis=1)
+        for col in ['x', 'y', 'cluster', 'id', 'filter_col']:
+            if col in gdf.columns:
+                gdf = gdf.drop([col], axis=1)
 
         if new_figerprints is not None and new_chembl_ids is not None:
             # Add new figerprints and chEmblIds before reclustering
@@ -179,56 +217,8 @@ class GpuWorkflow(BaseClusterWorkflow):
 
             del fp_df
 
-        task_start_time = datetime.now()
-        kmeans_cuml = cuDaskKMeans(client=self.client,
-                                   n_clusters=self.n_clusters)
-        kmeans_cuml.fit(gdf)
-        kmeans_labels = kmeans_cuml.predict(gdf)
-        runtime = datetime.now() - task_start_time
-
-        silhouette_score = batched_silhouette_scores(gdf, kmeans_labels, on_gpu=True)
-        logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
-        log_results(task_start_time, 'gpu', 'kmeans', runtime,
-                    n_molecules=self.n_molecules,
-                    n_workers=n_gpu,
-                    metric_name='silhouette_score',
-                    metric_value=silhouette_score,
-                    benchmark_file=self.benchmark_file)
-
-        task_start_time = datetime.now()
-        local_model = cuUMAP()
-        X_train = gdf.compute()
-        local_model.fit(X_train)
-
-        umap_model = cuDaskUMAP(local_model,
-                                n_neighbors=100,
-                                a=1.0,
-                                b=1.0,
-                                learning_rate=1.0,
-                                client=self.client)
-        Xt = umap_model.transform(gdf)
-        runtime = datetime.now() - task_start_time
-
-        # Sample to calculate spearman's rho
-        n_indexes = min(5000, X_train.shape[0])
-        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
-        X_train_sample = cupy.fromDlpack(mol_df.compute().to_dlpack())[indexes]
-        Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
-        dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)
-        dist_array_eucl = pairwise_distances(Xt_sample)
-        spearman_mean = spearman_rho(dist_array_tani, dist_array_eucl).mean()
-
-        logger.info('### Runtime UMAP time (hh:mm:ss.ms) {} with {} of {}'.format(runtime, 'spearman_rho', spearman_mean))
-        log_results(task_start_time, 'gpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_gpu, metric_name='spearman_rho', metric_value=spearman_mean, benchmark_file=self.benchmark_file)
-
-        # Add back the column required for plotting and to correlating data
-        # between re-clustering
-        gdf['x'] = Xt[0]
-        gdf['y'] = Xt[1]
-        gdf['cluster'] = kmeans_labels
-        gdf['id'] = gdf.index
-
-        return gdf
+        self.df_embedding = self._cluster_wrapper(self.df_embedding)
+        return self.df_embedding
 
 
 class CpuWorkflow(BaseClusterWorkflow):
@@ -261,7 +251,8 @@ class CpuWorkflow(BaseClusterWorkflow):
             runtime = datetime.now() - task_start_time
             logger.info(
                 '### Runtime PCA time (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, 'cpu', 'pca', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='', metric_value='', benchmark_file=self.benchmark_file)
+            log_results(task_start_time, 'cpu', 'pca', runtime, n_molecules=self.n_molecules,
+                        n_workers=n_cpu, metric_name='', metric_value='', benchmark_file=self.benchmark_file)
         else:
             df_fingerprints = mol_df.copy()
 
@@ -276,7 +267,8 @@ class CpuWorkflow(BaseClusterWorkflow):
 
         silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False)
         logger.info('### Runtime Kmeans time (hh:mm:ss.ms) {} and silhouette score {}'.format(runtime, silhouette_score))
-        log_results(task_start_time, 'cpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='silhouette_score', metric_value=silhouette_score, benchmark_file=self.benchmark_file)
+        log_results(task_start_time, 'cpu', 'kmeans', runtime, n_molecules=self.n_molecules, n_workers=n_cpu,
+                    metric_name='silhouette_score', metric_value=silhouette_score, benchmark_file=self.benchmark_file)
 
         logger.info('UMAP...')
         task_start_time = datetime.now()
@@ -291,6 +283,7 @@ class CpuWorkflow(BaseClusterWorkflow):
         runtime = datetime.now() - task_start_time
 
         logger.info('### Runtime UMAP time (hh:mm:ss.ms) {}'.format(runtime))
-        log_results(task_start_time, 'cpu', 'umap', runtime, n_molecules=self.n_molecules, n_workers=n_cpu, metric_name='', metric_value='', benchmark_file=self.benchmark_file)
+        log_results(task_start_time, 'cpu', 'umap', runtime, n_molecules=self.n_molecules,
+                    n_workers=n_cpu, metric_name='', metric_value='', benchmark_file=self.benchmark_file)
 
         return mol_df

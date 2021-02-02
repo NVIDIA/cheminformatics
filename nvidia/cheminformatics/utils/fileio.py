@@ -43,7 +43,8 @@ class MaticsLogger(object):
                task_name,
                compute_type,
                benchmark_file,
-               n_molecules):
+               n_molecules,
+               benchmark=False):
 
         self.task_name = task_name
         self.compute_type = compute_type
@@ -52,8 +53,13 @@ class MaticsLogger(object):
         self.start_time = None
         self.client = client
         self.n_workers = None
-        self.metric_name=''
-        self.metric_value=''
+        self.metric_name=None
+        self.metric_value=None
+        self.benchmark = benchmark
+
+        self.metric_func = None
+        self.metric_func_args = None
+        self.metric_func_kwargs = {}
 
     def __enter__(self):
         self.n_workers = len(self.client.cluster.workers)
@@ -64,6 +70,15 @@ class MaticsLogger(object):
     def __exit__(self, type, value, traceback):
         runtime = datetime.now() - self.start_time
         logger.info('### Runtime {} time (hh:mm:ss.ms) {}'.format(self.task_name, runtime))
+
+        if self.metric_func and self.benchmark:
+            self.metric_value = self.metric_func(*self.metric_func_args,
+                                                 **self.metric_func_kwargs)
+
+        if self.metric_value is None:
+            self.metric_name = ''
+            self.metric_value = ''
+
         log_results(self.start_time, self.compute_type, self.task_name,
                     runtime,
                     n_molecules=self.n_molecules,

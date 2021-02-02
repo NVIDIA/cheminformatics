@@ -257,18 +257,20 @@ To create cache:
                                    client=client,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters,
-                                   benchmark_file=benchmark_file)
+                                   benchmark_file=benchmark_file,
+                                   benchmark=args.benchmark)
         else:
-            workflow = CpuWorkflow(n_molecules,
-                                   client=client,
-                                   pca_comps=args.pca_comps,
+            workflow = CpuWorkflow(client,
+                                   n_molecules,
+                                   n_pca=args.pca_comps,
                                    n_clusters=args.num_clusters,
-                                   benchmark_file=benchmark_file)
+                                   benchmark_file=benchmark_file,
+                                   benchmark=args.benchmark)
 
         mol_df = workflow.cluster(cache_directory=args.cache_directory)
-        # workflow.compute_qa_matric()
 
         if args.benchmark:
+            workflow.compute_qa_matric()
             if not args.cpu:
                 mol_df = mol_df.compute()
                 n_workers = args.n_gpu

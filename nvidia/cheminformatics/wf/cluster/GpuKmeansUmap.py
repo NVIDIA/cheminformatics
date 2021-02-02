@@ -17,9 +17,6 @@
 import logging
 
 import numpy
-import sklearn.decomposition
-from dask_ml.cluster import KMeans as dask_KMeans
-import umap
 
 import cudf
 import cupy
@@ -33,85 +30,15 @@ from cuml.dask.cluster import KMeans as cuDaskKMeans
 from cuml.dask.manifold import UMAP as cuDaskUMAP
 from cuml.metrics import pairwise_distances
 
+from . import BaseClusterWorkflow
 from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.utils.fileio import MaticsLogger
-from nvidia.cheminformatics.wf.cluster import BaseClusterWorkflow
+
 
 logger = logging.getLogger(__name__)
-
-
-class CpuWorkflow(BaseClusterWorkflow):
-
-    def __init__(self,
-                 client,
-                 n_molecules,
-                 dao: ClusterWfDAO = ChemblClusterWfDao(),
-                 n_pca=64,
-                 n_clusters=7,
-                 benchmark_file='./benchmark.csv',
-                 benchmark=False):
-        self.client = client
-        self.dao = dao
-        self.n_molecules = n_molecules
-        self.n_pca = n_pca
-        self.n_clusters = n_clusters
-        self.benchmark_file = benchmark_file
-        self.benchmark=benchmark
-
-    def cluster(self,
-                df_molecular_embedding=None,
-                cache_directory=None):
-
-        logger.info("Executing CPU workflow...")
-
-        if df_molecular_embedding is None:
-            df_molecular_embedding = self.dao.fetch_molecular_embedding(
-                self.n_molecules,
-                cache_directory=cache_directory)
-
-        df_molecular_embedding = df_molecular_embedding.persist()
-
-        if self.n_pca:
-            with MaticsLogger(self.client, 'pca', 'cpu',
-                              self.benchmark_file, self.n_molecules,
-                              benchmark=self.benchmark) as ml:
-
-                pca = sklearn.decomposition.PCA(n_components=self.n_pca)
-                df_fingerprints = pca.fit_transform(df_molecular_embedding)
-
-        else:
-            df_fingerprints = df_molecular_embedding.copy()
-
-        with MaticsLogger(self.client, 'kmeans', 'cpu',
-                          self.benchmark_file, self.n_molecules,
-                          benchmark=self.benchmark) as ml:
-
-            kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
-            kmeans_float.fit(df_fingerprints)
-            kmeans_labels = kmeans_float.predict(df_fingerprints)
-
-            ml.metric_name='silhouette_score'
-            ml.metric_func = batched_silhouette_scores
-            ml.metric_func_args = (df_fingerprints, kmeans_labels)
-            ml.metric_func_kwargs = {'on_gpu': False}
-
-        with MaticsLogger(self.client, 'umap', 'gpu',
-                          self.benchmark_file, self.n_molecules,
-                          benchmark=self.benchmark) as ml:
-            umap_model = umap.UMAP()
-
-            Xt = umap_model.fit_transform(df_fingerprints)
-            # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
-            df_molecular_embedding = df_molecular_embedding.compute()
-
-        df_molecular_embedding['x'] = Xt[:, 0]
-        df_molecular_embedding['y'] = Xt[:, 1]
-        df_molecular_embedding['cluster'] = kmeans_float.labels_
-
-        return df_molecular_embedding
 
 
 @singledispatch
@@ -274,4 +201,3 @@ class GpuWorkflow(BaseClusterWorkflow):
 
         self.df_embedding = self._cluster_wrapper(self.df_embedding)
         return self.df_embedding
-

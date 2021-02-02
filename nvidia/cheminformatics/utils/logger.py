@@ -19,6 +19,7 @@ import logging
 
 from datetime import datetime
 from .sysinfo import get_machine_config, print_machine_config
+from nvidia.cheminformatics.config import Context
 
 BENCHMARK_FILE = './benchmark.csv'
 
@@ -36,42 +37,35 @@ def initialize_logfile(benchmark_file=BENCHMARK_FILE):
             fh.write(f'# {config_message}\n')
             fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_molecules,n_workers,metric_name,metric_value\n')
 
-class MaticsLogger(object):
+class MetricsLogger(object):
 
     def __init__(self,
-               client,
                task_name,
-               compute_type,
-               benchmark_file,
-               n_molecules,
-               benchmark=False):
+               n_molecules):
 
         self.task_name = task_name
-        self.compute_type = compute_type
-        self.benchmark_file = benchmark_file
         self.n_molecules = n_molecules
         self.start_time = None
-        self.client = client
-        self.n_workers = None
         self.metric_name=None
         self.metric_value=None
-        self.benchmark = benchmark
 
         self.metric_func = None
         self.metric_func_args = None
         self.metric_func_kwargs = {}
 
     def __enter__(self):
-        self.n_workers = len(self.client.cluster.workers)
         self.start_time = datetime.now()
 
         return self
 
     def __exit__(self, type, value, traceback):
+        context = Context()
+
         runtime = datetime.now() - self.start_time
         logger.info('### Runtime {} time (hh:mm:ss.ms) {}'.format(self.task_name, runtime))
+        n_workers = len(context.dask_client.cluster.workers)
 
-        if self.metric_func and self.benchmark:
+        if self.metric_func and context.is_benchmark:
             self.metric_value = self.metric_func(*self.metric_func_args,
                                                  **self.metric_func_kwargs)
 
@@ -79,13 +73,13 @@ class MaticsLogger(object):
             self.metric_name = ''
             self.metric_value = ''
 
-        log_results(self.start_time, self.compute_type, self.task_name,
+        log_results(self.start_time, context.compute_type, self.task_name,
                     runtime,
                     n_molecules=self.n_molecules,
-                    n_workers=self.n_workers,
+                    n_workers=n_workers,
                     metric_name=self.metric_name,
                     metric_value=self.metric_value,
-                    benchmark_file=self.benchmark_file)
+                    benchmark_file=context.benchmark_file)
 
 def log_results(date, benchmark_type, step, time, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=BENCHMARK_FILE):
     """Log benchmark results to a file"""

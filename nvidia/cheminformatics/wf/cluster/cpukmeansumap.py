@@ -24,23 +24,21 @@ from . import BaseClusterWorkflow
 from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
-from nvidia.cheminformatics.utils.fileio import MaticsLogger
+from nvidia.cheminformatics.utils.logger import MetricsLogger
 
 
 logger = logging.getLogger(__name__)
 
 
-class CpuWorkflow(BaseClusterWorkflow):
+class CpuKmeansUmap(BaseClusterWorkflow):
 
     def __init__(self,
-                 client,
                  n_molecules,
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
                  n_pca=64,
                  n_clusters=7,
                  benchmark_file='./benchmark.csv',
                  benchmark=False):
-        self.client = client
         self.dao = dao
         self.n_molecules = n_molecules
         self.n_pca = n_pca
@@ -51,6 +49,10 @@ class CpuWorkflow(BaseClusterWorkflow):
     def cluster(self,
                 df_molecular_embedding=None,
                 cache_directory=None):
+        """
+        Generates UMAP transformation on Kmeans labels generated from
+        molecular fingerprints.
+        """
 
         logger.info("Executing CPU workflow...")
 
@@ -62,9 +64,7 @@ class CpuWorkflow(BaseClusterWorkflow):
         df_molecular_embedding = df_molecular_embedding.persist()
 
         if self.n_pca:
-            with MaticsLogger(self.client, 'pca', 'cpu',
-                              self.benchmark_file, self.n_molecules,
-                              benchmark=self.benchmark) as ml:
+            with MetricsLogger('pca', self.n_molecules) as ml:
 
                 pca = sklearn.decomposition.PCA(n_components=self.n_pca)
                 df_fingerprints = pca.fit_transform(df_molecular_embedding)
@@ -72,9 +72,7 @@ class CpuWorkflow(BaseClusterWorkflow):
         else:
             df_fingerprints = df_molecular_embedding.copy()
 
-        with MaticsLogger(self.client, 'kmeans', 'cpu',
-                          self.benchmark_file, self.n_molecules,
-                          benchmark=self.benchmark) as ml:
+        with MetricsLogger('kmeans',self.n_molecules,) as ml:
 
             kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
             kmeans_float.fit(df_fingerprints)
@@ -85,9 +83,7 @@ class CpuWorkflow(BaseClusterWorkflow):
             ml.metric_func_args = (df_fingerprints, kmeans_labels)
             ml.metric_func_kwargs = {'on_gpu': False}
 
-        with MaticsLogger(self.client, 'umap', 'gpu',
-                          self.benchmark_file, self.n_molecules,
-                          benchmark=self.benchmark) as ml:
+        with MetricsLogger('umap', self.n_molecules) as ml:
             umap_model = umap.UMAP()
 
             Xt = umap_model.fit_transform(df_fingerprints)

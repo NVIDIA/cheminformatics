@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nvidia.cheminformatics.utils.fileio import initialize_logfile
 import os
 import sys
 import atexit
@@ -34,10 +33,14 @@ import cupy
 from dask_cuda import initialize, LocalCUDACluster
 from dask.distributed import Client, LocalCluster
 
+from nvidia.cheminformatics.utils.logger import initialize_logfile
+from nvidia.cheminformatics.data.helper.chembldata import ChEmblData
 from nvidia.cheminformatics.data.cluster_wf import FINGER_PRINT_FILES
-from nvidia.cheminformatics.wf.cluster import CpuKmeansUmap, GpuKmeansUmap
+from nvidia.cheminformatics.wf.cluster.cpukmeansumap import CpuKmeansUmap
+from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
 from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
-from nvidia.cheminformatics.utils.fileio import initialize_logfile, log_results
+from nvidia.cheminformatics.utils.logger import initialize_logfile, log_results
+from nvidia.cheminformatics.config import Context
 
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
@@ -114,7 +117,9 @@ To create cache:
                 n_gpu = args.n_gpu
 
             CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(n_gpu)).split(',')
-            CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
+            # CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
+            CUDA_VISIBLE_DEVICES = [0, 1]
+
             logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
 
             cluster = LocalCUDACluster(protocol="ucx",
@@ -248,24 +253,27 @@ To create cache:
 
         client = self.initialize_cluster(args)
 
+        # Set the context
+        context = Context()
+        context.dask_client = client
+        context.is_benchmark = args.benchmark
+        context.benchmark_file = benchmark_file
+
+        if args.cpu:
+            context.compute_type = 'cpu'
+
         start_time = datetime.now()
         task_start_time = datetime.now()
 
         n_molecules = args.n_mol
         if not args.cpu:
             workflow = GpuKmeansUmap(n_molecules,
-                                   client=client,
-                                   pca_comps=args.pca_comps,
-                                   n_clusters=args.num_clusters,
-                                   benchmark_file=benchmark_file,
-                                   benchmark=args.benchmark)
+                                     pca_comps=args.pca_comps,
+                                     n_clusters=args.num_clusters)
         else:
-            workflow = CpuKmeansUmap(client,
-                                   n_molecules,
-                                   n_pca=args.pca_comps,
-                                   n_clusters=args.num_clusters,
-                                   benchmark_file=benchmark_file,
-                                   benchmark=args.benchmark)
+            workflow = CpuKmeansUmap(n_molecules,
+                                     n_pca=args.pca_comps,
+                                     n_clusters=args.num_clusters)
 
         mol_df = workflow.cluster(cache_directory=args.cache_directory)
 
@@ -274,28 +282,31 @@ To create cache:
             if not args.cpu:
                 mol_df = mol_df.compute()
                 n_workers = args.n_gpu
-                runtype = 'gpu'
             else:
                 n_workers = args.n_cpu
-                runtype = 'cpu'
 
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, runtype, 'workflow', runtime, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=benchmark_file)
+            log_results(task_start_time, context.compute_type, 'workflow',
+                        runtime, n_molecules, n_workers, metric_name='',
+                        metric_value='', benchmark_file=benchmark_file)
 
             runtime = datetime.now() - start_time
             logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, runtype, 'total', runtime, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=benchmark_file)
-        # else:
+            log_results(task_start_time, context.compute_type, 'total',
+                        runtime, n_molecules, n_workers, metric_name='',
+                        metric_value='', benchmark_file=benchmark_file)
+        else:
+            port = context.get_config('plotly_port', 5000)
 
-        #     logger.info("Starting interactive visualization...")
-        #     v = ChemVisualization(
-        #             mol_df,
-        #             workflow,
-        #             gpu=not args.cpu)
+            logger.info("Starting interactive visualization...")
+            v = ChemVisualization(
+                    mol_df,
+                    workflow,
+                    gpu=not args.cpu)
 
-        #     logger.info('navigate to https://localhost:5001')
-        #     v.start('0.0.0.0', port=5001)
+            logger.info('navigate to https://localhost: %s' % port)
+            v.start('0.0.0.0', port=port)
 
 
 def main():

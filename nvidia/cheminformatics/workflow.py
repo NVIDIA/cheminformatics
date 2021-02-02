@@ -52,7 +52,7 @@ class CpuWorkflow(BaseClusterWorkflow):
                  n_pca=64,
                  n_clusters=7,
                  benchmark_file='./benchmark.csv',
-                 benchmark=False):
+                 seed=0):
         self.client = client
         self.dao = dao
         self.n_molecules = n_molecules
@@ -60,6 +60,19 @@ class CpuWorkflow(BaseClusterWorkflow):
         self.n_clusters = n_clusters
         self.benchmark_file = benchmark_file
         self.benchmark=benchmark
+        self.seed = seed
+        self.n_spearman = 5000
+        
+    def _compute_spearman_rho(self, mol_df, X_train):
+        n_indexes = min(self.n_spearman, X_train.shape[0])
+        numpy.random.seed(self.seed)
+        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])), size=n_indexes, replace=False)
+        fp_sample = cupy.array(mol_df.iloc[indexes])
+        Xt_sample = cupy.array(X_train[indexes])
+        dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
+        dist_array_eucl = pairwise_distances(Xt_sample)
+        return spearman_rho(dist_array_tani, dist_array_eucl, top_k=100)
+    
 
     def cluster(self,
                 df_molecular_embedding=None,
@@ -96,8 +109,8 @@ class CpuWorkflow(BaseClusterWorkflow):
             ml.metric_name='silhouette_score'
             ml.metric_func = batched_silhouette_scores
             ml.metric_func_args = (df_fingerprints, kmeans_labels)
-            ml.metric_func_kwargs = {'on_gpu': False}
-
+            ml.metric_func_kwargs = {'on_gpu': False, seed=self.seed}
+ 
         with MetricsLogger(self.client, 'umap', 'gpu',
                           self.benchmark_file, self.n_molecules,
                           benchmark=self.benchmark) as ml:
@@ -105,7 +118,13 @@ class CpuWorkflow(BaseClusterWorkflow):
 
             Xt = umap_model.fit_transform(df_fingerprints)
             # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
+            # Sample to calculate spearman's rho
+            # Currently this converts indexes to 
             df_molecular_embedding = df_molecular_embedding.compute()
+
+            ml.metric_name='spearman_rho'
+            ml.metric_func = self._compute_spearman_rho
+            ml.metric_func_args = (df_molecular_embedding, X_train)
 
         df_molecular_embedding['x'] = Xt[:, 0]
         df_molecular_embedding['y'] = Xt[:, 1]
@@ -138,7 +157,7 @@ class GpuWorkflow(BaseClusterWorkflow):
                  pca_comps=64,
                  n_clusters=7,
                  benchmark_file='./benchmark.csv',
-                 benchmark=False):
+                 seed=0):
         self.client = client
         self.dao = dao
         self.n_molecules = n_molecules
@@ -148,20 +167,22 @@ class GpuWorkflow(BaseClusterWorkflow):
         self.benchmark=benchmark
 
         self.df_embedding = None
+        self.seed = seed
+        self.n_spearman = 5000
 
     def _compute_spearman_rho(self, embedding, X_train, Xt):
-        n_indexes = min(5000, X_train.shape[0])
+        n_indexes = min(self.n_spearman, X_train.shape[0])
+        numpy.random.seed(self.seed)
         indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])),
                                       size=n_indexes,
                                       replace=False)
-
-        X_train_sample = cupy.fromDlpack(embedding.compute().to_dlpack())[indexes]
+        fp_sample = cupy.fromDlpack(mol_df.compute().to_dlpack())[indexes]
         Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
 
-        dist_array_tani = tanimoto_calculate(X_train_sample, calc_distance=True)
+        dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
         dist_array_eucl = pairwise_distances(Xt_sample)
 
-        return spearman_rho(dist_array_tani, dist_array_eucl).mean()
+        return spearman_rho(dist_array_tani, dist_array_eucl, top_k=100)
 
     def _cluster(self, embedding, n_pca):
 
@@ -271,7 +292,3 @@ class GpuWorkflow(BaseClusterWorkflow):
             self.chembl_ids.extend(new_chembl_ids)
 
             del fp_df
-
-        self.df_embedding = self._cluster_wrapper(self.df_embedding)
-        return self.df_embedding
-

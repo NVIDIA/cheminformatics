@@ -35,7 +35,7 @@ from dask_cuda import initialize, LocalCUDACluster
 from dask.distributed import Client, LocalCluster
 
 from nvidia.cheminformatics.data.cluster_wf import FINGER_PRINT_FILES
-from nvidia.cheminformatics.workflow import CpuWorkflow, GpuWorkflow
+from nvidia.cheminformatics.wf.cluster import CpuKmeansUmap, GpuKmeansUmap
 from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
 from nvidia.cheminformatics.utils.fileio import initialize_logfile, log_results
 
@@ -253,14 +253,14 @@ To create cache:
 
         n_molecules = args.n_mol
         if not args.cpu:
-            workflow = GpuWorkflow(n_molecules,
+            workflow = GpuKmeansUmap(n_molecules,
                                    client=client,
                                    pca_comps=args.pca_comps,
                                    n_clusters=args.num_clusters,
                                    benchmark_file=benchmark_file,
                                    benchmark=args.benchmark)
         else:
-            workflow = CpuWorkflow(client,
+            workflow = CpuKmeansUmap(client,
                                    n_molecules,
                                    n_pca=args.pca_comps,
                                    n_clusters=args.num_clusters,

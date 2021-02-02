@@ -37,7 +37,7 @@ from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spea
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
-from nvidia.cheminformatics.utils.fileio import MaticsLogger
+from nvidia.cheminformatics.utils.fileio import MetricsLogger
 from nvidia.cheminformatics.wf.cluster import BaseClusterWorkflow
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,7 @@ class CpuWorkflow(BaseClusterWorkflow):
         df_molecular_embedding = df_molecular_embedding.persist()
 
         if self.n_pca:
-            with MaticsLogger(self.client, 'pca', 'cpu',
+            with MetricsLogger(self.client, 'pca', 'cpu',
                               self.benchmark_file, self.n_molecules,
                               benchmark=self.benchmark) as ml:
 
@@ -85,7 +85,7 @@ class CpuWorkflow(BaseClusterWorkflow):
         else:
             df_fingerprints = df_molecular_embedding.copy()
 
-        with MaticsLogger(self.client, 'kmeans', 'cpu',
+        with MetricsLogger(self.client, 'kmeans', 'cpu',
                           self.benchmark_file, self.n_molecules,
                           benchmark=self.benchmark) as ml:
 
@@ -98,7 +98,7 @@ class CpuWorkflow(BaseClusterWorkflow):
             ml.metric_func_args = (df_fingerprints, kmeans_labels)
             ml.metric_func_kwargs = {'on_gpu': False}
 
-        with MaticsLogger(self.client, 'umap', 'gpu',
+        with MetricsLogger(self.client, 'umap', 'gpu',
                           self.benchmark_file, self.n_molecules,
                           benchmark=self.benchmark) as ml:
             umap_model = umap.UMAP()
@@ -171,13 +171,13 @@ class GpuWorkflow(BaseClusterWorkflow):
                 embedding = embedding.drop([col], axis=1)
 
         if n_pca:
-            with MaticsLogger(self.client, 'pca', 'gpu',
+            with MetricsLogger(self.client, 'pca', 'gpu',
                               self.benchmark_file, self.n_molecules,
                               benchmark=self.benchmark) as ml:
                 pca = cuDaskPCA(client=self.client, n_components=n_pca)
                 embedding = pca.fit_transform(embedding)
 
-        with MaticsLogger(self.client, 'kmeans', 'gpu',
+        with MetricsLogger(self.client, 'kmeans', 'gpu',
                           self.benchmark_file, self.n_molecules,
                           benchmark=self.benchmark) as ml:
             kmeans_cuml = cuDaskKMeans(client=self.client,
@@ -190,7 +190,7 @@ class GpuWorkflow(BaseClusterWorkflow):
             ml.metric_func_args = (embedding, kmeans_labels)
             ml.metric_func_kwargs = {'on_gpu': True}
 
-        with MaticsLogger(self.client, 'umap', 'gpu',
+        with MetricsLogger(self.client, 'umap', 'gpu',
                           self.benchmark_file, self.n_molecules,
                           benchmark=self.benchmark) as ml:
             X_train = embedding.compute()

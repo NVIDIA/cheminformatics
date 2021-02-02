@@ -36,7 +36,7 @@ def initialize_logfile(benchmark_file=BENCHMARK_FILE):
             fh.write(f'# {config_message}\n')
             fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_molecules,n_workers,metric_name,metric_value\n')
 
-class MaticsLogger(object):
+class MetricsLogger(object):
 
     def __init__(self,
                client,

@@ -19,8 +19,7 @@ RUN /opt/conda/envs/rapids/bin/pip install \
     sqlalchemy \
     openpyxl \
     tabulate \
-    autopep8 && \
-    /opt/conda/envs/rapids/bin/pip install --ignore-installed --upgrade tensorflow==1.13.1 tensorflow-gpu==1.13.1
+    autopep8
 
 # misc python packages
 RUN conda install -n rapids pywget

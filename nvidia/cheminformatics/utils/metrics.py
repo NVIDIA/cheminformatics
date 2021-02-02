@@ -115,7 +115,7 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
     n_samples = data_matrix1.shape[0]
     data_matrix_argsort = data_matrix1.argsort(axis=1)
     mask_top_k = (data_matrix_argsort > 0) & (data_matrix_argsort <= top_k).reshape(n_samples, -1)
-    
+
     data_matrix1_top_k = data_matrix1[mask_top_k].reshape(n_samples, -1)
     data_matrix2_top_k = data_matrix2[mask_top_k].reshape(n_samples, -1)
 
@@ -126,6 +126,6 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
     if hasattr(data_matrix2_top_k, 'device'):
         data_matrix2_top_k = cupy.asnumpy(data_matrix2_top_k)
 
-    rho_value = numpy.array([spearmanr(x, y).correlation 
+    rho_value = numpy.array([spearmanr(x, y).correlation
                               for x,y in zip(data_matrix1_top_k, data_matrix2_top_k)]).mean()
     return rho_value

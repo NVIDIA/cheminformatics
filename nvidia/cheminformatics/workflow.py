@@ -72,7 +72,6 @@ class CpuWorkflow:
 
         logger.info('PCA...')
         n_cpu = len(self.client.cluster.workers)
-        logger.info('WORKERS %d' % n_cpu)
 
         if self.pca_comps:
             task_start_time = datetime.now()
@@ -91,6 +90,7 @@ class CpuWorkflow:
         kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
         kmeans_float.fit(df_fingerprints)
         kmeans_labels = kmeans_float.predict(df_fingerprints)
+
         runtime = datetime.now() - task_start_time
 
         silhouette_score = batched_silhouette_scores(df_fingerprints, kmeans_labels, on_gpu=False, seed=self.seed)
@@ -243,7 +243,7 @@ class GpuWorkflow:
         logger.info('PCA...')
         if self.pca_comps:
             task_start_time = datetime.now()
-            pca = cuDaskPCA(client=self.client, n_components=self.pca_comps)
+            pca = PCA(client=self.client, n_components=self.pca_comps)
             df_fingerprints = pca.fit_transform(mol_df)
             runtime = datetime.now() - task_start_time
             logger.info(

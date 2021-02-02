@@ -66,12 +66,3 @@ class Embeddings(BaseTransformation):
 
     def __len__(self):
         return self.func.hparams.emb_size
-
-
-### DEPRECATED ###
-def morgan_fingerprint(smiles, radius=2, nBits=512):
-    m = Chem.MolFromSmiles(smiles)
-    fp = AllChem.GetMorganFingerprintAsBitVect(m, radius=radius, nBits=nBits)
-
-    return ', '.join(list(fp.ToBitString()))
-

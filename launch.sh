@@ -196,7 +196,7 @@ root() {
 
 
 dbSetup() {
-	local DATA_DIR=$1
+	local DATA_DIR=$DATA_PATH
 
 	if [[ ! -e "${DATA_DIR}/chembl_27.db" ]]; then
 		echo "Downloading chembl db to ${DATA_DIR}..."

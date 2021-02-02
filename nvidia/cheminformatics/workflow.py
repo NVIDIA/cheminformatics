@@ -219,7 +219,6 @@ class GpuWorkflow(BaseClusterWorkflow):
 
         return embedding
 
-
     def cluster(self,
                 df_molecular_embedding=None,
                 cache_directory=None):

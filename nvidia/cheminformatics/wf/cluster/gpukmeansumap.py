@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import logging
+from nvidia.cheminformatics.config import Context
 
 import numpy
 
@@ -35,7 +36,7 @@ from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spea
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
-from nvidia.cheminformatics.utils.fileio import MaticsLogger
+from nvidia.cheminformatics.utils.logger import MetricsLogger
 
 
 logger = logging.getLogger(__name__)
@@ -56,17 +57,15 @@ def _(embedding, n_pca, self):
     return self._cluster(embedding, n_pca)
 
 
-class GpuWorkflow(BaseClusterWorkflow):
+class GpuKmeansUmap(BaseClusterWorkflow):
 
     def __init__(self,
                  n_molecules: int,
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
-                 client=None,
                  pca_comps=64,
                  n_clusters=7,
                  benchmark_file='./benchmark.csv',
                  benchmark=False):
-        self.client = client
         self.dao = dao
         self.n_molecules = n_molecules
         self.pca_comps = pca_comps
@@ -91,6 +90,12 @@ class GpuWorkflow(BaseClusterWorkflow):
         return spearman_rho(dist_array_tani, dist_array_eucl).mean()
 
     def _cluster(self, embedding, n_pca):
+        """
+        Generates UMAP transformation on Kmeans labels generated from
+        molecular fingerprints.
+        """
+
+        client = Context().dask_client
 
         # Before reclustering remove all columns that may interfere
         for col in ['x', 'y', 'cluster', 'id', 'filter_col']:
@@ -98,16 +103,12 @@ class GpuWorkflow(BaseClusterWorkflow):
                 embedding = embedding.drop([col], axis=1)
 
         if n_pca:
-            with MaticsLogger(self.client, 'pca', 'gpu',
-                              self.benchmark_file, self.n_molecules,
-                              benchmark=self.benchmark) as ml:
-                pca = cuDaskPCA(client=self.client, n_components=n_pca)
+            with MetricsLogger('pca', self.n_molecules) as ml:
+                pca = cuDaskPCA(client=client, n_components=n_pca)
                 embedding = pca.fit_transform(embedding)
 
-        with MaticsLogger(self.client, 'kmeans', 'gpu',
-                          self.benchmark_file, self.n_molecules,
-                          benchmark=self.benchmark) as ml:
-            kmeans_cuml = cuDaskKMeans(client=self.client,
+        with MetricsLogger('kmeans', self.n_molecules) as ml:
+            kmeans_cuml = cuDaskKMeans(client=client,
                                        n_clusters=self.n_clusters)
             kmeans_cuml.fit(embedding)
             kmeans_labels = kmeans_cuml.predict(embedding)
@@ -117,9 +118,7 @@ class GpuWorkflow(BaseClusterWorkflow):
             ml.metric_func_args = (embedding, kmeans_labels)
             ml.metric_func_kwargs = {'on_gpu': True}
 
-        with MaticsLogger(self.client, 'umap', 'gpu',
-                          self.benchmark_file, self.n_molecules,
-                          benchmark=self.benchmark) as ml:
+        with MetricsLogger('umap', self.n_molecules) as ml:
             X_train = embedding.compute()
 
             local_model = cuUMAP()
@@ -130,7 +129,7 @@ class GpuWorkflow(BaseClusterWorkflow):
                                     a=1.0,
                                     b=1.0,
                                     learning_rate=1.0,
-                                    client=self.client)
+                                    client=client)
             Xt = umap_model.transform(embedding)
 
             ml.metric_name='spearman_rho'

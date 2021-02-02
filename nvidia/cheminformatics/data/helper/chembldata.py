@@ -11,10 +11,10 @@ from dask import delayed, dataframe
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
 from nvidia.cheminformatics.smiles import RemoveSalt, PreprocessSmiles
-from nvidia.cheminformatics.fingerprint import Embeddings
+from nvidia.cheminformatics.fingerprint import MorganFingerprint
+from nvidia.cheminformatics.config import Context
 
 SMILES_TRANSFORMS = [RemoveSalt(), PreprocessSmiles()]
-FINGERPRINT_SELECTION = Embeddings
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -33,10 +33,15 @@ logger = logging.getLogger(__name__)
 class ChEmblData(object, metaclass=Singleton):
 
     def __init__(self,
-                 db_file='/data/db/chembl_27.db',
-                 fp_type=Embeddings):
-        self.chembl_db = 'file:%s?mode=ro' % db_file
+                 fp_type=MorganFingerprint):
+
+        context = Context()
+        db_file = context.get_config('data_path')
+
+        self.chembl_db = 'file:%s/db/chembl_27.db?mode=ro' % db_file
         self.fp_type = fp_type
+
+        logger.info('Reading ChEmbleDB at %s...' % self.chembl_db)
 
     def fetch_props_by_molregno(self, molregnos):
         """
@@ -103,7 +108,6 @@ class ChEmblData(object, metaclass=Singleton):
                              start,
                              batch_size=5000,
                              smiles_transforms=SMILES_TRANSFORMS,
-                             transformation_function=FINGERPRINT_SELECTION,
                              **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
@@ -134,7 +138,7 @@ class ChEmblData(object, metaclass=Singleton):
                     df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
 
         # Conversion to fingerprints or embeddings
-        transformation = transformation_function(**transformation_kwargs)
+        transformation = self.fp_type(**transformation_kwargs)
         return_df = list(map(transformation.transform, df['transformed_smiles']))
 
         # TODO this is behavior specific to a fingerprint class and should be refactored
@@ -150,7 +154,6 @@ class ChEmblData(object, metaclass=Singleton):
     def fetch_mol_embedding(self,
                             num_recs=None,
                             batch_size=5000,
-                            transformation_function=FINGERPRINT_SELECTION,
                             **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
@@ -161,7 +164,7 @@ class ChEmblData(object, metaclass=Singleton):
         if not num_recs or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
-        transformation = transformation_function(**transformation_kwargs)
+        transformation = self.fp_type(**transformation_kwargs)
         prop_meta = {i: pandas.Series([], dtype='float32') for i in range(len(transformation))}
         meta_df = pandas.DataFrame(prop_meta)
 
@@ -171,16 +174,15 @@ class ChEmblData(object, metaclass=Singleton):
             dls.append(self._fetch_mol_embedding(
                     start,
                     batch_size=bsize,
-                    transformation_function=transformation_function,
                     **transformation_kwargs))
 
         return dataframe.from_delayed(dls, meta=meta_df)
 
-    def save_fingerprints(self, hdf_path='data/filter_*.h5'):
+    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None,):
         """
         Generates fingerprints for all ChEmblId's in the database
         """
         logger.debug('Fetching molecules from database for fingerprints...')
 
-        mol_df = self.fetch_all_props()
+        mol_df = self.fetch_mol_embedding(num_recs=num_recs)
         mol_df.to_hdf(hdf_path, 'fingerprints')

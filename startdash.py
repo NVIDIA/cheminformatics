@@ -194,13 +194,13 @@ To create cache:
                             dest='pca_comps',
                             type=int,
                             default=64,
-                            help='Numer of PCA components')
+                            help='Number of PCA components')
 
         parser.add_argument('-n', '--num_clusters',
                             dest='num_clusters',
                             type=int,
                             default=7,
-                            help='Numer of clusters (KMEANS)')
+                            help='Numer of clusters')
 
         parser.add_argument('-c', '--cache_directory',
                             dest='cache_directory',

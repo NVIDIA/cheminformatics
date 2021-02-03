@@ -3,18 +3,22 @@ import logging
 from io import StringIO
 from configparser import RawConfigParser
 
+from nvidia.cheminformatics.utils.singleton import Singleton
+
 logger = logging.getLogger(__name__)
 
 
 CONFIG_FILE = '.cheminf_local_environment'
 
 
-class Context(object):
-    from nvidia.cheminformatics.utils.singleton import Singleton
-    __metaclass__ = Singleton
-
+class Context(metaclass=Singleton):
 
     def __init__(self):
+
+        self.dask_client = None
+        self.compute_type = 'gpu'
+        self.is_benchmark = False
+        self.benchmark_file = None
 
         self.config = None
         if os.path.exists(CONFIG_FILE):
@@ -36,8 +40,12 @@ class Context(object):
 
         return config._sections['root']
 
-    def get_config(self, config_name):
+    def get_config(self, config_name, default=None):
         """
         Returns values from local configuration.
         """
-        return self.config[config_name]
+        try:
+            return self.config[config_name]
+        except KeyError:
+            logger.warn('%s not found, returing default.', config_name)
+            return config_name

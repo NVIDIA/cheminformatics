@@ -178,11 +178,11 @@ class ChEmblData(object, metaclass=Singleton):
 
         return dataframe.from_delayed(dls, meta=meta_df)
 
-    def save_fingerprints(self, hdf_path='data/filter_*.h5'):
+    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None,):
         """
         Generates fingerprints for all ChEmblId's in the database
         """
         logger.debug('Fetching molecules from database for fingerprints...')
 
-        mol_df = self.fetch_all_props()
+        mol_df = self.fetch_mol_embedding(num_recs=num_recs)
         mol_df.to_hdf(hdf_path, 'fingerprints')

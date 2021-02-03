@@ -19,16 +19,19 @@ import logging
 import sklearn.decomposition
 from dask_ml.cluster import KMeans as dask_KMeans
 import umap
+import numpy
+import cupy
+from cuml.metrics import pairwise_distances
 
 from . import BaseClusterWorkflow
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
+from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.utils.logger import MetricsLogger
 
 
 logger = logging.getLogger(__name__)
-
 
 class CpuKmeansUmap(BaseClusterWorkflow):
 
@@ -37,22 +40,32 @@ class CpuKmeansUmap(BaseClusterWorkflow):
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
                  n_pca=64,
                  n_clusters=7,
-                 benchmark_file='./benchmark.csv',
-                 benchmark=False):
+                 seed=0):
         self.dao = dao
         self.n_molecules = n_molecules
         self.n_pca = n_pca
         self.n_clusters = n_clusters
-        self.benchmark_file = benchmark_file
-        self.benchmark=benchmark
+
+        self.seed = seed
+        self.n_spearman = 5000
+
+    def _compute_spearman_rho(self, mol_df, X_train):
+        n_indexes = min(self.n_spearman, X_train.shape[0])
+        numpy.random.seed(self.seed)
+        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])),
+                                      size=n_indexes,
+                                      replace=False)
+
+        fp_sample = cupy.array(mol_df.iloc[indexes])
+        Xt_sample = cupy.array(X_train[indexes])
+
+        dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
+        dist_array_eucl = pairwise_distances(Xt_sample)
+        return spearman_rho(dist_array_tani, dist_array_eucl, top_k=100)
 
     def cluster(self,
                 df_molecular_embedding=None,
                 cache_directory=None):
-        """
-        Generates UMAP transformation on Kmeans labels generated from
-        molecular fingerprints.
-        """
 
         logger.info("Executing CPU workflow...")
 
@@ -81,17 +94,23 @@ class CpuKmeansUmap(BaseClusterWorkflow):
             ml.metric_name='silhouette_score'
             ml.metric_func = batched_silhouette_scores
             ml.metric_func_args = (df_fingerprints, kmeans_labels)
-            ml.metric_func_kwargs = {'on_gpu': False}
+            ml.metric_func_kwargs = {'on_gpu': False, 'seed': self.seed}
 
         with MetricsLogger('umap', self.n_molecules) as ml:
             umap_model = umap.UMAP()
 
-            Xt = umap_model.fit_transform(df_fingerprints)
+            X_train = umap_model.fit_transform(df_fingerprints)
             # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
+            # Sample to calculate spearman's rho
+            # Currently this converts indexes to
             df_molecular_embedding = df_molecular_embedding.compute()
 
-        df_molecular_embedding['x'] = Xt[:, 0]
-        df_molecular_embedding['y'] = Xt[:, 1]
+            ml.metric_name='spearman_rho'
+            ml.metric_func = self._compute_spearman_rho
+            ml.metric_func_args = (df_molecular_embedding, X_train)
+
+        df_molecular_embedding['x'] = X_train[:, 0]
+        df_molecular_embedding['y'] = X_train[:, 1]
         df_molecular_embedding['cluster'] = kmeans_float.labels_
 
         return df_molecular_embedding

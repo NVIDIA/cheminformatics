@@ -27,27 +27,30 @@ def compute_norms(data, norms):
         data (matrix): matrix with data and samples in rows
         norms (matrix): matrix for norms
     """
+
     i = cuda.grid(1)
     norms[i] = len(data[i])
+
     for j in range(len(data[i])):
         if data[i][j] != 0:
             value = j + 1
             data[i][j] = value
             norms[i] = norms[i] + (value**2)
+
     if norms[i] != 0:
         norms[i] = math.sqrt(norms[i])
 
 
 @cuda.jit
-def compute_tanimoto_matix(data, norms, dist_array, calc_distance=False):
-    """Numba kernel to calculate
+def compute_tanimoto_similarity_matrix(data, norms, dist_array):
+    """Numba kernel to calculate tanimoto similarity according to the wikipedia definition
 
     Args:
         data (matrix): data with samples in rows
         norms (matrix): matrix with samples in rows
         dist_array (matrix): square matrix to hold pairwise distance
-        calc_distance (bool, optional): Calculate distance metric. Defaults to False.
     """
+
     x = cuda.grid(1)
     rows = len(data)
 
@@ -55,7 +58,7 @@ def compute_tanimoto_matix(data, norms, dist_array, calc_distance=False):
     j = x % rows
 
     if i == j:
-        dist_array[i][j] = 0 if calc_distance else 1
+        dist_array[i][j] = 1.0
         return
 
     a = data[i]
@@ -68,13 +71,18 @@ def compute_tanimoto_matix(data, norms, dist_array, calc_distance=False):
     a_norm = norms[i]
     b_norm = norms[j]
 
-    tanimoto_calc = (prod / ((a_norm**2 + b_norm**2) - prod))
-    tanimoto_calc = 1 - tanimoto_calc if calc_distance else tanimoto_calc
-    dist_array[i][j] = tanimoto_calc
+    dist_array[i][j] = (prod / ((a_norm**2 + b_norm**2) - prod))
 
 
 @cuda.jit
-def compute_rdkit_tanimoto_matix(data, dist_array, calc_distance=False):
+def compute_rdkit_tanimoto_similarity_matrix(data, dist_array):
+    """Numba kernel to calculate tanimoto similarity according to the RDKit definition
+
+    Args:
+        data (matrix): data with samples in rows
+        dist_array (matrix): square matrix to hold pairwise distance
+    """
+    
     x = cuda.grid(1)
     rows = len(data)
 
@@ -82,7 +90,7 @@ def compute_rdkit_tanimoto_matix(data, dist_array, calc_distance=False):
     j = x % rows
 
     if i == j:
-        dist_array[i][j] = 0 if calc_distance else 1
+        dist_array[i][j] = 1.0
         return
 
     a = data[i]
@@ -97,7 +105,7 @@ def compute_rdkit_tanimoto_matix(data, dist_array, calc_distance=False):
         elif a[k] or b[k]:
             total += 1
 
-    dist_array[i][j] = intersections / (total - intersections)
+    dist_array[i][j] = intersections / float(total - intersections)
 
 
 def tanimoto_calculate(fp, calc_distance=False):
@@ -112,9 +120,9 @@ def tanimoto_calculate(fp, calc_distance=False):
     """
 
     dist_array = cupy.zeros((fp.shape[0], fp.shape[0]), cupy.float32)
-    compute_rdkit_tanimoto_matix.forall(fp.shape[0] * fp.shape[0], 1)(fp,
-                                                                dist_array,
-                                                                calc_distance)
+    compute_rdkit_tanimoto_similarity_matrix.forall(fp.shape[0] * fp.shape[0], 1)(fp, dist_array)
+
     if calc_distance:
-        dist_array = 1 - dist_array
+        dist_array = 1.0 - dist_array
+
     return dist_array

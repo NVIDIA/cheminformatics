@@ -16,6 +16,9 @@
 
 export PATH=/opt/conda/envs/rapids/bin:$PATH
 
+GREEN='\033[1;32m'
+NC='\033[0m'
+
 BENCHMARK_DIR='/workspace/benchmark'
 BENCHMARK_PATH=${BENCHMARK_DIR}/benchmark.csv
 PLOT_PATH=${BENCHMARK_DIR}/benchmark.png
@@ -47,16 +50,25 @@ fi
 
 # Run the benchmarks
 for n_molecules in ${N_MOLECULES[*]}; do
+
+    if [[ $n_molecules -eq -1 ]]; then
+        n_molecules_message="all"
+    else
+        n_molecules_message="$n_molecules"
+    fi
+
     for n_gpus in ${N_GPUS[*]}; do
-        echo "Benchmarking $n_molecules molecules on $n_gpus GPUs"
+        echo -e $GREEN"Benchmarking $n_molecules_message molecules on $n_gpus GPU(s)"$NC
         python startdash.py analyze -b --cache ${CACHE_DIR} --n_gpu $n_gpus --n_mol $n_molecules --output_dir $BENCHMARK_DIR
     done
 
     for n_cpus in ${N_CPUS[*]}; do
-        echo "Benchmarking $n_molecules molecules on $n_cpus CPU cores"
+        echo -e $GREEN"Benchmarking $n_molecules_message molecules on $n_cpus CPU cores"$NC
         python startdash.py analyze -b --cache ${CACHE_DIR} --cpu --n_cpu $n_cpus --n_mol $n_molecules --output_dir $BENCHMARK_DIR
     done
+
 done
 
 # Plot the results
+echo -e $GREEN"Plotting the results"$NC
 python nvidia/cheminformatics/utils/plot_benchmark_results.py --benchmark_file $BENCHMARK_PATH --output_path $PLOT_PATH

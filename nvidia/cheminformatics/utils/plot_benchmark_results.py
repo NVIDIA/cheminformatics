@@ -131,6 +131,9 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
     n_rows = min(2, n_groups)
     n_cols = int(n_groups / n_rows + 0.5)
 
+    if (n_rows, n_cols) == (2, 1):
+        n_rows, n_cols = n_cols, n_rows
+        
     fig, axList = plt.subplots(nrows=n_rows, ncols=n_cols)
     fig.set_size_inches(6 * n_cols, 6 * n_rows)
 

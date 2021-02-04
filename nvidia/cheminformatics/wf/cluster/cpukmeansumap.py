@@ -75,6 +75,7 @@ class CpuKmeansUmap(BaseClusterWorkflow):
                 cache_directory=cache_directory)
 
         df_molecular_embedding = df_molecular_embedding.persist()
+        self.n_molecules = df_molecular_embedding.compute().shape[0]
 
         if self.n_pca:
             with MetricsLogger('pca', self.n_molecules) as ml:
@@ -85,13 +86,13 @@ class CpuKmeansUmap(BaseClusterWorkflow):
         else:
             df_fingerprints = df_molecular_embedding.copy()
 
-        with MetricsLogger('kmeans',self.n_molecules,) as ml:
+        with MetricsLogger('kmeans', self.n_molecules,) as ml:
 
             kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
             kmeans_float.fit(df_fingerprints)
             kmeans_labels = kmeans_float.predict(df_fingerprints)
 
-            ml.metric_name='silhouette_score'
+            ml.metric_name = 'silhouette_score'
             ml.metric_func = batched_silhouette_scores
             ml.metric_func_args = (df_fingerprints, kmeans_labels)
             ml.metric_func_kwargs = {'on_gpu': False, 'seed': self.seed}
@@ -105,7 +106,7 @@ class CpuKmeansUmap(BaseClusterWorkflow):
             # Currently this converts indexes to
             df_molecular_embedding = df_molecular_embedding.compute()
 
-            ml.metric_name='spearman_rho'
+            ml.metric_name = 'spearman_rho'
             ml.metric_func = self._compute_spearman_rho
             ml.metric_func_args = (df_molecular_embedding, X_train)
 

@@ -66,7 +66,7 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, dow
         clusters = clusters.compute()
 
     # Shuffle
-    combined = dflib.DataFrame(embeddings) if not isinstance(embeddings, dflib.DataFrame) else embeddings
+    combined = dflib.DataFrame(embeddings) if not isinstance(embeddings, dflib.DataFrame) else embeddings.copy()
     embeddings_columns = combined.columns
     cluster_column = 'clusters'
 

@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
 import pytest
 import sys
 import os
@@ -22,7 +24,6 @@ import pandas as pd
 import numpy as np
 import cupy
 import cudf
-# from cuml.metrics import pairwise_distances
 
 from sklearn.metrics import silhouette_score, pairwise_distances
 from scipy.stats import spearmanr
@@ -33,10 +34,7 @@ from rdkit.DataManip.Metric import GetTanimotoDistMat
 # Define paths
 _this_directory = os.path.dirname(os.path.realpath(__file__))
 _parent_directory = os.path.dirname(_this_directory)
-sys.path.insert(0, _parent_directory) # TODO better way to add this directory to the path
-
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
-from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+sys.path.insert(0, _parent_directory)  # TODO better way to add this directory to the path
 
 _data_dir = os.path.join(_this_directory, 'data')
 benchmark_approved_drugs_path = os.path.join(_data_dir, 'benchmark_approved_drugs.csv')
@@ -84,13 +82,16 @@ def test_run_silhouette_score(pca_approved_csv, cluster_column):
     # TODO copy pca_data or ensure it doesn't modify original
     n_data = pca_data.shape[0]
     score_gpu1 = batched_silhouette_scores(pca_data, clusters, batch_size=n_data, on_gpu=False)
-    score_gpu2 = batched_silhouette_scores(cudf.DataFrame(pca_data), cudf.Series(clusters), batch_size=n_data, on_gpu=True)
+    score_gpu2 = batched_silhouette_scores(cudf.DataFrame(
+        pca_data), cudf.Series(clusters), batch_size=n_data, on_gpu=True)
 
     assert np.allclose(score_cpu, score_gpu1) & np.allclose(score_cpu, score_gpu2)
 
 
 @pytest.mark.parametrize('pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k, top_k_value', run_spearman_rho_params)
 def test_run_spearman_rho(pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k, top_k_value):
+    """Validate the spearman rho score"""
+
     # Load PCA data to use as Euclidean distances
     pca_data = pd.read_csv(pca_approved_drugs_csv).set_index('molregno').drop(cluster_column, axis=1)
     float_data = pca_data[pca_data.columns[:n_dims_eucl_data]]
@@ -107,11 +108,10 @@ def test_run_spearman_rho(pca_approved_drugs_csv, fingerprint_approved_drugs_csv
     assert np.allclose(top_k_value_check, np.round(top_k_value, 5))
 
     # Check all data compared to the CPU version
-    top_k_all_data = pairwise_eucl_dist.shape[1]# - 1
+    top_k_all_data = pairwise_eucl_dist.shape[1]  # - 1
     all_data_gpu = spearman_rho(pairwise_eucl_dist, tanimoto_dist, top_k=top_k_all_data)
 
     tanimoto_dist_cpu = cupy.asnumpy(tanimoto_dist)
-    all_data_cpu = np.array([spearmanr(x, y).correlation for x,y in zip(pairwise_eucl_dist, tanimoto_dist_cpu)])
+    all_data_cpu = np.array([spearmanr(x, y).correlation for x, y in zip(pairwise_eucl_dist, tanimoto_dist_cpu)])
     all_data_cpu = np.nanmean(all_data_cpu)
     # assert np.allclose(all_data_gpu, all_data_cpu) # TODO debug this
-

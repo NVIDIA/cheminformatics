@@ -73,6 +73,7 @@ def test_run_benchmark(benchmark_config_list, data_dir, output_dir):
     nrows, ncols = benchmark_results.shape
     assert nrows == len(benchmark_config_list) * 5
     assert ncols == 8
+    assert benchmark_results['n_molecules'].min() > 0
 
 
 @pytest.mark.parametrize('output_dir', load_benchmark_params)

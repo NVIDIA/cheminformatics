@@ -98,7 +98,7 @@ def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, dow
     return numpy.array(scores).mean()
 
 
-def spearman_rho(data_matrix1, data_matrix2, top_k=10):
+def spearman_rho(data_matrix1, data_matrix2, top_k=100):
     """Calculate spearman's Rho, ranked correlation coefficient
 
     Args:
@@ -109,23 +109,31 @@ def spearman_rho(data_matrix1, data_matrix2, top_k=10):
         matrix: ranked correlation coeffcients for data
     """
 
+    assert data_matrix1.shape == data_matrix2.shape
+
     data_matrix1 = cupy.asnumpy(data_matrix1)
     data_matrix2 = cupy.asnumpy(data_matrix2)
 
-    n_samples = data_matrix1.shape[0]
-    data_matrix_argsort = data_matrix1.argsort(axis=1)
-    mask_top_k = (data_matrix_argsort > 0) & (data_matrix_argsort <= top_k).reshape(n_samples, -1)
-    
-    data_matrix1_top_k = data_matrix1[mask_top_k].reshape(n_samples, -1)
-    data_matrix2_top_k = data_matrix2[mask_top_k].reshape(n_samples, -1)
+    cupy.fill_diagonal(data_matrix1, cupy.inf)
+    cupy.fill_diagonal(data_matrix2, cupy.inf)
 
-   # Includes Dask and cupy and cudf
-    if hasattr(data_matrix1_top_k, 'device'):
-        data_matrix1_top_k = cupy.asnumpy(data_matrix1_top_k)
+    data_matrix1.sort(axis=1)
+    data_matrix2.sort(axis=1)
 
-    if hasattr(data_matrix2_top_k, 'device'):
-        data_matrix2_top_k = cupy.asnumpy(data_matrix2_top_k)
+    if top_k is not None:
+        if top_k < data_matrix1.shape[1]:
+            data_matrix1 = data_matrix1[:, :top_k]
+            data_matrix2 = data_matrix2[:, :top_k]
 
+    # Includes Dask and cupy and cudf
+    if hasattr(data_matrix1, 'device'):
+        data_matrix1 = cupy.asnumpy(data_matrix1)
+
+    if hasattr(data_matrix2, 'device'):
+        data_matrix2 = cupy.asnumpy(data_matrix2)
+        
     rho_value = numpy.array([spearmanr(x, y).correlation 
-                              for x,y in zip(data_matrix1_top_k, data_matrix2_top_k)]).mean()
+                            for x,y in zip(data_matrix1, data_matrix2)])
+    rho_value = numpy.nanmean(rho_value)
+
     return rho_value

@@ -284,6 +284,8 @@ To create cache:
             else:
                 n_workers = args.n_cpu
 
+            n_molecules = workflow.n_molecules
+            
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
             log_results(task_start_time, context.compute_type, 'workflow',

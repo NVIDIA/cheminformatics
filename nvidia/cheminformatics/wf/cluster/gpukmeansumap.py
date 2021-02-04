@@ -114,7 +114,7 @@ class GpuKmeansUmap(BaseClusterWorkflow):
             kmeans_cuml.fit(embedding)
             kmeans_labels = kmeans_cuml.predict(embedding)
 
-            ml.metric_name='silhouette_score'
+            ml.metric_name = 'silhouette_score'
             ml.metric_func = batched_silhouette_scores
             ml.metric_func_args = (embedding, kmeans_labels)
             ml.metric_func_kwargs = {'on_gpu': True,  'seed': self.seed}
@@ -133,7 +133,7 @@ class GpuKmeansUmap(BaseClusterWorkflow):
                                     client=client)
             Xt = umap_model.transform(embedding)
 
-            ml.metric_name='spearman_rho'
+            ml.metric_name = 'spearman_rho'
             ml.metric_func = self._compute_spearman_rho
             ml.metric_func_args = (embedding, X_train, Xt)
 
@@ -158,6 +158,7 @@ class GpuKmeansUmap(BaseClusterWorkflow):
                 cache_directory=cache_directory)
             df_molecular_embedding = df_molecular_embedding.persist()
 
+        self.n_molecules = df_molecular_embedding.compute().shape[0]
         self.df_embedding = _gpu_cluster_wrapper(df_molecular_embedding,
                                                  self.pca_comps,
                                                  self)
@@ -196,6 +197,7 @@ class GpuKmeansUmap(BaseClusterWorkflow):
                 cudf.Series(new_chembl_ids), ignore_index=True)
             ids = ids.append(fp_df['id'], ignore_index=True), 'id', 'chembl_id'
             self.chembl_ids.extend(new_chembl_ids)
+            self.n_molecules = len(self.chembl_ids)
 
         self.df_embedding = self._cluster_wrapper(self.df_embedding)
         return self.df_embedding

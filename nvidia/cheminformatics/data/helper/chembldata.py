@@ -41,11 +41,11 @@ class ChEmblData(object, metaclass=Singleton):
         self.chembl_db = 'file:%s/db/chembl_27.db?mode=ro' % db_file
         self.fp_type = fp_type
 
-        logger.info('Reading ChEmbleDB at %s...' % self.chembl_db)
+        logger.info('Reading ChEMBL database at %s...' % self.chembl_db)
 
     def fetch_props_by_molregno(self, molregnos):
         """
-        Returns compound properties and structure filtered by ChEMBL ids along
+        Returns compound properties and structure filtered by ChEMBL IDs along
         with a list of columns.
         """
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
@@ -59,7 +59,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def fetch_props_df_by_molregno(self, molregnos, gpu=True):
         """
-        Returns compound properties and structure filtered by ChEMBL ids in a
+        Returns compound properties and structure filtered by ChEMBL IDs in a
         dataframe.
         """
         select_stmt = SQL_MOLECULAR_PROP % " ,".join(molregnos)
@@ -72,7 +72,7 @@ class ChEmblData(object, metaclass=Singleton):
             return df
 
     def fetch_molregno_by_chemblId(self, chemblIds):
-        logger.debug('Fetch chemblId using molregno...')
+        logger.debug('Fetch ChEMBL ID using molregno...')
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
             select_stmt = '''
@@ -180,7 +180,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None,):
         """
-        Generates fingerprints for all ChEmblId's in the database
+        Generates fingerprints for all ChEMBL ID's in the database
         """
         logger.debug('Fetching molecules from database for fingerprints...')
 

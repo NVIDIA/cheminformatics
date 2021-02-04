@@ -14,8 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from nvidia.cheminformatics.utils.distance import tanimoto_calculate
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
 import pytest
 import sys
 import os
@@ -35,6 +33,9 @@ from rdkit.DataManip.Metric import GetTanimotoDistMat
 _this_directory = os.path.dirname(os.path.realpath(__file__))
 _parent_directory = os.path.dirname(_this_directory)
 sys.path.insert(0, _parent_directory)  # TODO better way to add this directory to the path
+
+from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
 
 _data_dir = os.path.join(_this_directory, 'data')
 benchmark_approved_drugs_path = os.path.join(_data_dir, 'benchmark_approved_drugs.csv')

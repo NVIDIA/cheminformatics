@@ -4,6 +4,7 @@
 import json
 import base64
 import logging
+from pydoc import locate
 from rdkit import Chem
 from rdkit.Chem import Draw
 import numpy as np
@@ -34,8 +35,7 @@ DOT_SIZE = 5
 
 class ChemVisualization:
 
-    def __init__(self, workflow, gpu=True):
-        self.enable_gpu = gpu
+    def __init__(self, workflow):
         self.app = dash.Dash(
             __name__, external_stylesheets=external_stylesheets)
 
@@ -43,6 +43,8 @@ class ChemVisualization:
         self.n_clusters = workflow.n_clusters
 
         self.chem_data = ChEmblData()
+
+        self.wf = 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'
 
         # Store colors to avoid plots changes colors on events such as
         # molecule selection, etc.
@@ -97,8 +99,10 @@ class ChemVisualization:
 
         self.app.callback(
             Output("refresh_main_fig", "value"),
-            [Input("bt_reset", "n_clicks")],
-            [State("refresh_main_fig", "children")])(self.handle_reset)
+            [Input("bt_reset", "n_clicks"),
+             Input("bt_apply_wf", "n_clicks")],
+            [State("refresh_main_fig", "children"),
+             State("sl_wf", "value")])(self.handle_reset)
 
         self.app.callback(
             [Output('north_star', 'value'),
@@ -112,9 +116,16 @@ class ChemVisualization:
             raise dash.exceptions.PreventUpdate
         return dash.callback_context.triggered[0]['prop_id'].split('.')
 
-    def handle_reset(self, reset_bt_evt, refresh_main_fig):
-        if not dash.callback_context.triggered:
-            raise dash.exceptions.PreventUpdate
+    def handle_reset(self, bt_reset, bt_apply_wf, refresh_main_fig, sl_wf):
+        comp_id, event_type = self._fetch_event_data()
+
+        if comp_id == 'bt_apply_wf' and event_type == 'n_clicks':
+            if self.wf != sl_wf:
+                self.wf = sl_wf
+                wf_class = locate(self.wf)
+                self.workflow = wf_class()
+            else:
+                raise dash.exceptions.PreventUpdate
 
         self.recluster(reload_data=True)
         if refresh_main_fig is None:
@@ -156,10 +167,9 @@ class ChemVisualization:
     def create_graph(self, df, color_col='cluster', north_stars=None, gradient_prop=None):
         fig = go.Figure(layout={'colorscale': {}})
 
+        ldf = df
         if hasattr(df, 'compute'):
             ldf = df.compute()
-        else:
-            ldf = df
 
         moi_molregno = []
         if north_stars:
@@ -187,7 +197,7 @@ class ChemVisualization:
             customdata = ldf['id']
             grad_prop = ldf[gradient_prop]
 
-            if self.enable_gpu:
+            if self.workflow.is_gpu_enabled():
                 x_data = x_data.to_array()
                 y_data = y_data.to_array()
                 cluster = cluster.to_array()
@@ -215,22 +225,19 @@ class ChemVisualization:
             }))
         else:
             clusters = ldf[color_col].unique()
-            if self.enable_gpu:
+            if self.workflow.is_gpu_enabled():
                 clusters = clusters.values_host
 
             if self.cluster_colors is None or len(self.cluster_colors) != len(clusters):
                 self.cluster_colors = generate_colors(len(clusters))
 
-            north_points = northstar_df['id']
             scatter_traces = []
-
             for cluster_id in clusters:
-                query = 'cluster == ' + str(cluster_id)
-                cdf = ldf.query(query)
+                cdf = ldf.query('cluster == ' + str(cluster_id))
 
-                df_size = cdf['id'].isin(north_points)
+                df_size = cdf['id'].isin(northstar_df['id'])
                 moi_present = False
-                if df_size.shape[0] > 1:
+                if df_size.unique().shape[0] > 1:
                     northstar_cluster.append(str(cluster_id))
                     moi_present = True
 
@@ -243,7 +250,7 @@ class ChemVisualization:
                 cluster = cdf['cluster']
                 customdata = cdf['id']
 
-                if self.enable_gpu:
+                if self.workflow.is_gpu_enabled():
                     x_data = x_data.to_array()
                     y_data = y_data.to_array()
                     cluster = cluster.to_array()
@@ -274,7 +281,7 @@ class ChemVisualization:
                 fig.add_trace(scatter_trace)
 
         # Change the title to indicate type of H/W in use
-        f_color = 'green' if self.enable_gpu else 'blue'
+        f_color = 'green' if self.workflow.is_gpu_enabled() else 'blue'
 
         fig.update_layout(
             showlegend=True, clickmode='event', height=main_fig_height,
@@ -377,10 +384,26 @@ class ChemVisualization:
                          style={'verticalAlign': 'text-top', }),
                 html.Div([
                     html.Div(children=[
+                        dcc.Markdown("""**Select Workflow**"""), ]),
+                    html.Div(className='row', children=[
+                        html.Div(children=[
+                            dcc.Dropdown(id='sl_wf', multi=False,
+                                        options=[{'label': 'Gpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
+                                                 {'label': 'Cpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
+                                        value='alogp',
+                                        clearable=False),
+                        ], className='nine columns'),
+                        dbc.Button('Apply',
+                                   id='bt_apply_wf', n_clicks=0,
+                                   style={'marginLeft': 6, }),
+                    ], style={'marginLeft': 0, 'marginTop': 18, }),
+
+                    html.Div(children=[
                         dcc.Markdown("""
                             **Molecule(s) of Interest (MoI)**
 
-                            Please enter Chembl id."""), ]),
+                            Please enter Chembl id."""), ],
+                        style={'marginTop': 18, 'marginLeft': 6}),
                     html.Div(className='row', children=[
                         dcc.Input(id='north_star', type='text', debounce=True),
                         dbc.Button('Highlight',
@@ -395,13 +418,12 @@ class ChemVisualization:
 
                     html.Div(children=[
                         dcc.Input(id='sl_nclusters', value=self.n_clusters)],
-                        style={'marginLeft': 6},
+                        style={'marginLeft': 0},
                         className='row'),
 
                     html.Div(children=[
                         dcc.Markdown("""
                             **Cluster Selection**
-
                             Click a point to select a cluster.
                         """)],
                         style={'marginTop': 18, 'marginLeft': 6},
@@ -412,7 +434,7 @@ class ChemVisualization:
                         dbc.Button('Recluster',
                                    id='bt_recluster_clusters', n_clicks=0,
                                    style={'marginLeft': 6, }),
-                    ], style={'marginLeft': 0, 'marginTop': 18, }),
+                    ], style={'marginLeft': 0}),
 
                     html.Div(children=[
                         dcc.Markdown("""
@@ -423,32 +445,16 @@ class ChemVisualization:
                         """), ], style={'marginTop': 18, }),
                     dbc.Button('Recluster Selection',
                                id='bt_recluster_points', n_clicks=0),
-                    html.Div(children=[
-                             html.Div(id='selected_point_cnt'), ]),
+                    html.Div(children=[html.Div(id='selected_point_cnt'), ]),
 
                     html.Div(className='row', children=[
-                        html.Div(children=[
-                            dbc.Button("Close", id="bt_close"),
-                            dbc.Modal([
-                                dbc.ModalHeader("Close"),
-                                dbc.ModalBody(
-                                    dcc.Markdown("""
-                                            Dashboard closed. Please return to the notebook.
-                                        """),
-                                ),
-                                dbc.ModalFooter(dbc.Button(
-                                    "Close", id="bt_close_dash", className="ml-auto")),
-                            ], id="md_export"),
-                        ]),
-
-                        html.Div(children=[dbc.Button('Reload', id='bt_reset', n_clicks=0), ],
-                                 style={'marginLeft': 18, }),
+                        dbc.Button('Reload', id='bt_reset', n_clicks=0),
                     ], style={'marginLeft': 0, 'marginTop': 18, }),
 
                     html.Div(id='section_prop_gradient', children=[
                         html.Label([
                             "Select Molecular Property for color gradient",
-                            dcc.Dropdown(id='sl_prop_gradient', multi=False,
+                            dcc.Dropdown(id='sl_prop_gradient', multi=False,  clearable=False,
                                          options=[{"label": p, "value": p} for p in IMP_PROPS],),
                         ], style={'marginTop': 18})],
                     ),
@@ -642,9 +648,6 @@ class ChemVisualization:
         elif comp_id == 'refresh_main_fig' and event_type == 'value':
             reload_data = True
 
-        # else:
-        #     raise dash.exceptions.PreventUpdate
-
         figure, northstar_cluster, chembl_clusterid_map = self.recluster_selection(
             filter_value=filter_values,
             filter_column=filter_column,
@@ -652,11 +655,6 @@ class ChemVisualization:
             north_stars=north_star_hidden,
             color_col='cluster',
             reload_data = reload_data)
-
-        if north_star_hidden is None:
-            northstar_cluster = ''
-        else:
-            northstar_cluster = north_star_hidden
 
         return figure, ','.join(northstar_cluster), chembl_clusterid_map, ''
 
@@ -680,7 +678,6 @@ class ChemVisualization:
             ldf = self.chem_data.fetch_props_df_by_molregno(missing_molregno)
 
             if ldf.shape[0] > 0:
-
                 smiles = []
                 for i in range(0, ldf.shape[0]):
                     smiles.append(

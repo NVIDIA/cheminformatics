@@ -214,7 +214,8 @@ To create cache:
         context.dask_client = client
         context.is_benchmark = args.benchmark
         context.benchmark_file = benchmark_file
-        context.cache_directory=args.cache_directory
+        context.cache_directory = args.cache_directory
+        context.n_molecule = args.n_mol
 
         if args.cpu:
             context.compute_type = 'cpu'
@@ -259,7 +260,7 @@ To create cache:
             port = context.get_config('plotly_port', 5000)
 
             logger.info("Starting interactive visualization...")
-            v = ChemVisualization(workflow, gpu=not args.cpu)
+            v = ChemVisualization(workflow)
 
             logger.info('navigate to https://localhost: %s' % port)
             v.start('0.0.0.0', port=port)

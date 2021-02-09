@@ -69,7 +69,7 @@ def _(embedding, n_pca, self):
 class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
     def __init__(self,
-                 n_molecules: int,
+                 n_molecules: int = None,
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
                  pca_comps=64,
                  n_clusters=7,
@@ -169,12 +169,12 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         return embedding
 
-    def cluster(self,
-                df_mol_embedding=None):
+    def cluster(self, df_mol_embedding=None):
 
         logger.info("Executing GPU workflow...")
 
         if df_mol_embedding is None:
+            self.n_molecules = Context().n_molecule
 
             cache_directory = Context().cache_directory
 

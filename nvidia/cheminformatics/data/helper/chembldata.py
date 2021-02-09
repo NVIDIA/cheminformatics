@@ -52,7 +52,7 @@ class ChEmblData(object, metaclass=Singleton):
                  fp_type=MorganFingerprint):
 
         context = Context()
-        db_file = context.get_config('data_path')
+        db_file = context.get_config('data_mount_path', default='/data')
 
         self.chembl_db = 'file:%s/db/chembl_27.db?mode=ro' % db_file
         self.fp_type = fp_type

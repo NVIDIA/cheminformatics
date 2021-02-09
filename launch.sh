@@ -114,6 +114,7 @@ REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=$(cat ~/NGC.NVIDIA.COM.API)}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
+DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
 
 ###############################################################################
 #
@@ -131,6 +132,7 @@ if [ $write_env -eq 1 ]; then
 	echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
 	echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
 	echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
+	echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
 fi
 
 ###############################################################################
@@ -156,7 +158,7 @@ DOCKER_CMD="docker run \
 	-p ${DASK_PORT}:${DASK_PORT} \
 	-p ${PLOTLY_PORT}:5000 \
 	-v ${PROJECT_PATH}:/workspace \
-	-v ${DATA_PATH}:/data \
+	-v ${DATA_PATH}:${DATA_MOUNT_PATH} \
 	--shm-size=1g \
 	--ulimit memlock=-1 \
 	--ulimit stack=67108864 \

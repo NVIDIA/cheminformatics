@@ -24,7 +24,7 @@ import cupy
 import cudf
 
 from scipy.stats import rankdata as rankdata_cpu
-from scipy.stats import spearmanr as spearmanr_cpu_base
+from scipy.stats import spearmanr as spearmanr_cpu
 from sklearn.metrics import silhouette_score, pairwise_distances
 
 from rdkit import Chem
@@ -39,7 +39,7 @@ _parent_directory = os.path.dirname(_this_directory)
 sys.path.insert(0, _parent_directory)  # TODO better way to add this directory to the path
 
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, rankdata, get_kth_unique_value, spearmanr
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, rankdata, get_kth_unique_value, corr_pairwise, spearmanr
 
 _data_dir = os.path.join(_this_directory, 'data')
 benchmark_approved_drugs_path = os.path.join(_data_dir, 'benchmark_approved_drugs.csv')
@@ -50,8 +50,33 @@ pca_approved_drugs_path = os.path.join(_data_dir, 'pca_approved_drugs.csv')
 run_tanimoto_params = [(benchmark_approved_drugs_path, 'canonical_smiles')]
 run_silhouette_score_params = [(pca_approved_drugs_path, 'clusters')]
 run_rankdata_params = [(10, 10, 5, 0), (10, 10, 5, 1), (10, 20, 10, 0), (10, 20, 10, 1)]
-run_spearman_rho_params = [(pca_approved_drugs_path, fingerprint_approved_drugs_path, 'clusters', 2, 10, 0.99547)]
-run_get_kth_unique_value_params = [(2, 0), (2, 1), (10, 0), (10, 1)]
+run_corr_pairwise = [(10, 10, 5, 0), (10, 10, 5, 2), (10, 20, 10, 0), (10, 20, 10, 5)]
+run_spearman_rho_params = [(10, 10, 5, 1), (10, 10, 5, 2), (10, 20, 10, 5), (10, 20, 10, 100)]
+run_get_kth_unique_value_params = [(10, 10, 5, 2, 0), (10, 10, 5, 2, 1), (10, 20, 10, 5, 0), (10, 20, 10, 5, 1), (10, 20, 10, 100, 1)]
+
+# Accessory functions
+def _random_nans(data1, data2, num_nans):
+    """Randomly add NaNs in identical positions to two numpy arrays"""
+
+    n_rows, n_cols = data1.shape
+    row_array = np.random.choice(np.arange(0, n_rows), num_nans)
+    col_array = np.random.choice(np.arange(0, n_cols), num_nans)
+    data1[row_array, col_array] = np.NaN
+    data2[row_array, col_array] = np.NaN
+
+    return data1, data2
+
+
+def _rowwise_numpy_corr(data1, data2, func):
+    """Pariwise correlation function on CPU"""
+    corr_array = []
+    for d1,d2 in zip(data1, data2):
+        mask = np.invert( np.isnan(d1) | np.isnan(d2) )
+        val = func(d1[mask], d2[mask])
+        if hasattr(val, 'correlation'):
+            val = val.correlation
+        corr_array.append(val[1,0])
+    return np.array(corr_array)
 
 
 # The unit tests
@@ -98,9 +123,10 @@ def test_run_silhouette_score(pca_approved_csv, cluster_column):
 @pytest.mark.parametrize('n_rows, n_cols, max_int, axis', run_rankdata_params)
 def test_run_rankdata(n_rows, n_cols, max_int, axis):
     """Test the GPU ranking function relative to the CPU baseline"""
+    # TODO Add tests for ranking with NaNs once it's fixed in cuDF
 
     # Use integers to ensure there will be ties
-    data = np.random.randint(0, max_int, (n_rows, n_cols))
+    data = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
     rank_cpu = rankdata_cpu(data, axis=axis)
     rank_gpu = rankdata(cupy.asarray(data), axis=axis)
     assert np.allclose(rank_cpu, cupy.asnumpy(rank_gpu))
@@ -112,19 +138,36 @@ def test_run_rankdata(n_rows, n_cols, max_int, axis):
         assert np.allclose(rank_cpu2, cupy.asnumpy(rank_gpu2))
 
 
+@pytest.mark.parametrize('n_rows, n_cols, max_int, num_nans', run_corr_pairwise)
+def test_run_corr_pairwise(n_rows, n_cols, max_int, num_nans):
+    """Test the pairwise covariance matrix calculation and the Pearson correlation coefficient"""
+        
+    data1c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
+    data2c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
+
+    if num_nans > 0:
+        data1c, data2c = _random_nans(data1c, data2c, num_nans)
+
+    data1g = cupy.array(data1c)
+    data2g = cupy.array(data2c)
+
+    # Covariance matrix
+    cov_cpu = _rowwise_numpy_corr(data1c, data2c, np.cov)
+    cov_gpu = corr_pairwise(data1g, data2g, False).squeeze()
+    assert np.allclose(cov_cpu, cupy.asnumpy(cov_gpu))
+
+    # Pearson correlation
+    corcoef_cpu = _rowwise_numpy_corr(data1c, data2c, np.corrcoef)
+    corcoef_gpu = corr_pairwise(data1g, data2g, True).squeeze()
+    assert np.allclose(corcoef_cpu, cupy.asnumpy(corcoef_gpu))
+
+
 # TODO DOES NOT WORK YET
-@pytest.mark.parametrize('top_k, axis', run_get_kth_unique_value_params)
-def test_run_get_kth_unique_value(top_k, axis):
+@pytest.mark.parametrize('n_rows, n_cols, max_int, top_k, axis', run_get_kth_unique_value_params)
+def test_run_get_kth_unique_value(n_rows, n_cols, max_int, top_k, axis):
     """Test the GPU function to get the kth unique value relative to the CPU baseline"""
 
-    # TODO UPDATE THIS TO USE ANY ARRAY
-    # Use integers to ensure there will be ties
-    data = np.array([[3., 4., 4., 1., 0.],
-                     [0., 2., 4., 2., 1.],
-                     [2., 3., 0., 0., 1.],
-                     [2., 0., 2., 4., 3.],
-                     [1., 3., 0., 2., 2.]])
-
+    data = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
     rank_cpu = rankdata_cpu(data, axis=axis)
     rank_gpu = rankdata(cupy.asarray(data), axis=axis, is_symmetric=False)
 
@@ -152,18 +195,21 @@ def test_run_get_kth_unique_value(top_k, axis):
     # print(kth_values_cpu, kth_values_gpu)
 
 
-# TODO WRITE SPEARMAN R TEST
-# n = 5
-# d1c = np.random.randint(0, n, (n,n)).astype(np.float)
-# d2c = np.random.randint(0, n, (n,n)).astype(np.float)
-# d1g = cupy.array(d1c)
-# d2g = cupy.array(d2c)
-# ranks1 = rankdata(d1g, axis=1, method='average', na_option='keep')
-# ranks2 = rankdata(d2g, axis=1, method='average', na_option='keep')
-# print(corr_pairwise(ranks1, ranks2, return_pearson=True))
-# print([spearmanr_cpu(cupy.asnumpy(ranks1[x]), cupy.asnumpy(ranks2[x])).correlation for x in range(ranks1.shape[0])])
-    
+@pytest.mark.parametrize('n_rows, n_cols, max_int, num_nans, top_k', run_spearman_rho_params)
+def test_run_spearman_rho(n_rows, n_cols, max_int, num_nans, top_k):
+    data1c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
+    data2c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
 
+    if num_nans > 0:
+        data1c, data2c = _random_nans(data1c, data2c, num_nans)
+
+    data1g = cupy.array(data1c)
+    data2g = cupy.array(data2c)
+
+    # rank top k on CPU arrays
+    spearmanr_calc_cpu = _rowwise_numpy_corr(data1c, data2c, spearmanr_cpu)
+    spearmanr_calc_gpu = spearmanr(data1g, data2g, top_k)
+    assert np.allclose(spearmanr_calc_cpu, cupy.asnumpy(spearmanr_calc_gpu))
 
 
 

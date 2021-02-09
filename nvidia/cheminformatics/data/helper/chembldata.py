@@ -30,6 +30,22 @@ WHERE cp.molregno = md.molregno
 logger = logging.getLogger(__name__)
 
 
+IMP_PROPS = [
+    'alogp',
+    'aromatic_rings',
+    'full_mwt',
+    'psa',
+    'rtb']
+ADDITIONAL_FEILD = ['canonical_smiles', 'transformed_smiles']
+
+IMP_PROPS_TYPE = [pandas.Series([], dtype='float64'),
+                  pandas.Series([], dtype='int64'),
+                  pandas.Series([], dtype='float64'),
+                  pandas.Series([], dtype='float64'),
+                  pandas.Series([], dtype='int64')]
+ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
+                         pandas.Series([], dtype='object')]
+
 class ChEmblData(object, metaclass=Singleton):
 
     def __init__(self,
@@ -51,7 +67,6 @@ class ChEmblData(object, metaclass=Singleton):
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
             select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos)))
-            logger.info(select_stmt)
             cur.execute(select_stmt)
 
             cols = list(map(lambda x: x[0], cur.description))
@@ -116,18 +131,18 @@ class ChEmblData(object, metaclass=Singleton):
 
         logger.info('Fetching %d records starting %d...' % (batch_size, start))
 
+        imp_cols = [ 'cp.' + col for col in IMP_PROPS]
         select_stmt = '''
-            SELECT md.molregno, cs.canonical_smiles
+            SELECT md.molregno, %s, cs.canonical_smiles
             FROM compound_properties cp,
                  molecule_dictionary md,
                  compound_structures cs
             WHERE cp.molregno = md.molregno
                   AND md.molregno = cs.molregno
             LIMIT %d, %d
-        ''' % (start, batch_size)
+        ''' % (', '.join(imp_cols), start, batch_size)
         df = pandas.read_sql(select_stmt,
-                            sqlite3.connect(self.chembl_db, uri=True),
-                            index_col='molregno')
+                            sqlite3.connect(self.chembl_db, uri=True))
 
         # Smiles -> Smiles transformation and filtering
         df['transformed_smiles'] = df['canonical_smiles']
@@ -139,16 +154,15 @@ class ChEmblData(object, metaclass=Singleton):
 
         # Conversion to fingerprints or embeddings
         transformation = self.fp_type(**transformation_kwargs)
-        return_df = list(map(transformation.transform, df['transformed_smiles']))
-
-        # TODO this is behavior specific to a fingerprint class and should be refactored
-        if transformation.name == 'MorganFingerprint':
-            return_df = [x.split(', ') for x in return_df]
+        return_df = df.apply(transformation.transform, result_type='expand', axis=1)
 
         return_df = pandas.DataFrame(
             return_df,
             columns=pandas.RangeIndex(start=0,
                                       stop=len(transformation))).astype('float32')
+
+        return_df = df.merge(return_df, left_index=True, right_index=True)
+        return_df.rename(columns={'molregno': 'id'}, inplace=True)
         return return_df
 
     def fetch_mol_embedding(self,
@@ -165,9 +179,13 @@ class ChEmblData(object, metaclass=Singleton):
             num_recs = self.fetch_molecule_cnt()
 
         transformation = self.fp_type(**transformation_kwargs)
-        prop_meta = {i: pandas.Series([], dtype='float32') for i in range(len(transformation))}
-        meta_df = pandas.DataFrame(prop_meta)
 
+        prop_meta = {'id': pandas.Series([], dtype='int64')}
+        prop_meta.update(dict(zip(IMP_PROPS + ADDITIONAL_FEILD,
+                              IMP_PROPS_TYPE + ADDITIONAL_FEILD_TYPE)))
+        prop_meta.update({i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
+
+        meta_df = pandas.DataFrame(prop_meta)
         dls = []
         for start in range(0, num_recs, batch_size):
             bsize = min(num_recs - start, batch_size)

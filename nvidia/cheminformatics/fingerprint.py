@@ -14,7 +14,6 @@ from cddd.inference import InferenceModel
 logger = logging.getLogger(__name__)
 
 class TransformationDefaults(Enum):
-    morgan_fingerprint = {'radius':2, 'nBits':512}
     MorganFingerprint = {'radius':2, 'nBits':512}
     Embeddings = {}
 
@@ -43,9 +42,10 @@ class MorganFingerprint(BaseTransformation):
         self.func = AllChem.GetMorganFingerprintAsBitVect
 
     def transform(self, data):
-        m = Chem.MolFromSmiles(data)
+        smile = data['transformed_smiles']
+        m = Chem.MolFromSmiles(smile)
         fp = self.func(m, **self.kwargs)
-        return ', '.join(list(fp.ToBitString()))
+        return list(fp.ToBitString())
 
     def __len__(self):
         return self.kwargs['nBits']
@@ -60,9 +60,10 @@ class Embeddings(BaseTransformation):
         self.func = InferenceModel(self.MODEL_DIR, use_gpu=use_gpu, cpu_threads=cpu_threads)
 
     def transform(self, data):
-        if isinstance(data, str):
-            data = [data]
-        return self.func.seq_to_emb(data).squeeze()
+        smile = data['transformed_smiles']
+        if isinstance(smile, str):
+            smile = [smile]
+        return self.func.seq_to_emb(smile).squeeze()
 
     def __len__(self):
         return self.func.hparams.emb_size

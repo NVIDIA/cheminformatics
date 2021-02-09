@@ -1,6 +1,6 @@
 class BaseClusterWorkflow:
 
-    def cluster(self, embedding, cache_directory):
+    def cluster(self, embedding):
         """
         Runs clustering workflow on the data fetched from database/cache.
         """

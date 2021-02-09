@@ -156,6 +156,28 @@ def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=Fals
     return ranks
 
 
+@cuda.jit
+def _get_kth_unique_kernel(data, kth_values, k, axis):
+    """Numba kernel to get the kth unique value from a sorted array"""
+
+    i = cuda.grid(1)
+    if axis == 1:
+        vector = data[i, :]
+    else:
+        vector = data[:, i]
+
+    pos = 1
+    prev_val = vector[0]
+    for val in vector[1:]:
+        if val > prev_val:
+            pos += 1
+            if pos == k:
+                break
+        prev_val = val
+
+    kth_values[i] = val
+
+
 def get_kth_unique_value(data, k, axis=1):
     """Find the kth value along an axis of a matrix on the GPU
     
@@ -173,32 +195,16 @@ def get_kth_unique_value(data, k, axis=1):
     kth_values : cupy ndarray
          An array of kth values.
     """
-
-    @cuda.jit
-    def _get_kth_unique_kernel(data, kth_values, k, axis):
-        """Numba kernel to get the kth unique value from a sorted array"""
-
-        i = cuda.grid(1)
-        if axis == 1:
-            vector = data[i, :]
-        else:
-            vector = data[:, i]
-
-        pos = 1
-        prev_val = vector[0]
-        for val in vector[1:]:
-            if val > prev_val:
-                pos += 1
-                if pos == k:
-                    break
-            prev_val = val
-
-        kth_values[i] = val
         
     # Coerce data into array -- make a copy since it needs to be sorted
     # TODO -- should the sort be done in Numba kernel (and how to do it)?
     dtype = cupy.result_type(data, cupy.float64)
-    data = cupy.array(data, dtype=dtype, copy=True)
+    data_id = id(data)
+    data = cupy.ascontiguousarray(data, dtype=dtype)
+    
+    if data_id == id(data): # Don't want to sort original array
+        data = data.copy()
+
     assert data.ndim <= 2
     
     if data.ndim < 2:
@@ -242,7 +248,7 @@ def corr_pairwise(x, y, return_pearson=False):
     """
     
     def _cov_pairwise(x1, x2, factor):
-        return np.nansum(x1 * x2, axis=1, keepdims=True) * cupy.true_divide(1, factor)
+        return cupy.nansum(x1 * x2, axis=1, keepdims=True) * cupy.true_divide(1, factor)
 
     # Coerce arrays into 2D format and set dtype
     dtype = cupy.result_type(x, y, cupy.float64)

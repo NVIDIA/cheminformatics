@@ -26,7 +26,7 @@ import cupy
 from cuml.metrics import pairwise_distances
 
 from . import BaseClusterWorkflow
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearmanr
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
@@ -66,7 +66,7 @@ class CpuKmeansUmap(BaseClusterWorkflow):
 
         dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
         dist_array_eucl = pairwise_distances(Xt_sample)
-        return spearman_rho(dist_array_tani, dist_array_eucl, top_k=100)
+        return spearmanr(dist_array_tani, dist_array_eucl, top_k=100)
 
     def cluster(self,
                 df_molecular_embedding=None,

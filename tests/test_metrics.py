@@ -26,8 +26,6 @@ import cudf
 from scipy.stats import rankdata as rankdata_cpu
 from scipy.stats import spearmanr as spearmanr_cpu_base
 from sklearn.metrics import silhouette_score, pairwise_distances
-from scipy.stats import rankdata as rankdata_cpu
-from scipy.stats import spearmanr as spearmanr_cpu_base
 
 from rdkit import Chem
 from rdkit.Chem import AllChem

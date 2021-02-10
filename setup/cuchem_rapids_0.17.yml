@@ -29,4 +29,5 @@ dependencies:
     - chembl_webresource_client==0.10.2
     - dask_ml==1.8.0
     - matplotlib==3.3.4
+    - umap
     - git+https://github.com/jrwnter/cddd.git

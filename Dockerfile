@@ -8,23 +8,24 @@ RUN  wget --quiet -O /tmp/miniconda.sh \
     https://repo.anaconda.com/miniconda/Miniconda3-py37_4.9.2-Linux-x86_64.sh \
     && /bin/bash /tmp/miniconda.sh -b -p /opt/conda \
     && rm /tmp/miniconda.sh \
-    && /opt/conda/bin/conda clean -tipsy \
     && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
+ENV PATH /opt/conda/bin:$PATH
 
-# Copy source code
-RUN mkdir -p /opt/nvidia/cuchemsetup
-COPY setup/cuchem_rapids_0.17.yml /opt/nvidia/cuchemsetup/
+# Copy conda env spec.
+COPY setup/cuchem_rapids_0.17.yml /tmp
 
-RUN /opt/conda/bin/conda env create --name cuchem -f /opt/nvidia/cuchemsetup/cuchem_rapids_0.17.yml
+RUN conda env create --name cuchem -f /tmp/cuchem_rapids_0.17.yml
+ENV PATH /opt/conda/envs/cuchem/bin:$PATH
+RUN conda clean -afy
+RUN rm /tmp/cuchem_rapids_0.17.yml
 
-RUN cd /opt/conda/bin/ && source activate cuchem && python3 -m ipykernel install --user --name=cuchem
-RUN echo "cd /opt/conda/bin/ && source activate cuchem" > ~/.bashrc
+RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
+RUN echo "source activate cuchem" > /etc/bash.bashrc
 
 COPY launch.sh /opt/nvidia/cheminfomatics/
 COPY *.py /opt/nvidia/cheminfomatics/
 COPY nbs/*.ipynb /opt/nvidia/cheminfomatics/
 
 ENV UCX_LOG_LEVEL error
-ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 
 CMD /opt/nvidia/cheminfomatics/launch.sh dash

@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, rankdata, get_kth_unique_value, corr_pairwise, spearmanr
+from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 import pytest
 import sys
 import os
@@ -24,7 +26,7 @@ from math import isnan
 
 from scipy.stats import rankdata as rankdata_cpu
 from scipy.stats import spearmanr as spearmanr_cpu
-from sklearn.metrics import silhouette_score, pairwise_distances
+from sklearn.metrics import silhouette_score
 
 from rdkit import Chem
 from rdkit.Chem import AllChem
@@ -32,16 +34,12 @@ from rdkit.DataManip.Metric import GetTanimotoDistMat
 
 import cupy
 import cudf
+from cuml.metrics import pairwise_distances
 
 # Define paths
-# TODO FIX THIS
-# _this_directory = os.path.dirname(os.path.realpath(__file__))
-_this_directory = '/workspace/tests'
+_this_directory = os.path.dirname(os.path.realpath(__file__))
 _parent_directory = os.path.dirname(_this_directory)
 sys.path.insert(0, _parent_directory)  # TODO better way to add this directory to the path
-
-from nvidia.cheminformatics.utils.distance import tanimoto_calculate
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, rankdata, get_kth_unique_value, corr_pairwise, spearmanr
 
 _data_dir = os.path.join(_this_directory, 'data')
 benchmark_approved_drugs_path = os.path.join(_data_dir, 'benchmark_approved_drugs.csv')
@@ -53,14 +51,14 @@ run_tanimoto_params = [(benchmark_approved_drugs_path, 'canonical_smiles')]
 run_silhouette_score_params = [(pca_approved_drugs_path, 'clusters')]
 run_rankdata_params = [(10, 10, 5, 0), (10, 10, 5, 1), (10, 20, 10, 0), (10, 20, 10, 1)]
 run_corr_pairwise = [(10, 10, 5, 0), (10, 10, 5, 2), (10, 20, 10, 0), (10, 20, 10, 5)]
-run_get_kth_unique_value_params = [(10, 10, 5, 2, 0), (10, 10, 5, 2, 1), (10, 20, 10, 5, 0), (10, 20, 10, 5, 1), (10, 20, 10, 100, 1)]
-run_spearman_rho_params = [(10, 10, 5, 0, 1), (10, 10, 5, 3, 2), (10, 20, 10, 5, 5), (10, 20, 10, 10, 100)]
+run_get_kth_unique_value_params = [(10, 10, 5, 2, 0), (10, 10, 5, 2, 1),
+                                   (10, 20, 10, 5, 0), (10, 20, 10, 5, 1), (10, 20, 10, 100, 1)]
+run_spearman_rho_params = [(pca_approved_drugs_path, fingerprint_approved_drugs_path, 'clusters', 2, 100)]
 
 
 # Accessory functions
 def _random_nans(data1, data2, num_nans):
     """Randomly add NaNs in identical positions to two numpy arrays"""
-
     n_rows, n_cols = data1.shape
     row_array = np.random.choice(np.arange(0, n_rows), num_nans)
     col_array = np.random.choice(np.arange(0, n_cols), num_nans)
@@ -72,10 +70,9 @@ def _random_nans(data1, data2, num_nans):
 
 def _rowwise_numpy_corr(data1, data2, func):
     """Pariwise correlation function on CPU"""
-    
     corr_array = []
-    for d1,d2 in zip(data1, data2):
-        mask = np.invert( np.isnan(d1) | np.isnan(d2) )
+    for d1, d2 in zip(data1, data2):
+        mask = np.invert(np.isnan(d1) | np.isnan(d2))
         val = func(d1[mask], d2[mask])
         if hasattr(val, 'correlation'):
             val = val.correlation
@@ -88,10 +85,9 @@ def _rowwise_numpy_corr(data1, data2, func):
 
 def _get_kth_unique_array_cpu(data, k, axis):
     """Return kth unique values for a sorted array along row/column"""
-
     data = data.T if axis == 0 else data
     kth_values = []
-    
+
     for vector in data:
         pos = 0
         prev_val = np.NaN
@@ -100,7 +96,7 @@ def _get_kth_unique_array_cpu(data, k, axis):
             if not isnan(val):
                 if val != prev_val:
                     prev_val = val
-                    pos +=1
+                    pos += 1
 
             if pos == k:
                 break
@@ -171,7 +167,7 @@ def test_run_rankdata(n_rows, n_cols, max_int, axis):
 @pytest.mark.parametrize('n_rows, n_cols, max_int, num_nans', run_corr_pairwise)
 def test_run_corr_pairwise(n_rows, n_cols, max_int, num_nans):
     """Test the pairwise covariance matrix calculation and the Pearson correlation coefficient"""
-        
+
     data1c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
     data2c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
 
@@ -214,17 +210,38 @@ def test_run_get_kth_unique_value(n_rows, n_cols, max_int, top_k, axis):
     assert np.allclose(kth_values_cpu, cupy.asnumpy(kth_values_gpu), equal_nan=True)
 
 
-# TODO does not work yet
-# @pytest.mark.parametrize('n_rows, n_cols, max_int, num_nans, top_k', run_spearman_rho_params)
-# def test_run_spearman_rho(n_rows, n_cols, max_int, num_nans, top_k):
-#     data1c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
-#     data2c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
+@pytest.mark.parametrize('pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k', run_spearman_rho_params)
+def test_run_spearman_rho(pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k):
+    """Validate the spearman rho scoring"""
 
-#     if num_nans > 0:
-#         data1c, data2c = _random_nans(data1c, data2c, num_nans)
+    # Load PCA data to use as Euclidean distances
+    pca_data = pd.read_csv(pca_approved_drugs_csv).set_index('molregno').drop(cluster_column, axis=1)
+    float_data = pca_data[pca_data.columns[:n_dims_eucl_data]]
+    euclidean_dist = pairwise_distances(cupy.array(float_data))
 
-#     # rank top k on CPU arrays
-#     spearmanr_calc_cpu = _rowwise_numpy_corr(data1c, data2c, spearmanr_cpu)
-#     spearmanr_calc_gpu = spearmanr(cupy.array(data1c), cupy.array(data2c), top_k)
-#     assert np.allclose(spearmanr_calc_cpu, cupy.asnumpy(spearmanr_calc_gpu), equal_nan=True)
+    # Load fingerprints and calculate tanimoto distance
+    fp_data = pd.read_csv(fingerprint_approved_drugs_csv).set_index('molregno')
+    tanimoto_dist = tanimoto_calculate(cupy.array(fp_data), calc_distance=True)
 
+    # Check all data compared to the CPU version
+    all_data_gpu = spearmanr(tanimoto_dist, euclidean_dist)
+
+    euclidean_dist_cpu = cupy.asnumpy(euclidean_dist)
+    tanimoto_dist_cpu = cupy.asnumpy(tanimoto_dist)
+    all_data_cpu = _rowwise_numpy_corr(tanimoto_dist_cpu, euclidean_dist_cpu, spearmanr_cpu)
+
+    cupy.allclose(cupy.array(all_data_cpu), all_data_gpu, atol=0.005, equal_nan=True)
+
+    # Check using top k calculation compared to the CPU version
+    top_k_data_gpu = spearmanr(tanimoto_dist, euclidean_dist, top_k=top_k, axis=1)
+
+    cupy.fill_diagonal(tanimoto_dist, cupy.NaN)
+    kth_lim = get_kth_unique_value(tanimoto_dist, top_k, axis=1)
+    mask = tanimoto_dist > kth_lim
+    tanimoto_dist[mask] = cupy.NaN
+    euclidean_dist[mask] = cupy.NaN
+    euclidean_dist_cpu = cupy.asnumpy(euclidean_dist)
+    tanimoto_dist_cpu = cupy.asnumpy(tanimoto_dist)
+    top_k_data_cpu = _rowwise_numpy_corr(tanimoto_dist_cpu, euclidean_dist_cpu, spearmanr_cpu)
+
+    cupy.allclose(cupy.array(top_k_data_cpu), top_k_data_gpu, atol=0.005, equal_nan=True)

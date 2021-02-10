@@ -15,10 +15,11 @@
 # limitations under the License.
 
 import math
-import cudf
-import cupy
 import pandas
 import numpy
+from math import isnan
+import cudf
+import cupy
 from numba import cuda
 
 import dask
@@ -135,7 +136,8 @@ def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=Fals
          scores.
          
     See also scipy.stats.rankdata, for which this function is a replacement
-    """        
+    """
+
     dtype = cupy.result_type(data.dtype, cupy.float64)
     data = cupy.asarray(data, dtype=dtype)
     
@@ -156,26 +158,30 @@ def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=Fals
     return ranks
 
 
-@cuda.jit
+@cuda.jit()
 def _get_kth_unique_kernel(data, kth_values, k, axis):
-    """Numba kernel to get the kth unique value from a sorted array"""
+    """Numba kernel to get the kth unique rank from a sorted array"""
 
     i = cuda.grid(1)
+    
     if axis == 1:
         vector = data[i, :]
     else:
         vector = data[:, i]
 
-    pos = 1
-    prev_val = vector[0]
-    for val in vector[1:]:
-        if val > prev_val:
-            pos += 1
-            if pos == k:
-                break
-        prev_val = val
+    pos = 0
+    prev_val = cupy.NaN
+    
+    for val in vector:
+        if not isnan(val):
+            if val != prev_val:
+                prev_val = val
+                pos +=1
 
-    kth_values[i] = val
+        if pos == k:
+            break
+
+    kth_values[i] = prev_val
 
 
 def get_kth_unique_value(data, k, axis=1):
@@ -202,7 +208,7 @@ def get_kth_unique_value(data, k, axis=1):
     data_id = id(data)
     data = cupy.ascontiguousarray(data, dtype=dtype)
     
-    if data_id == id(data): # Don't want to sort original array
+    if data_id == id(data): # Ensure sort is being done on a copy
         data = data.copy()
 
     assert data.ndim <= 2

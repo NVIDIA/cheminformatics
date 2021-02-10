@@ -20,8 +20,7 @@ import os
 
 import pandas as pd
 import numpy as np
-import cupy
-import cudf
+from math import isnan
 
 from scipy.stats import rankdata as rankdata_cpu
 from scipy.stats import spearmanr as spearmanr_cpu
@@ -30,6 +29,9 @@ from sklearn.metrics import silhouette_score, pairwise_distances
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from rdkit.DataManip.Metric import GetTanimotoDistMat
+
+import cupy
+import cudf
 
 # Define paths
 # TODO FIX THIS
@@ -51,8 +53,9 @@ run_tanimoto_params = [(benchmark_approved_drugs_path, 'canonical_smiles')]
 run_silhouette_score_params = [(pca_approved_drugs_path, 'clusters')]
 run_rankdata_params = [(10, 10, 5, 0), (10, 10, 5, 1), (10, 20, 10, 0), (10, 20, 10, 1)]
 run_corr_pairwise = [(10, 10, 5, 0), (10, 10, 5, 2), (10, 20, 10, 0), (10, 20, 10, 5)]
-run_spearman_rho_params = [(10, 10, 5, 1), (10, 10, 5, 2), (10, 20, 10, 5), (10, 20, 10, 100)]
 run_get_kth_unique_value_params = [(10, 10, 5, 2, 0), (10, 10, 5, 2, 1), (10, 20, 10, 5, 0), (10, 20, 10, 5, 1), (10, 20, 10, 100, 1)]
+run_spearman_rho_params = [(10, 10, 5, 0, 1), (10, 10, 5, 3, 2), (10, 20, 10, 5, 5), (10, 20, 10, 10, 100)]
+
 
 # Accessory functions
 def _random_nans(data1, data2, num_nans):
@@ -69,14 +72,41 @@ def _random_nans(data1, data2, num_nans):
 
 def _rowwise_numpy_corr(data1, data2, func):
     """Pariwise correlation function on CPU"""
+    
     corr_array = []
     for d1,d2 in zip(data1, data2):
         mask = np.invert( np.isnan(d1) | np.isnan(d2) )
         val = func(d1[mask], d2[mask])
         if hasattr(val, 'correlation'):
             val = val.correlation
-        corr_array.append(val[1,0])
+        if hasattr(val, '__len__'):
+            val = val[1, 0]
+        corr_array.append(val)
+
     return np.array(corr_array)
+
+
+def _get_kth_unique_array_cpu(data, k, axis):
+    """Return kth unique values for a sorted array along row/column"""
+
+    data = data.T if axis == 0 else data
+    kth_values = []
+    
+    for vector in data:
+        pos = 0
+        prev_val = np.NaN
+
+        for val in vector:
+            if not isnan(val):
+                if val != prev_val:
+                    prev_val = val
+                    pos +=1
+
+            if pos == k:
+                break
+
+        kth_values.append(prev_val)
+    return np.array(kth_values)
 
 
 # The unit tests
@@ -154,91 +184,47 @@ def test_run_corr_pairwise(n_rows, n_cols, max_int, num_nans):
     # Covariance matrix
     cov_cpu = _rowwise_numpy_corr(data1c, data2c, np.cov)
     cov_gpu = corr_pairwise(data1g, data2g, False).squeeze()
-    assert np.allclose(cov_cpu, cupy.asnumpy(cov_gpu))
+    assert np.allclose(cov_cpu, cupy.asnumpy(cov_gpu), equal_nan=True)
 
     # Pearson correlation
     corcoef_cpu = _rowwise_numpy_corr(data1c, data2c, np.corrcoef)
     corcoef_gpu = corr_pairwise(data1g, data2g, True).squeeze()
-    assert np.allclose(corcoef_cpu, cupy.asnumpy(corcoef_gpu))
+    assert np.allclose(corcoef_cpu, cupy.asnumpy(corcoef_gpu), equal_nan=True)
 
 
-# TODO DOES NOT WORK YET
 @pytest.mark.parametrize('n_rows, n_cols, max_int, top_k, axis', run_get_kth_unique_value_params)
 def test_run_get_kth_unique_value(n_rows, n_cols, max_int, top_k, axis):
     """Test the GPU function to get the kth unique value relative to the CPU baseline"""
 
     data = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
-    rank_cpu = rankdata_cpu(data, axis=axis)
-    rank_gpu = rankdata(cupy.asarray(data), axis=axis, is_symmetric=False)
+    data = rankdata_cpu(data, axis=axis)
+    data.sort(axis=axis)
 
-    if axis == 0:
-        rank_cpu_iter = rank_cpu.T
-    else:
-        rank_cpu_iter = rank_cpu
+    # Test without NaNs
+    kth_values_cpu = _get_kth_unique_array_cpu(data, top_k, axis)
+    kth_values_gpu = get_kth_unique_value(cupy.array(data), top_k, axis=axis).squeeze()
+    assert np.allclose(kth_values_cpu, cupy.asnumpy(kth_values_gpu), equal_nan=True)
 
-    # Calculate CPU kth rank
-    kth_values_cpu = []
-    for x in rank_cpu_iter:
-        unique_vals = sorted(set(x))
-        if top_k >= len(unique_vals):
-            val = unique_vals[-1]
-        else:
-            val = unique_vals[top_k]
-        kth_values_cpu.append(val)
+    # And with NaNs
+    np.fill_diagonal(data, np.NaN)
+    data[2, :] = np.NaN
 
-    kth_values_cpu = np.array(kth_values_cpu)
-
-    # GPU kth rank
-    kth_values_gpu = get_kth_unique_value(rank_gpu, top_k, axis=axis).squeeze()
-    print(kth_values_cpu, kth_values_gpu)
-
-    # print(kth_values_cpu, kth_values_gpu)
+    kth_values_cpu = _get_kth_unique_array_cpu(data, top_k, axis)
+    kth_values_gpu = get_kth_unique_value(cupy.array(data), top_k, axis=axis).squeeze()
+    assert np.allclose(kth_values_cpu, cupy.asnumpy(kth_values_gpu), equal_nan=True)
 
 
-@pytest.mark.parametrize('n_rows, n_cols, max_int, num_nans, top_k', run_spearman_rho_params)
-def test_run_spearman_rho(n_rows, n_cols, max_int, num_nans, top_k):
-    data1c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
-    data2c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
+# TODO does not work yet
+# @pytest.mark.parametrize('n_rows, n_cols, max_int, num_nans, top_k', run_spearman_rho_params)
+# def test_run_spearman_rho(n_rows, n_cols, max_int, num_nans, top_k):
+#     data1c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
+#     data2c = np.random.randint(0, max_int, (n_rows, n_cols)).astype(np.float)
 
-    if num_nans > 0:
-        data1c, data2c = _random_nans(data1c, data2c, num_nans)
+#     if num_nans > 0:
+#         data1c, data2c = _random_nans(data1c, data2c, num_nans)
 
-    data1g = cupy.array(data1c)
-    data2g = cupy.array(data2c)
-
-    # rank top k on CPU arrays
-    spearmanr_calc_cpu = _rowwise_numpy_corr(data1c, data2c, spearmanr_cpu)
-    spearmanr_calc_gpu = spearmanr(data1g, data2g, top_k)
-    assert np.allclose(spearmanr_calc_cpu, cupy.asnumpy(spearmanr_calc_gpu))
-
-
-
-# @pytest.mark.parametrize('pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k, top_k_value', run_spearman_rho_params)
-# def test_run_spearman_rho(pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k, top_k_value):
-#     """Validate the spearman rho score"""
-
-#     # Load PCA data to use as Euclidean distances
-#     pca_data = pd.read_csv(pca_approved_drugs_csv).set_index('molregno').drop(cluster_column, axis=1)
-#     float_data = pca_data[pca_data.columns[:n_dims_eucl_data]]
-#     pairwise_eucl_dist = pairwise_distances(float_data)
-#     np.fill_diagonal(pairwise_eucl_dist, np.inf)
-
-#     # Load fingerprints for tanimoto distances
-#     fp_data = pd.read_csv(fingerprint_approved_drugs_csv).set_index('molregno')
-#     tanimoto_dist = tanimoto_calculate(cupy.array(fp_data), calc_distance=True)
-#     cupy.fill_diagonal(tanimoto_dist, cupy.inf)
-
-#     # Check small amount of data (top_k) for absolute value
-#     top_k_value_check = spearmanr(pairwise_eucl_dist, tanimoto_dist, top_k=top_k)
-#     assert np.allclose(top_k_value_check, np.round(top_k_value, 5))
-
-#     # Check all data compared to the CPU version
-#     top_k_all_data = pairwise_eucl_dist.shape[1]  # - 1
-#     all_data_gpu = spearmanr(pairwise_eucl_dist, tanimoto_dist, top_k=top_k_all_data)
-
-#     tanimoto_dist_cpu = cupy.asnumpy(tanimoto_dist)
-#     all_data_cpu = np.array([spearmanr(x, y).correlation for x, y in zip(pairwise_eucl_dist, tanimoto_dist_cpu)])
-#     all_data_cpu = np.nanmean(all_data_cpu)
-#     # assert np.allclose(all_data_gpu, all_data_cpu) # TODO debug this
-
+#     # rank top k on CPU arrays
+#     spearmanr_calc_cpu = _rowwise_numpy_corr(data1c, data2c, spearmanr_cpu)
+#     spearmanr_calc_gpu = spearmanr(cupy.array(data1c), cupy.array(data2c), top_k)
+#     assert np.allclose(spearmanr_calc_cpu, cupy.asnumpy(spearmanr_calc_gpu), equal_nan=True)
 

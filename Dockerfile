@@ -1,40 +1,30 @@
 # Copyright 2020 NVIDIA Corporation
 # SPDX-License-Identifier: Apache-2.0
-FROM rapidsai/rapidsai-dev:0.17-cuda10.1-devel-ubuntu18.04-py3.7
+FROM ubuntu:18.04
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git
 
-# install to rapids virtual environment
-RUN conda install -n rapids -c rdkit -c plotly plotly=4.9.0 pywget rdkit
-
-# install to rapids virtual environment using pip
-RUN /opt/conda/envs/rapids/bin/pip install \
-    dash \
-    jupyter-dash \
-    dash_bootstrap_components \
-    dash_core_components \
-    dash_html_components \
-    progressbar2 \
-    tables \
-    sqlalchemy \
-    openpyxl \
-    tabulate \
-    autopep8 \
-    chembl_webresource_client
-
-RUN /opt/conda/envs/rapids/bin/pip install --ignore-installed --upgrade \
-        tensorflow-gpu==1.15.4
+SHELL ["/bin/bash", "-c"]
+RUN  wget --quiet -O /tmp/miniconda.sh \
+    https://repo.anaconda.com/miniconda/Miniconda3-py37_4.9.2-Linux-x86_64.sh \
+    && /bin/bash /tmp/miniconda.sh -b -p /opt/conda \
+    && rm /tmp/miniconda.sh \
+    && /opt/conda/bin/conda clean -tipsy \
+    && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
 
 # Copy source code
-RUN mkdir -p /opt/nvidia/cheminfomatics/
-WORKDIR /opt/nvidia/cheminfomatics/
-RUN git clone https://github.com/jrwnter/cddd.git && \
-    cd cddd && \
-    /opt/conda/envs/rapids/bin/pip install -e . && \
-    ./download_default_model.sh
+RUN mkdir -p /opt/nvidia/cuchemsetup
+COPY setup/cuchem_rapids_0.17.yml /opt/nvidia/cuchemsetup/
+
+RUN /opt/conda/bin/conda env create --name cuchem -f /opt/nvidia/cuchemsetup/cuchem_rapids_0.17.yml
+
+RUN cd /opt/conda/bin/ && source activate cuchem && python3 -m ipykernel install --user --name=cuchem
+RUN echo "cd /opt/conda/bin/ && source activate cuchem" > ~/.bashrc
 
 COPY launch.sh /opt/nvidia/cheminfomatics/
 COPY *.py /opt/nvidia/cheminfomatics/
-COPY *.ipynb /opt/nvidia/cheminfomatics/
+COPY nbs/*.ipynb /opt/nvidia/cheminfomatics/
 
 ENV UCX_LOG_LEVEL error
+ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 
 CMD /opt/nvidia/cheminfomatics/launch.sh dash

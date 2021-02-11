@@ -50,4 +50,4 @@ class Context(metaclass=Singleton):
             return self.config[config_name]
         except KeyError:
             logger.warn('%s not found, returing default.', config_name)
-            return config_name
+            return default

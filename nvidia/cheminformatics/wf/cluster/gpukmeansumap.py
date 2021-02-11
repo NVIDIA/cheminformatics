@@ -95,8 +95,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
         dist_array_eucl = pairwise_distances(Xt_sample)
-
-        return spearman_rho(dist_array_tani, dist_array_eucl, top_k=100)
+        return cupy.nanmean(spearmanr(dist_array_tani, dist_array_eucl, top_k=100))
 
     def _cluster(self, embedding, n_pca):
         """

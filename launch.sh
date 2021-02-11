@@ -200,14 +200,16 @@ root() {
 dbSetup() {
 	local DATA_DIR=$DATA_PATH
 
-	if [[ ! -e "${DATA_DIR}/chembl_27.db" ]]; then
+	if [[ ! -e "${DATA_DIR}/db/chembl_27.db" ]]; then
 		echo "Downloading chembl db to ${DATA_DIR}..."
-		mkdir -p ${DATA_DIR}
-		wget -q --show-progress \
-			-O ${DATA_DIR}/chembl_27_sqlite.tar.gz \
-			ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/latest/chembl_27_sqlite.tar.gz
+		mkdir -p ${DATA_DIR}/db
+		if [[ ! -e "${DATA_DIR}/chembl_27_sqlite.tar.gz" ]]; then
+			wget -q --show-progress \
+				-O ${DATA_DIR}/chembl_27_sqlite.tar.gz \
+				ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/latest/chembl_27_sqlite.tar.gz
+		fi
 		echo "Unzipping chembl db to ${DATA_DIR}..."
-		tar -C ${DATA_DIR} \
+		tar -C ${DATA_DIR}/db \
 			--strip-components=2 \
 			-xf ${DATA_DIR}/chembl_27_sqlite.tar.gz chembl_27/chembl_27_sqlite/chembl_27.db
 	fi

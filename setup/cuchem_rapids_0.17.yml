@@ -5,10 +5,11 @@ channels:
   - rdkit
   - anaconda
   - plotly
+  - default
 dependencies:
   - rapids=0.17
   - python=3.7
-  - cudatoolkit=11.0
+  - cudatoolkit=11.0 # Ensure version matches with base image in Dockerfile
   - rdkit==2020.09.1
   - plotly==4.9.0
   - pip

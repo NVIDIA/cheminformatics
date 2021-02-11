@@ -1,6 +1,6 @@
 # Copyright 2020 NVIDIA Corporation
 # SPDX-License-Identifier: Apache-2.0
-FROM ubuntu:18.04
+FROM nvidia/cuda:11.0-base
 RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git
 
 SHELL ["/bin/bash", "-c"]

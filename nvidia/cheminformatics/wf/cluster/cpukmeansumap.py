@@ -15,6 +15,8 @@
 # limitations under the License.
 
 import logging
+from nvidia.cheminformatics.data.helper.chembldata import ADDITIONAL_FEILD, IMP_PROPS
+from nvidia.cheminformatics.config import Context
 
 import sklearn.decomposition
 from dask_ml.cluster import KMeans as dask_KMeans
@@ -36,7 +38,7 @@ logger = logging.getLogger(__name__)
 class CpuKmeansUmap(BaseClusterWorkflow):
 
     def __init__(self,
-                 n_molecules,
+                 n_molecules = None,
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
                  n_pca=64,
                  n_clusters=7,
@@ -48,6 +50,9 @@ class CpuKmeansUmap(BaseClusterWorkflow):
 
         self.seed = seed
         self.n_spearman = 5000
+
+    def is_gpu_enabled(self):
+        return False
 
     def _compute_spearman_rho(self, mol_df, X_train):
         n_indexes = min(self.n_spearman, X_train.shape[0])
@@ -70,12 +75,21 @@ class CpuKmeansUmap(BaseClusterWorkflow):
         logger.info("Executing CPU workflow...")
 
         if df_molecular_embedding is None:
+            self.n_molecules = Context().n_molecule
             df_molecular_embedding = self.dao.fetch_molecular_embedding(
                 self.n_molecules,
                 cache_directory=cache_directory)
 
+        ids =  df_molecular_embedding['id']
         df_molecular_embedding = df_molecular_embedding.persist()
         self.n_molecules = df_molecular_embedding.compute().shape[0]
+
+        for col in ['id', 'index', 'molregno']:
+            if col in df_molecular_embedding.columns:
+                df_molecular_embedding = df_molecular_embedding.drop([col], axis=1)
+
+        other_props = IMP_PROPS + ADDITIONAL_FEILD
+        df_molecular_embedding = df_molecular_embedding.drop(other_props, axis=1)
 
         if self.n_pca:
             with MetricsLogger('pca', self.n_molecules) as ml:
@@ -113,5 +127,7 @@ class CpuKmeansUmap(BaseClusterWorkflow):
         df_molecular_embedding['x'] = X_train[:, 0]
         df_molecular_embedding['y'] = X_train[:, 1]
         df_molecular_embedding['cluster'] = kmeans_float.labels_
+        df_molecular_embedding['id'] = ids
 
-        return df_molecular_embedding
+        self.df_embedding = df_molecular_embedding
+        return self.df_embedding

@@ -24,16 +24,10 @@ import warnings
 import argparse
 
 from datetime import datetime
-from dask_cuda.local_cuda_cluster import cuda_visible_devices
-from dask_cuda.utils import get_n_gpus
 
-import rmm
-import cupy
-
-from dask_cuda import initialize, LocalCUDACluster
 from dask.distributed import Client, LocalCluster
 
-from nvidia.cheminformatics.utils.logger import initialize_logfile
+from nvidia.cheminformatics.utils.dask import initialize_cluster
 from nvidia.cheminformatics.data.helper.chembldata import ChEmblData
 from nvidia.cheminformatics.data.cluster_wf import FINGER_PRINT_FILES
 from nvidia.cheminformatics.wf.cluster.cpukmeansumap import CpuKmeansUmap
@@ -96,45 +90,6 @@ To create cache:
             exit(1)
 
         getattr(self, args.command)()
-
-    def initialize_cluster(self, args):
-        rmm.reinitialize(managed_memory=True)
-        cupy.cuda.set_allocator(rmm.rmm_cupy_allocator)
-
-        enable_tcp_over_ucx = True
-        enable_nvlink = False
-        enable_infiniband = False
-
-        logger.info('Starting dash cluster...')
-        if not args.cpu:
-            initialize.initialize(create_cuda_context=True,
-                                  enable_tcp_over_ucx=enable_tcp_over_ucx,
-                                  enable_nvlink=enable_nvlink,
-                                  enable_infiniband=enable_infiniband)
-            if args.n_gpu == -1:
-                n_gpu = get_n_gpus() - 1
-            else:
-                n_gpu = args.n_gpu
-
-            CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(n_gpu)).split(',')
-            CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
-
-            logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
-
-            cluster = LocalCUDACluster(protocol="ucx",
-                                       dashboard_address=':9001',
-                                       # TODO: automate visible device list
-                                       CUDA_VISIBLE_DEVICES=CUDA_VISIBLE_DEVICES,
-                                       enable_tcp_over_ucx=enable_tcp_over_ucx,
-                                       enable_nvlink=enable_nvlink,
-                                       enable_infiniband=enable_infiniband)
-        else:
-            logger.info('Using {} CPUs ...'.format(args.n_cpu))
-            cluster = LocalCluster(dashboard_address=':9001',
-                                   n_workers=args.n_cpu,
-                                   threads_per_worker=4)
-
-        return Client(cluster)
 
     def cache(self):
         """
@@ -250,13 +205,17 @@ To create cache:
         benchmark_file = os.path.join(args.output_dir, 'benchmark.csv')
         initialize_logfile(benchmark_file)
 
-        client = self.initialize_cluster(args)
+        client = initialize_cluster(not args.cpu,
+                                    n_cpu=args.n_cpu,
+                                    n_gpu=args.n_gpu)
 
         # Set the context
         context = Context()
         context.dask_client = client
         context.is_benchmark = args.benchmark
         context.benchmark_file = benchmark_file
+        context.cache_directory = args.cache_directory
+        context.n_molecule = args.n_mol
 
         if args.cpu:
             context.compute_type = 'cpu'
@@ -266,15 +225,15 @@ To create cache:
 
         n_molecules = args.n_mol
         if not args.cpu:
-            workflow = GpuKmeansUmap(n_molecules,
+            workflow = GpuKmeansUmap(n_molecules=n_molecules,
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
         else:
-            workflow = CpuKmeansUmap(n_molecules,
+            workflow = CpuKmeansUmap(n_molecules=n_molecules,
                                      n_pca=args.pca_comps,
                                      n_clusters=args.num_clusters)
 
-        mol_df = workflow.cluster(cache_directory=args.cache_directory)
+        mol_df = workflow.cluster()
 
         if args.benchmark:
             workflow.compute_qa_matric()
@@ -285,7 +244,7 @@ To create cache:
                 n_workers = args.n_cpu
 
             n_molecules = workflow.n_molecules
-            
+
             runtime = datetime.now() - task_start_time
             logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
             log_results(task_start_time, context.compute_type, 'workflow',
@@ -301,10 +260,7 @@ To create cache:
             port = context.get_config('plotly_port', 5000)
 
             logger.info("Starting interactive visualization...")
-            v = ChemVisualization(
-                    mol_df,
-                    workflow,
-                    gpu=not args.cpu)
+            v = ChemVisualization(workflow)
 
             logger.info('navigate to https://localhost: %s' % port)
             v.start('0.0.0.0', port=port)

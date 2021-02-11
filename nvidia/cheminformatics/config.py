@@ -19,6 +19,8 @@ class Context(metaclass=Singleton):
         self.compute_type = 'gpu'
         self.is_benchmark = False
         self.benchmark_file = None
+        self.cache_directory = None
+        self.n_molecule = None
 
         self.config = None
         if os.path.exists(CONFIG_FILE):
@@ -36,7 +38,7 @@ class Context(metaclass=Singleton):
         config_file = open(properties_file, 'r')
         config_content = StringIO('[root]\n' + config_file.read())
         config = RawConfigParser()
-        config.readfp(config_content)
+        config.read_file(config_content)
 
         return config._sections['root']
 
@@ -48,4 +50,4 @@ class Context(metaclass=Singleton):
             return self.config[config_name]
         except KeyError:
             logger.warn('%s not found, returing default.', config_name)
-            return config_name
+            return default

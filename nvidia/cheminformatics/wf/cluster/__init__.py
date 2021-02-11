@@ -1,6 +1,9 @@
 class BaseClusterWorkflow:
 
-    def cluster(self, embedding, cache_directory):
+    def is_gpu_enabled(self):
+        return True
+
+    def cluster(self, embedding):
         """
         Runs clustering workflow on the data fetched from database/cache.
         """

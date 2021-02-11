@@ -31,7 +31,7 @@ def initialize_cluster(use_gpu=True, n_cpu=None, n_gpu=-1):
 
         CUDA_VISIBLE_DEVICES = cuda_visible_devices(1, range(n_gpu)).split(',')
         CUDA_VISIBLE_DEVICES = [int(x) for x in CUDA_VISIBLE_DEVICES]
-        CUDA_VISIBLE_DEVICES = [0, 1]
+        # CUDA_VISIBLE_DEVICES = [0, 1]
 
         logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
 

@@ -22,9 +22,10 @@ RUN rm /tmp/cuchem_rapids_0.17.yml
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
 
-COPY launch.sh /opt/nvidia/cheminfomatics/
-COPY *.py /opt/nvidia/cheminfomatics/
-COPY nbs/*.ipynb /opt/nvidia/cheminfomatics/
+RUN mkdir -p /opt/nvidia/ \
+    && cd /opt/nvidia/ \
+    && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
+    && rm -rf /opt/nvidia/cheminfomatics/.git
 
 ENV UCX_LOG_LEVEL error
 

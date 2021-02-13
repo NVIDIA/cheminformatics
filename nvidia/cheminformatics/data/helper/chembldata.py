@@ -46,6 +46,8 @@ IMP_PROPS_TYPE = [pandas.Series([], dtype='float64'),
 ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
                          pandas.Series([], dtype='object')]
 
+
+# DEPRECATED. Please add code to DAO classes.
 class ChEmblData(object, metaclass=Singleton):
 
     def __init__(self,
@@ -118,11 +120,21 @@ class ChEmblData(object, metaclass=Singleton):
 
             return cur.fetchone()[0]
 
-    @delayed
+    def _meta_df(self, **transformation_kwargs):
+        transformation = self.fp_type(**transformation_kwargs)
+
+        prop_meta = {'id': pandas.Series([], dtype='int64')}
+        prop_meta.update(dict(zip(IMP_PROPS + ADDITIONAL_FEILD,
+                              IMP_PROPS_TYPE + ADDITIONAL_FEILD_TYPE)))
+        prop_meta.update({i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
+
+        return pandas.DataFrame(prop_meta)
+
     def _fetch_mol_embedding(self,
-                             start,
+                             start=0,
                              batch_size=5000,
                              smiles_transforms=SMILES_TRANSFORMS,
+                             molregnos=None,
                              **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
@@ -132,15 +144,29 @@ class ChEmblData(object, metaclass=Singleton):
         logger.info('Fetching %d records starting %d...' % (batch_size, start))
 
         imp_cols = [ 'cp.' + col for col in IMP_PROPS]
-        select_stmt = '''
-            SELECT md.molregno, %s, cs.canonical_smiles
-            FROM compound_properties cp,
-                 molecule_dictionary md,
-                 compound_structures cs
-            WHERE cp.molregno = md.molregno
-                  AND md.molregno = cs.molregno
-            LIMIT %d, %d
-        ''' % (', '.join(imp_cols), start, batch_size)
+
+        if molregnos is None:
+            select_stmt = '''
+                SELECT md.molregno, %s, cs.canonical_smiles
+                FROM compound_properties cp,
+                    molecule_dictionary md,
+                    compound_structures cs
+                WHERE cp.molregno = md.molregno
+                    AND md.molregno = cs.molregno
+                LIMIT %d, %d
+            ''' % (', '.join(imp_cols), start, batch_size)
+        else:
+            select_stmt = '''
+                SELECT md.molregno, %s, cs.canonical_smiles
+                FROM compound_properties cp,
+                    molecule_dictionary md,
+                    compound_structures cs
+                WHERE cp.molregno = md.molregno
+                    AND md.molregno = cs.molregno
+                    AND md.molregno in (%s)
+                LIMIT %d, %d
+            ''' % (', '.join(imp_cols), " ,".join(list(map(str, molregnos))), start, batch_size)
+
         df = pandas.read_sql(select_stmt,
                             sqlite3.connect(self.chembl_db, uri=True))
 
@@ -168,6 +194,7 @@ class ChEmblData(object, metaclass=Singleton):
     def fetch_mol_embedding(self,
                             num_recs=None,
                             batch_size=5000,
+                            molregnos=None,
                             **transformation_kwargs):
         """
         Returns compound properties and structure for the first N number of
@@ -178,25 +205,18 @@ class ChEmblData(object, metaclass=Singleton):
         if not num_recs or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
-        transformation = self.fp_type(**transformation_kwargs)
+        meta_df = self._meta_df(**transformation_kwargs)
 
-        prop_meta = {'id': pandas.Series([], dtype='int64')}
-        prop_meta.update(dict(zip(IMP_PROPS + ADDITIONAL_FEILD,
-                              IMP_PROPS_TYPE + ADDITIONAL_FEILD_TYPE)))
-        prop_meta.update({i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
-
-        meta_df = pandas.DataFrame(prop_meta)
         dls = []
         for start in range(0, num_recs, batch_size):
             bsize = min(num_recs - start, batch_size)
-            dls.append(self._fetch_mol_embedding(
-                    start,
-                    batch_size=bsize,
-                    **transformation_kwargs))
+            dl_data = delayed(self._fetch_mol_embedding) \
+                             (start=start, batch_size=bsize, molregnos=molregnos, **transformation_kwargs)
+            dls.append(dl_data)
 
         return dataframe.from_delayed(dls, meta=meta_df)
 
-    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None,):
+    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None):
         """
         Generates fingerprints for all ChEMBL ID's in the database
         """

@@ -19,7 +19,7 @@ from nvidia.cheminformatics.data.helper.chembldata import ADDITIONAL_FEILD, IMP_
 from . import BaseClusterWorkflow
 from nvidia.cheminformatics.utils.singleton import Singleton
 from nvidia.cheminformatics.config import Context
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao

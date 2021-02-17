@@ -627,7 +627,8 @@ class ChemVisualization:
         filter_values = None
         filter_column = None
         reload_data = False
-        recluster_data=True
+        recluster_data = True
+        error_msg = ''
 
         if selected_clusters and comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks':
             filter_values = list(map(int, selected_clusters.split(",")))
@@ -641,11 +642,15 @@ class ChemVisualization:
             filter_column = 'id'
 
         elif comp_id == 'bt_north_star' and event_type == 'n_clicks':
-            _, molregnos, _ = self.workflow.add_molecules(north_star)
-            north_star_hidden = " ,".join(list(map(str, molregnos)))
-            recluster_data = False
-            if not north_star_hidden:
-                raise dash.exceptions.PreventUpdate
+            if north_star:
+                north_star = north_star.split(',')
+                missing_mols, molregnos, _ = self.workflow.add_molecules(north_star)
+                recluster_data = len(missing_mols) > 0
+
+                north_star_hidden = " ,".join(list(map(str, molregnos)))
+            else:
+                north_star_hidden = ''
+                recluster_data = False
 
         elif comp_id == 'hidden_northstar' and event_type == 'value':
             recluster_data = False
@@ -664,4 +669,4 @@ class ChemVisualization:
             reload_data = reload_data,
             recluster_data=recluster_data)
 
-        return figure, ','.join(northstar_cluster), chembl_clusterid_map, ''
+        return figure, ','.join(northstar_cluster), chembl_clusterid_map, error_msg

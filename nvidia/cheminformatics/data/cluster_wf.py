@@ -1,6 +1,7 @@
 from nvidia.cheminformatics.config import Context
 from nvidia.cheminformatics.utils.singleton import Singleton
 import os
+import cudf
 import dask_cudf
 import dask
 import logging
@@ -54,19 +55,21 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
         fp_df = chem_data._fetch_mol_embedding(molregnos=molecule_id) \
                          .astype(meta.dtypes)
 
-        fp_df = dask.dataframe.from_pandas(fp_df, npartitions=1)
-        fp_df = dask_cudf.from_dask_dataframe(fp_df).reset_index()
+        fp_df = cudf.from_pandas(fp_df)
+        fp_df = dask_cudf.from_cudf(fp_df, npartitions=1).reset_index()
         return fp_df
 
-    def fetch_id_from_smile(self, new_molecules: List):
+    def fetch_id_from_chembl(self, new_molecules: List):
         logger.debug('Fetch ChEMBL ID using molregno...')
 
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
             select_stmt = '''
-                SELECT cs.molregno as molregno
-                FROM compound_structures cs
-                WHERE cs.canonical_smiles in (%s)
+                SELECT cs.molregno as molregno, md.chembl_id as chembl_id
+                FROM compound_structures cs,
+                    molecule_dictionary md
+                WHERE md.molregno = cs.molregno
+                    AND md.chembl_id in (%s)
             ''' %  "'%s'" %"','".join(new_molecules)
             cur.execute(select_stmt)
 

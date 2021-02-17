@@ -104,6 +104,20 @@ class ChEmblData(object, metaclass=Singleton):
             cur.execute(select_stmt)
             return cur.fetchall()
 
+
+    def fetch_chemblId_by_molregno(self, molregnos):
+        logger.debug('Fetch ChEMBL ID using molregno...')
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+                closing(con.cursor()) as cur:
+            select_stmt = '''
+                SELECT md.chembl_id as chembl_id
+                FROM molecule_dictionary md
+                WHERE md.molregno in (%s)
+            ''' %  ", ".join(list(map(str, molregnos)))
+            logger.info(select_stmt)
+            cur.execute(select_stmt)
+            return cur.fetchall()
+
     def fetch_molecule_cnt(self):
         logger.debug('Finding number of molecules...')
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \

@@ -221,7 +221,7 @@ dash() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
-	        python3 startdash.py analyze $@
+        python3 startdash.py analyze $@
 	else
 		dbSetup "${DATA_PATH}/db"
 		# run a container and start dash inside container.
@@ -236,12 +236,20 @@ cache() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
-	        python3 startdash.py cache $@
+	    python3 startdash.py cache $@
 	else
 		dbSetup "${DATA_PATH}/db"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py cache $@
 	fi
+	exit
+}
+
+
+test() {
+	dbSetup "${DATA_PATH}/db"
+	# run a container and start dash inside container.
+	${DOCKER_CMD} -it ${CONT} python startdash.py analyze -b --n_mol 100000
 	exit
 }
 

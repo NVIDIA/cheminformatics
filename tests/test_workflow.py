@@ -1,17 +1,11 @@
-from nvidia.cheminformatics.wf.cluster.gpurandomprojection import GpuWorkflowRandomProjection
-from nvidia.cheminformatics.data.helper.chembldata import ChEmblData
-import os
 import cudf
-import dask
 import logging
-import tempfile
 
 from tests.utils import _fetch_chembl_test_dataset, _create_context
 
-from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
-from nvidia.cheminformatics.utils.dask import initialize_cluster
-from nvidia.cheminformatics.config import Context
+from nvidia.cheminformatics.wf.cluster.gpurandomprojection import GpuWorkflowRandomProjection
+from nvidia.cheminformatics.data.helper.chembldata import ChEmblData
 
 
 logger = logging.getLogger(__name__)

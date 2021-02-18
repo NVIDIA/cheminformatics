@@ -1,10 +1,14 @@
 import os
 import dask
 import tempfile
+import logging
 
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.utils.dask import initialize_cluster
 from nvidia.cheminformatics.config import Context
+
+
+logger = logging.getLogger(__name__)
 
 
 def _fetch_chembl_test_dataset(n_molecules=None):
@@ -19,13 +23,23 @@ def _fetch_chembl_test_dataset(n_molecules=None):
     return n_molecules, dao, mol_df
 
 
-def _create_context():
+def _create_context(use_gpu=True,
+                    n_workers=-1,
+                    benchmark_file=None,
+                    cache_directory=None):
     context = Context()
     if context.dask_client is None:
-        context.dask_client = initialize_cluster()
+        context.dask_client = initialize_cluster(use_gpu=use_gpu,
+                                                 n_gpu=n_workers,
+                                                 n_cpu=n_workers)
     context.is_benchmark = False
-    context.benchmark_file = os.path.join(tempfile.tempdir, 'benchmark.csv')
-    context.cache_directory=tempfile.tempdir
+
+    context.cache_directory = cache_directory
+    if cache_directory is None:
+        context.cache_directory = tempfile.tempdir
+
+    context.benchmark_file = benchmark_file
+    if benchmark_file is None:
+        context.benchmark_file = os.path.join(tempfile.tempdir, 'benchmark.csv')
 
     return context
-

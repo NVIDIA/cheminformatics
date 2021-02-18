@@ -124,12 +124,12 @@ DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
 
 if [ $write_env -eq 1 ]; then
 	echo CONT=${CONT} >> $LOCAL_ENV
-	echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
-	echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
-	echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
 	echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
 	echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
 	echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
+	echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
+	echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
+	echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
 	echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
 	echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
 	echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
@@ -231,6 +231,21 @@ dash() {
 }
 
 
+cache() {
+	echo $@
+	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
+		# Executed within container or a managed env.
+		dbSetup '/data/db'
+	        python3 startdash.py cache $@
+	else
+		dbSetup "${DATA_PATH}/db"
+		# run a container and start dash inside container.
+		${DOCKER_CMD} -it ${CONT} python startdash.py cache $@
+	fi
+	exit
+}
+
+
 jupyter() {
 	${DOCKER_CMD} -it ${CONT} jupyter-lab --no-browser --port=8888 --ip=0.0.0.0 --notebook-dir=/workspace --NotebookApp.password=\"\" --NotebookApp.token=\"\" --NotebookApp.password_required=False
 	exit
@@ -251,6 +266,9 @@ case $1 in
 	dbSetup)
 		;&
 	dash)
+		$@
+		;;
+	cache)
 		$@
 		;;
 	jupyter)

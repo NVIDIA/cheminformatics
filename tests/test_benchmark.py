@@ -15,81 +15,92 @@
 # limitations under the License.
 
 import pytest
-import unittest
 import tempfile
 import os
 import shutil
-import sys
-import shlex
 import glob
+import logging
+from pydoc import locate
 import pandas as pd
 
-# Define paths for the tests
-_this_directory = os.path.dirname(os.path.realpath(__file__))
-_parent_directory = os.path.dirname(_this_directory)
-_data_dir = os.path.join(_this_directory, 'data')
+from tests.utils import _create_context
+from nvidia.cheminformatics.utils.logger import initialize_logfile
+from nvidia.cheminformatics.utils.plot_benchmark_results \
+    import prepare_benchmark_df, prepare_acceleration_stacked_plot
 
-sys.path.insert(0, _parent_directory) # TODO better way to add this directory to the path
-from startdash import Launcher
-from nvidia.cheminformatics.utils.plot_benchmark_results import prepare_benchmark_df, prepare_acceleration_stacked_plot
 
-# Output directory
-temp_dir = tempfile.mkdtemp()
+logger = logging.getLogger(__name__)
+
 
 # Parameter lists
-run_benchmark_params = [ ([{'test_type': 'gpu', 'n_workers':  1, 'n_mol': -1}, 
-                           {'test_type': 'cpu', 'n_workers': 19, 'n_mol': -1}], _data_dir, temp_dir) ]
-load_benchmark_params = [(temp_dir)]
+run_benchmark_params = [ ([{'test_type': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap',
+                            'use_gpu': True,
+                            'n_workers':  1,
+                            'n_mol': 5000},
+                           {'test_type': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap',
+                            'use_gpu': False,
+                            'n_workers': 10,
+                            'n_mol': 5000}]) ]
 
+@pytest.mark.parametrize('benchmark_config_list', run_benchmark_params)
+def test_run_benchmark(benchmark_config_list):
 
-@pytest.mark.parametrize('benchmark_config_list, data_dir, output_dir', run_benchmark_params)
-def test_run_benchmark(benchmark_config_list, data_dir, output_dir):
-
+    output_dir = tempfile.tempdir
     output_file = os.path.join(output_dir, 'benchmark.csv')
-    if os.path.exists(output_file):
-        os.remove(output_file)
+    initialize_logfile(output_file)
 
+    max_n_mol = 0
     for config in benchmark_config_list:
         test_type = config['test_type']
+        use_gpu = config['use_gpu']
         n_workers = config['n_workers']
         n_mol = config['n_mol']
-        
-        # Create run command and inject into sys.argv
-        command = f'startdash.py analyze -b --cache {data_dir} '
-        if test_type == 'cpu':
-            command += f'--{test_type} '
-        command += f'--n_{test_type} {n_workers} --n_mol {n_mol} --output_dir {output_dir}'
+        max_n_mol = max(max_n_mol, n_mol)
 
-        sys_argv = shlex.split(command)
-        with unittest.mock.patch('sys.argv', sys_argv):
-            Launcher()
+        context = _create_context(use_gpu=use_gpu,
+                                  n_workers=n_workers,
+                                  benchmark_file=output_file)
+        context.n_molecule = n_mol
+        context.cache_directory = None
+        context.is_benchmark = True
+
+        wf_class = locate(test_type)
+        workflow = wf_class()
+
+        workflow.cluster()
+        workflow.compute_qa_matric()
+
+        context.dask_client.cluster.close()
+        context.dask_client.close()
+        context.dask_client = None
 
     # Filename is set in workflow -- move to create randomized name
-    temp_file = tempfile.NamedTemporaryFile(prefix='benchmark_', suffix='.csv', dir=output_dir, delete=False).name
+    temp_file = tempfile.NamedTemporaryFile(prefix='benchmark_',
+                                            suffix='.csv',
+                                            dir=output_dir,
+                                            delete=False).name
     shutil.move(output_file, temp_file)
     assert os.path.exists(temp_file)
-    
+
     benchmark_results = pd.read_csv(temp_file, comment='#')
+    logger.info(benchmark_results)
+
     nrows, ncols = benchmark_results.shape
-    assert nrows == len(benchmark_config_list) * 5
     assert ncols == 8
+    assert nrows >= len(benchmark_config_list)
+    assert benchmark_results['n_molecules'].min() > 0
+    assert benchmark_results['n_molecules'].min() < max_n_mol
 
+    df, machine_config = prepare_benchmark_df(temp_file)
+    basename = os.path.splitext(temp_file)[0]
+    excel_file = basename + '.xlsx'
+    assert os.path.exists(excel_file)
+    md_file = basename + '.md'
+    assert os.path.exists(md_file)
 
-@pytest.mark.parametrize('output_dir', load_benchmark_params)
-def test_load_benchmarks(output_dir):
-
-    csv_path = os.path.join(output_dir, 'benchmark_*.csv')
-    for benchmark_file in glob.glob(csv_path):
-        df, machine_config = prepare_benchmark_df(benchmark_file)
-        basename = os.path.splitext(benchmark_file)[0]
-        excel_file = basename + '.xlsx'
-        assert os.path.exists(excel_file)
-        md_file = basename + '.md'
-        assert os.path.exists(md_file)
-        
-        png_file = basename + '.png'
-        prepare_acceleration_stacked_plot(df, machine_config, output_path=png_file)
-        assert os.path.exists(png_file)
+    png_file = basename + '.png'
+    prepare_acceleration_stacked_plot(df, machine_config, output_path=png_file)
+    assert os.path.exists(png_file)
 
 
 # TODO add test for metrics and values

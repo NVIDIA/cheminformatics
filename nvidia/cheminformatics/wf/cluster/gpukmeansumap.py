@@ -15,32 +15,30 @@
 # limitations under the License.
 
 import logging
-from nvidia.cheminformatics.data.helper.chembldata import ADDITIONAL_FEILD, IMP_PROPS
 from . import BaseClusterWorkflow
 from nvidia.cheminformatics.utils.singleton import Singleton
 from nvidia.cheminformatics.config import Context
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearman_rho
-from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.utils.logger import MetricsLogger
 
-import numpy
-
 import cudf
-import cupy
 import dask
 import dask_cudf
 from functools import singledispatch
+from typing import List
 
 from cuml.manifold import UMAP as cuUMAP
 from cuml.dask.decomposition import PCA as cuDaskPCA
 from cuml.dask.cluster import KMeans as cuDaskKMeans
 from cuml.dask.manifold import UMAP as cuDaskUMAP
-from cuml.metrics import pairwise_distances
 
 
 logger = logging.getLogger(__name__)
+
+
+MIN_RECLUSTER_SIZE = 200
 
 
 @singledispatch
@@ -62,7 +60,7 @@ def _(embedding, n_pca, self):
 @_gpu_cluster_wrapper.register(cudf.DataFrame)
 def _(embedding, n_pca, self):
     embedding = dask_cudf.from_cudf(embedding,
-                                    int(chunksize=embedding.shape * 0.1))
+                                    chunksize=int(embedding.shape[0] * 0.1))
     return self._cluster(embedding, n_pca)
 
 
@@ -78,24 +76,12 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         self.dao = dao
         self.n_molecules = n_molecules
         self.pca_comps = pca_comps
+        self.pca = None
         self.n_clusters = n_clusters
 
         self.df_embedding = None
         self.seed = seed
         self.n_spearman = 5000
-
-    def _compute_spearman_rho(self, embedding, X_train, Xt):
-        n_indexes = min(self.n_spearman, X_train.shape[0])
-        numpy.random.seed(self.seed)
-        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])),
-                                      size=n_indexes,
-                                      replace=False)
-        fp_sample = cupy.fromDlpack(embedding.compute().to_dlpack())[indexes]
-        Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
-
-        dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
-        dist_array_eucl = pairwise_distances(Xt_sample)
-        return cupy.nanmean(spearmanr(dist_array_tani, dist_array_eucl, top_k=100))
 
     def _cluster(self, embedding, n_pca):
         """
@@ -105,30 +91,24 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         dask_client = Context().dask_client
         embedding = embedding.reset_index()
+        n_molecules = embedding.compute().shape[0]
 
         # Before reclustering remove all columns that may interfere
-        ids =  embedding['id']
-        for col in ['x', 'y', 'cluster', 'id', 'filter_col', 'index', 'molregno']:
-            if col in embedding.columns:
-                embedding = embedding.drop([col], axis=1)
+        embedding, prop_series = self._remove_non_numerics(embedding)
 
-        other_props = IMP_PROPS + ADDITIONAL_FEILD
-        # Tempraryly store columns not required during processesing
-        prop_series = {}
-        for col in other_props:
-            if col in embedding.columns:
-                prop_series[col] = embedding[col]
-        if len(prop_series) > 0:
-            embedding = embedding.drop(other_props, axis=1)
+        if n_pca and embedding.shape[1] > n_pca:
+            with MetricsLogger('pca', n_molecules) as ml:
+                if self.pca == None:
+                    self.pca = cuDaskPCA(client=dask_client, n_components=n_pca)
+                    self.pca.fit(embedding)
+                embedding = self.pca.transform(embedding)
 
-        if n_pca:
-            with MetricsLogger('pca', self.n_molecules) as ml:
-                pca = cuDaskPCA(client=dask_client, n_components=n_pca)
-                embedding = pca.fit_transform(embedding)
+        with MetricsLogger('kmeans', n_molecules) as ml:
+            if n_molecules < MIN_RECLUSTER_SIZE:
+                raise Exception('Reclustering less then %d molecules is not supported.' % MIN_RECLUSTER_SIZE)
 
-        with MetricsLogger('kmeans', self.n_molecules) as ml:
             kmeans_cuml = cuDaskKMeans(client=dask_client,
-                                       n_clusters=self.n_clusters)
+                                    n_clusters=self.n_clusters)
             kmeans_cuml.fit(embedding)
             kmeans_labels = kmeans_cuml.predict(embedding)
 
@@ -137,7 +117,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
             ml.metric_func_args = (embedding, kmeans_labels)
             ml.metric_func_kwargs = {'on_gpu': True,  'seed': self.seed}
 
-        with MetricsLogger('umap', self.n_molecules) as ml:
+        with MetricsLogger('umap', n_molecules) as ml:
             X_train = embedding.compute()
 
             local_model = cuUMAP()
@@ -160,10 +140,9 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         embedding['cluster'] = kmeans_labels
         embedding['x'] = Xt[0]
         embedding['y'] = Xt[1]
-        embedding['id'] = ids
 
         # Add back the prop columns
-        for col in other_props:
+        for col in prop_series.keys():
             embedding[col] = prop_series[col]
 
         return embedding
@@ -175,24 +154,21 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         if df_mol_embedding is None:
             self.n_molecules = Context().n_molecule
 
-            cache_directory = Context().cache_directory
-
             df_mol_embedding = self.dao.fetch_molecular_embedding(
                 self.n_molecules,
-                cache_directory=cache_directory)
+                cache_directory=Context().cache_directory)
 
             df_mol_embedding = df_mol_embedding.persist()
 
-        self.n_molecules = df_mol_embedding.compute().shape[0]
         self.df_embedding = _gpu_cluster_wrapper(df_mol_embedding,
                                                  self.pca_comps,
                                                  self)
         return self.df_embedding
 
-    def re_cluster(self, filter_column, filter_values,
-                   new_figerprints=None,
-                   new_chembl_ids=None,
-                   n_clusters=None):
+    def recluster(self,
+                  filter_column=None,
+                  filter_values=None,
+                  n_clusters=None):
 
         df_embedding = self.df_embedding
         if filter_values is not None:
@@ -207,3 +183,36 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         self.df_embedding = _gpu_cluster_wrapper(df_embedding, None, self)
 
         return self.df_embedding
+
+    def add_molecules(self, chemblids:List):
+
+        chem_mol_map = {row[0]: row[1] for row in self.dao.fetch_id_from_chembl(chemblids)}
+        molregnos = list(chem_mol_map.keys())
+
+        self.df_embedding['id_exists'] = self.df_embedding['id'].isin(molregnos)
+
+        ldf = self.df_embedding.query('id_exists == True')
+        if hasattr(ldf, 'compute'):
+            ldf = ldf.compute()
+
+        self.df_embedding = self.df_embedding.drop(['id_exists'], axis=1)
+        missing_mol = set(molregnos).difference(ldf['id'].to_array())
+
+        chem_mol_map = {id: chem_mol_map[id] for id in missing_mol}
+
+        missing_molregno = chem_mol_map.keys()
+        if self.pca and len(missing_molregno) > 0:
+            new_fingerprints = self.dao.fetch_molecular_embedding_by_id(missing_molregno)
+            new_fingerprints, prop_series = self._remove_non_numerics(new_fingerprints)
+            new_fingerprints = self.pca.transform(new_fingerprints)
+
+            # Add back the prop columns
+            for col in prop_series.keys():
+                new_fingerprints[col] = prop_series[col]
+
+            self.df_embedding = self._remove_ui_columns(self.df_embedding)
+
+            # TODO: Should we maintain the original PCA result for use here
+            self.df_embedding = self.df_embedding.append(new_fingerprints)
+
+        return chem_mol_map, molregnos, self.df_embedding

@@ -69,10 +69,9 @@ class CpuKmeansUmap(BaseClusterWorkflow):
         return cupy.nanmean(spearmanr(dist_array_tani, dist_array_eucl, top_k=100))
 
     def cluster(self,
-                df_molecular_embedding=None,
-                cache_directory=None):
-
+                df_molecular_embedding=None):
         logger.info("Executing CPU workflow...")
+        cache_directory = Context().cache_directory
 
         if df_molecular_embedding is None:
             self.n_molecules = Context().n_molecule

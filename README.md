@@ -22,10 +22,7 @@ To generate a template for `.cheminf_local_environment`, just run `./launch.sh` 
 If `.cheminf_local_environment` does not exist, then a template will be written for you.
 
 ```
-CONT=gitlab-master.nvidia.com:5005/cheminf-clustering
-REGISTRY=gitlab-master.nvidia.com:5005
-REGISTRY_USER='$oauthtoken'
-REGISTRY_ACCESS_TOKEN=$(cat <path_to_your_access_token>)
+CONT=nvcr.io/nvidia/clara/cheminformatics_demo:200929-0.0.1
 JUPYTER_PORT=8888
 PLOTLY_PORT=5000
 DASK_PORT=9001

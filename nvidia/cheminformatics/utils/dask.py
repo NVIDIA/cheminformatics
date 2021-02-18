@@ -34,7 +34,6 @@ def initialize_cluster(use_gpu=True, n_cpu=None, n_gpu=-1):
                 CUDA_VISIBLE_DEVICES.append(int(device))
             except ValueError as vex:
                 logger.warn(vex)
-        CUDA_VISIBLE_DEVICES = [0, 1]
 
         logger.info('Using GPUs {} ...'.format(CUDA_VISIBLE_DEVICES))
 

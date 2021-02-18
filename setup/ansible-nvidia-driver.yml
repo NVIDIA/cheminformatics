@@ -1,0 +1,69 @@
+---
+- name: CUDA Toolkit
+  hosts: all
+  become: yes
+  tasks:
+    - name: Add CUDA apt-key
+      apt_key:
+        url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
+        state: present
+
+    - name: Add CUDA apt repository
+      apt_repository:
+        repo: 'deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /'
+        state: present
+        filename: nvidia
+        update_cache: yes
+
+    - name: Add Nvidia container runtime apt-key
+      apt_key:
+        url: https://nvidia.github.io/nvidia-docker/gpgkey
+        state: present
+
+    - name: nvidia-container-runtime apt repositories are registered
+      apt_repository:
+        repo: "{{ item }}"    
+        filename: nvidia-container-runtime
+        state: present
+        update_cache: yes
+      with_items:
+        - 'deb https://nvidia.github.io/libnvidia-container/stable/ubuntu18.04/amd64/ /'
+        - 'deb https://nvidia.github.io/nvidia-container-runtime/stable/ubuntu18.04/amd64/ /'
+        - 'deb https://nvidia.github.io/nvidia-docker/ubuntu18.04/amd64/ /'
+      register: nvidia_container_runtime_apt_repo
+
+    - name: Remove "nvidia-*" packages
+      apt: pkg=nvidia-* state=absent purge=yes
+
+    - name: Remove "cuda-*" packages
+      apt: pkg=cuda-* state=absent purge=yes
+
+    - name: Install Nvidia Driver
+      apt: pkg=nvidia-driver-460 state=present
+
+    - name: Install CUDA Toolkit
+      apt: pkg=nvidia-container-toolkit update_cache=yes state=present
+
+- name: Docker
+  hosts: all
+  become: yes
+  tasks:
+    - name: Add Docker apt-key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker apt repository
+      apt_repository:
+        repo: 'deb https://download.docker.com/linux/ubuntu disco stable'
+        state: present
+        filename: docker
+        update_cache: yes
+
+    - name: Install Docker packages
+      apt:
+        pkg={{ item }}
+        update_cache=yes
+        state=present
+      with_items:
+        - docker-ce

@@ -114,7 +114,6 @@ class ChEmblData(object, metaclass=Singleton):
                 FROM molecule_dictionary md
                 WHERE md.molregno in (%s)
             ''' %  ", ".join(list(map(str, molregnos)))
-            logger.info(select_stmt)
             cur.execute(select_stmt)
             return cur.fetchall()
 

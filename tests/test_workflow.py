@@ -1,9 +1,12 @@
+from nvidia.cheminformatics.wf.cluster.gpurandomprojection import GpuWorkflowRandomProjection
 from nvidia.cheminformatics.data.helper.chembldata import ChEmblData
 import os
 import cudf
 import dask
 import logging
 import tempfile
+
+from tests.utils import _fetch_chembl_test_dataset, _create_context
 
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
@@ -14,52 +17,41 @@ from nvidia.cheminformatics.config import Context
 logger = logging.getLogger(__name__)
 
 
-def _fetch_test_dataset(n_molecules=None):
-    if n_molecules is None:
-        n_molecules = 1000
+def test_random_proj():
+    """
+    Verify fetching data from chemblDB when the input is a pandas df.
+    """
+    n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
 
-    dao = ChemblClusterWfDao()
-    mol_df = dao.fetch_molecular_embedding(n_molecules=n_molecules)
-    assert isinstance(mol_df, dask.dataframe.core.DataFrame),\
-        'Incorrect data structure from DAO'
-
-    return n_molecules, dao, mol_df
-
-
-def _create_context():
-    context = Context()
-    if context.dask_client is None:
-        context.dask_client = initialize_cluster()
-    context.is_benchmark = False
-    context.benchmark_file = os.path.join(tempfile.tempdir, 'benchmark.csv')
-    context.cache_directory=tempfile.tempdir
-
-    return context
+    context = _create_context()
+    wf = GpuWorkflowRandomProjection(n_molecules=n_molecules,
+                                     dao=dao)
+    wf.cluster(df_mol_embedding=mol_df)
 
 
-# def test_gpukmeansumap_dask():
-#     """
-#     Verify fetching data from chemblDB when the input is a pandas df.
-#     """
-#     n_molecules, dao, mol_df = _fetch_test_dataset()
+def test_gpukmeansumap_dask():
+    """
+    Verify fetching data from chemblDB when the input is a pandas df.
+    """
+    n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
 
-#     context = _create_context()
-#     wf = GpuKmeansUmap(n_molecules=n_molecules,
-#                     dao=dao, pca_comps=64)
-#     wf.cluster(df_mol_embedding=mol_df)
+    context = _create_context()
+    wf = GpuKmeansUmap(n_molecules=n_molecules,
+                       dao=dao, pca_comps=64)
+    wf.cluster(df_mol_embedding=mol_df)
 
 
-# def test_gpukmeansumap_cudf():
-#     """
-#     Verify fetching data from chemblDB when the input is a cudf df.
-#     """
-#     context = _create_context()
+def test_gpukmeansumap_cudf():
+    """
+    Verify fetching data from chemblDB when the input is a cudf df.
+    """
+    context = _create_context()
 
-#     n_molecules, dao, mol_df = _fetch_test_dataset()
-#     wf = GpuKmeansUmap(n_molecules=n_molecules,
-#                     dao=dao, pca_comps=64)
-#     mol_df = mol_df.compute()
-#     wf.cluster(df_mol_embedding=mol_df)
+    n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
+    wf = GpuKmeansUmap(n_molecules=n_molecules,
+                       dao=dao, pca_comps=64)
+    mol_df = mol_df.compute()
+    wf.cluster(df_mol_embedding=mol_df)
 
 
 def test_add_molecule():
@@ -68,7 +60,7 @@ def test_add_molecule():
     """
     context = _create_context()
 
-    n_molecules, dao, mol_df = _fetch_test_dataset()
+    n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
 
     if hasattr(mol_df, 'compute'):
         mol_df = mol_df.compute()

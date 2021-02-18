@@ -109,6 +109,12 @@ class ChemVisualization:
             [State('north_star', 'value'),
              State('hidden_northstar', 'value')])(self.handle_mark_north_star)
 
+        self.app.callback(
+            [Output('error_msg', 'children'),
+             Output('md_error', 'is_open')],
+            [Input('recluster_error', 'children'),
+             Input('bt_close_err', 'n_clicks')])(self.handle_error)
+
     def _fetch_event_data(self):
         if not dash.callback_context.triggered:
             raise dash.exceptions.PreventUpdate
@@ -388,6 +394,7 @@ class ChemVisualization:
                         html.Div(children=[
                             dcc.Dropdown(id='sl_wf', multi=False,
                                         options=[{'label': 'Gpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
+                                                 {'label': 'GPU Random Projection - Single GPU', 'value': 'nvidia.cheminformatics.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
                                                  {'label': 'Cpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
                                         value='alogp',
                                         clearable=False),
@@ -501,8 +508,29 @@ class ChemVisualization:
             html.Div(id='hidden_northstar', style={'display': 'none'}),
             html.Div(id='north_star_clusterid_map', style={'display': 'none'}),
             html.Div(id='recluster_error'),
-            html.Div(id='mol_selection_error')
+            html.Div(id='mol_selection_error'),
+            html.Div(className='row', children=[
+                dbc.Modal([
+                    dbc.ModalHeader("Error"),
+                    dbc.ModalBody(
+                        html.Div(id='error_msg', style={'color': 'red'}),
+                    ),
+                    dbc.ModalFooter(
+                        dbc.Button("Close", id="bt_close_err", className="ml-auto")
+                    ),
+                ], id="md_error"),
+            ]),
         ])
+
+    def handle_error(self, recluster_error, bt_close_err):
+        comp_id, event_type = self._fetch_event_data()
+
+        if comp_id == 'bt_close_err' and event_type == 'n_clicks':
+            return '', False
+
+        if not recluster_error:
+            raise dash.exceptions.PreventUpdate
+        return recluster_error, True
 
     @report_ui_error(5)
     def handle_molecule_selection(self, mf_selected_data, selected_columns,

@@ -15,20 +15,15 @@
 # limitations under the License.
 
 import logging
-from nvidia.cheminformatics.data.helper.chembldata import ADDITIONAL_FEILD, IMP_PROPS
 from . import BaseClusterWorkflow
 from nvidia.cheminformatics.utils.singleton import Singleton
 from nvidia.cheminformatics.config import Context
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spearmanr
-from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores
 from nvidia.cheminformatics.data import ClusterWfDAO
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.utils.logger import MetricsLogger
 
-import numpy
-
 import cudf
-import cupy
 import dask
 import dask_cudf
 from functools import singledispatch
@@ -38,10 +33,12 @@ from cuml.manifold import UMAP as cuUMAP
 from cuml.dask.decomposition import PCA as cuDaskPCA
 from cuml.dask.cluster import KMeans as cuDaskKMeans
 from cuml.dask.manifold import UMAP as cuDaskUMAP
-from cuml.metrics import pairwise_distances
 
 
 logger = logging.getLogger(__name__)
+
+
+MIN_RECLUSTER_SIZE = 200
 
 
 @singledispatch
@@ -86,40 +83,6 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         self.seed = seed
         self.n_spearman = 5000
 
-    def _remove_ui_columns(self, embedding):
-        for col in ['x', 'y', 'cluster', 'filter_col', 'index', 'molregno']:
-            if col in embedding.columns:
-                embedding = embedding.drop([col], axis=1)
-
-        return embedding
-
-    def _remove_non_numerics(self, embedding):
-        embedding = self._remove_ui_columns(embedding)
-
-        other_props = ['id'] +  IMP_PROPS + ADDITIONAL_FEILD
-        # Tempraryly store columns not required during processesing
-        prop_series = {}
-        for col in other_props:
-            if col in embedding.columns:
-                prop_series[col] = embedding[col]
-        if len(prop_series) > 0:
-            embedding = embedding.drop(other_props, axis=1)
-
-        return embedding, prop_series
-
-    def _compute_spearman_rho(self, embedding, X_train, Xt):
-        n_indexes = min(self.n_spearman, X_train.shape[0])
-        numpy.random.seed(self.seed)
-        indexes = numpy.random.choice(numpy.array(range(X_train.shape[0])),
-                                      size=n_indexes,
-                                      replace=False)
-        fp_sample = cupy.fromDlpack(embedding.compute().to_dlpack())[indexes]
-        Xt_sample = cupy.fromDlpack(Xt.compute().to_dlpack())[indexes]
-
-        dist_array_tani = tanimoto_calculate(fp_sample, calc_distance=True)
-        dist_array_eucl = pairwise_distances(Xt_sample)
-        return cupy.nanmean(spearmanr(dist_array_tani, dist_array_eucl, top_k=100))
-
     def _cluster(self, embedding, n_pca):
         """
         Generates UMAP transformation on Kmeans labels generated from
@@ -141,8 +104,11 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
                 embedding = self.pca.transform(embedding)
 
         with MetricsLogger('kmeans', n_molecules) as ml:
+            if n_molecules < MIN_RECLUSTER_SIZE:
+                raise Exception('Reclustering less then %d molecules is not supported.' % MIN_RECLUSTER_SIZE)
+
             kmeans_cuml = cuDaskKMeans(client=dask_client,
-                                       n_clusters=self.n_clusters)
+                                    n_clusters=self.n_clusters)
             kmeans_cuml.fit(embedding)
             kmeans_labels = kmeans_cuml.predict(embedding)
 

@@ -259,8 +259,6 @@ case $1 in
 		;&
 	dash)
 		;&
-	test $*)
-		;&
 	jupyter)
 		$1
 		;;

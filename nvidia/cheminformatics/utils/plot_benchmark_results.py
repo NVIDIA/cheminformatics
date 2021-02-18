@@ -15,12 +15,17 @@
 # limitations under the License.
 
 import os
+import logging
 import argparse
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import sys
+
+
+logger = logging.getLogger(__name__)
+
 
 # defaults to categorize steps for sorting
 STEP_TYPE_DICT = {'dim_reduction': ['pca', 'svd'],
@@ -55,6 +60,7 @@ def parse_args():
 def prepare_benchmark_df(benchmark_file, step_type_dict=STEP_TYPE_DICT, step_type_cat=STEP_TYPE_CAT):
     """Read and prepare the benchmark data as a dataframe"""
 
+    logger.info('Processing %s...', benchmark_file)
     # Load and format data
     with open(benchmark_file, 'r') as fh:
         machine_config = pd.Series({'Machine Config': fh.readlines()[0].replace('#', '').strip()})
@@ -131,6 +137,9 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
     n_rows = min(2, n_groups)
     n_cols = int(n_groups / n_rows + 0.5)
 
+    if (n_rows, n_cols) == (2, 1):
+        n_rows, n_cols = n_cols, n_rows
+
     fig, axList = plt.subplots(nrows=n_rows, ncols=n_cols)
     fig.set_size_inches(6 * n_cols, 6 * n_rows)
 
@@ -149,10 +158,10 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
 
     for ax, (n_molecules, dat) in zip(axList, df_plot.iterrows()):
         dat.plot(kind='bar', ax=ax, color=palette, width=bar_width)
-        
+
         bars = [rect for rect in ax.get_children() if isinstance(rect, matplotlib.patches.Rectangle)]
         indexes = [tuple([n_molecules] + list(x)) for x in dat.index.to_list()]
-        
+
         # Assemble index and label bars
         for bar, index in zip(bars, indexes):
             total = df.loc[index, ('stats', 'total')]
@@ -165,7 +174,7 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
             xpos = bar.get_x() + (bar.get_width() / 2.0)
             ax.text(xpos, ypos, label, horizontalalignment='center',
                     verticalalignment='bottom')
-            
+
         xticklabels = [f'{x[1]} CPU cores' if x[0] == 'CPU' else f'{x[1]} GPU(s)' for x in dat.index.to_list()]
         ax.set_xticklabels(xticklabels, rotation=25)
         ax.set(title=f'{n_molecules:,} Molecules', xlabel='')
@@ -184,6 +193,6 @@ if __name__ == '__main__':
     args = parse_args()
 
     # Read and prepare the dataframe then plot
-    bench_df, machine_config = prepare_benchmark_df(benchmark_file=args.benchmark_file, step_type_dict=STEP_TYPE_DICT, 
+    bench_df, machine_config = prepare_benchmark_df(benchmark_file=args.benchmark_file, step_type_dict=STEP_TYPE_DICT,
                                     step_type_cat=STEP_TYPE_CAT)
     prepare_acceleration_stacked_plot(bench_df, machine_config, output_path=args.output_path)

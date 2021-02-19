@@ -37,6 +37,7 @@ def initialize_logfile(benchmark_file=BENCHMARK_FILE):
             fh.write(f'# {config_message}\n')
             fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_molecules,n_workers,metric_name,metric_value\n')
 
+
 class MetricsLogger(object):
 
     def __init__(self,
@@ -81,7 +82,16 @@ class MetricsLogger(object):
                     metric_value=self.metric_value,
                     benchmark_file=context.benchmark_file)
 
-def log_results(date, benchmark_type, step, time, n_molecules, n_workers, metric_name='', metric_value='', benchmark_file=BENCHMARK_FILE):
+
+def log_results(date,
+                benchmark_type,
+                step,
+                time,
+                n_molecules,
+                n_workers,
+                metric_name='',
+                metric_value='',
+                benchmark_file=BENCHMARK_FILE):
     """Log benchmark results to a file"""
 
     out_list = [date, benchmark_type, step, time, n_molecules, n_workers, metric_name, metric_value]

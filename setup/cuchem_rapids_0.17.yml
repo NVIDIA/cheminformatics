@@ -12,7 +12,12 @@ dependencies:
   - cudatoolkit=11.0 # Ensure version matches with base image in Dockerfile
   - rdkit==2020.09.1
   - plotly==4.9.0
+<<<<<<< HEAD
   - jupyterlab=3.0.7=pyhd8ed1ab_0
+=======
+  - pytest==6.2.2
+  - umap-learn==0.5.1
+>>>>>>> cheminfo/dev
   - pip
   - pip:
     - tensorflow-gpu==1.15.5
@@ -31,5 +36,4 @@ dependencies:
     - chembl_webresource_client==0.10.2
     - dask_ml==1.8.0
     - matplotlib==3.3.4
-    - umap
     - git+https://github.com/jrwnter/cddd.git

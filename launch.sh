@@ -105,13 +105,10 @@ fi
 #
 ###############################################################################
 
-CONT=${CONT:=cheminf-clustering}
+CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:200929-0.0.1}
 JUPYTER_PORT=${JUPYTER_PORT:-9000}
 PLOTLY_PORT=${PLOTLY_PORT:-5000}
 DASK_PORT=${DASK_PORT:-9001}
-REGISTRY=${REGISTRY:=NotSpecified}
-REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
-REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=$(cat ~/NGC.NVIDIA.COM.API)}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
 DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
@@ -127,9 +124,6 @@ if [ $write_env -eq 1 ]; then
 	echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
 	echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
 	echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
-	echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
-	echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
-	echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
 	echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
 	echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
 	echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
@@ -217,15 +211,39 @@ dbSetup() {
 
 
 dash() {
+	echo $@
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
-	        python3 startdash.py analyze
+        python3 startdash.py analyze $@
 	else
 		dbSetup "${DATA_PATH}/db"
 		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CONT} python startdash.py analyze
+		${DOCKER_CMD} -it ${CONT} python startdash.py analyze $@
 	fi
+	exit
+}
+
+
+cache() {
+	echo $@
+	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
+		# Executed within container or a managed env.
+		dbSetup '/data/db'
+	    python3 startdash.py cache $@
+	else
+		dbSetup "${DATA_PATH}/db"
+		# run a container and start dash inside container.
+		${DOCKER_CMD} -it ${CONT} python startdash.py cache $@
+	fi
+	exit
+}
+
+
+test() {
+	dbSetup "${DATA_PATH}/db"
+	# run a container and start dash inside container.
+	${DOCKER_CMD} -it ${CONT} python startdash.py analyze -b --n_mol 100000
 	exit
 }
 
@@ -250,7 +268,11 @@ case $1 in
 	dbSetup)
 		;&
 	dash)
-		;&
+		$@
+		;;
+	cache)
+		$@
+		;;
 	jupyter)
 		$1
 		;;

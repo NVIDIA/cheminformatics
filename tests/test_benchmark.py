@@ -33,14 +33,15 @@ logger = logging.getLogger(__name__)
 
 
 # Parameter lists
-run_benchmark_params = [ ([{'test_type': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap',
-                            'use_gpu': True,
-                            'n_workers':  1,
-                            'n_mol': 5000},
-                           {'test_type': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap',
-                            'use_gpu': False,
-                            'n_workers': 10,
-                            'n_mol': 5000}]) ]
+run_benchmark_params = [([{'test_type': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap',
+                           'use_gpu': True,
+                           'n_workers':  1,
+                           'n_mol': 5000},
+                          {'test_type': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap',
+                           'use_gpu': False,
+                           'n_workers': 10,
+                           'n_mol': 5000}])]
+
 
 @pytest.mark.parametrize('benchmark_config_list', run_benchmark_params)
 def test_run_benchmark(benchmark_config_list):
@@ -101,6 +102,3 @@ def test_run_benchmark(benchmark_config_list):
     png_file = basename + '.png'
     prepare_acceleration_stacked_plot(df, machine_config, output_path=png_file)
     assert os.path.exists(png_file)
-
-
-# TODO add test for metrics and values

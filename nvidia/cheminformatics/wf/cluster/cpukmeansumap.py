@@ -81,20 +81,22 @@ class CpuKmeansUmap(BaseClusterWorkflow):
         other_props = IMP_PROPS + ADDITIONAL_FEILD
         df_molecular_embedding = df_molecular_embedding.drop(other_props, axis=1)
 
+        if self.context.is_benchmark:
+            molecular_embedding_sample, spearman_index = self._random_sample_from_arrays(
+                df_molecular_embedding, n_samples=self.n_spearman)
+
         if self.n_pca:
             with MetricsLogger('pca', self.n_molecules) as ml:
-
                 # pca = sklearn.decomposition.PCA(n_components=self.n_pca) # TODO ask Rajesh why this is used
                 pca = dask_PCA(n_components=self.n_pca)
-                df_fingerprints = pca.fit_transform(df_molecular_embedding.to_dask_array(lengths=True))
-
+                df_embedding = pca.fit_transform(df_molecular_embedding.to_dask_array(lengths=True))
         else:
-            df_fingerprints = df_molecular_embedding.copy()  # TODO is copy required here?
+            df_embedding = df_molecular_embedding
 
         with MetricsLogger('kmeans', self.n_molecules,) as ml:
 
             kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
-            kmeans_float.fit(df_fingerprints)
+            kmeans_float.fit(df_embedding)
             kmeans_labels = kmeans_float.labels_
 
             ml.metric_name = 'silhouette_score'
@@ -102,23 +104,22 @@ class CpuKmeansUmap(BaseClusterWorkflow):
             ml.metric_func_kwargs = {}
             ml.metric_func_args = (None, None)
             if self.context.is_benchmark:
-                (df_fingerprints_sample, kmeans_labels_sample), _ = self._random_sample_from_arrays(
-                    [df_fingerprints, kmeans_labels], n_samples=self.n_silhouette)
-                ml.metric_func_args = (df_fingerprints_sample, kmeans_labels_sample)
+                (embedding_sample, kmeans_labels_sample), _ = self._random_sample_from_arrays(
+                    df_embedding, kmeans_labels, n_samples=self.n_silhouette)
+                ml.metric_func_args = (embedding_sample, kmeans_labels_sample)
 
         with MetricsLogger('umap', self.n_molecules) as ml:
             umap_model = umap.UMAP()  # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
-            X_train = umap_model.fit_transform(df_fingerprints)
+            X_train = umap_model.fit_transform(df_molecular_embedding)
             X_train = dask.array.from_array(X_train)
-            # df_molecular_embedding = df_molecular_embedding.compute()
 
             ml.metric_name = 'spearman_rho'
             ml.metric_func = self._compute_spearman_rho
             ml.metric_func_args = (None, None)
             if self.context.is_benchmark:
-                (df_molecular_embedding_sample, X_train_sample), _ = self._random_sample_from_arrays(
-                    [df_molecular_embedding, X_train], n_samples=self.n_spearman)
-                ml.metric_func_args = (df_molecular_embedding_sample, X_train_sample)
+                X_train_sample, _ = self._random_sample_from_arrays(
+                    X_train, index=spearman_index)
+                ml.metric_func_args = (molecular_embedding_sample, X_train_sample)
 
         df_molecular_embedding['x'] = X_train[:, 0]
         df_molecular_embedding['y'] = X_train[:, 1]

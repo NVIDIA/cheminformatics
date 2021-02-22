@@ -120,7 +120,7 @@ class GpuWorkflowRandomProjection(BaseClusterWorkflow, metaclass=Singleton):
             ml.metric_func_args = (None, None)
             if self.context.is_benchmark:
                 (srp_sample, kmeans_labels_sample), _ = self._random_sample_from_arrays(
-                    [srp, kmeans_labels], n_samples=self.n_silhouette)
+                    srp, kmeans_labels, n_samples=self.n_silhouette)
                 ml.metric_func_args = (srp_sample, kmeans_labels_sample)
 
         # Add back the column required for plotting and to correlating data

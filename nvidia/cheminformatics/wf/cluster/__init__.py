@@ -32,7 +32,7 @@ class BaseClusterWorkflow:
 
         return embedding, prop_series
 
-    def _random_sample_from_arrays(self, input_array_list, n_samples=None, index=None):
+    def _random_sample_from_arrays(self, *input_array_list, n_samples=None, index=None):
         assert (n_samples is not None) != (index is not None)  # XOR -- must specify one or the other, but not both
 
         # Ensure array sizes are all the same
@@ -60,6 +60,9 @@ class BaseClusterWorkflow:
                 output_array_list[pos] = array.iloc[index]
             else:
                 output_array_list[pos] = array[index]
+
+        if len(output_array_list) == 1:
+            output_array_list = output_array_list[0]
 
         return output_array_list, index
 

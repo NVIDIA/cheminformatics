@@ -97,19 +97,18 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         # Before reclustering remove all columns that may interfere
         embedding, prop_series = self._remove_non_numerics(embedding)
         n_molecules, n_obs = embedding.compute().shape
+        self.n_molecules = n_molecules
 
-        # if self.context.is_benchmark:
-        #     [molecular_embedding], sample_indexes = self._random_sample_from_arrays([embedding], n_samples=self.n_silhouette)
+        if self.context.is_benchmark:
+            molecular_embedding_sample, spearman_index = self._random_sample_from_arrays(
+                embedding, n_samples=self.n_spearman)
 
         if n_pca and n_obs > n_pca:
             with MetricsLogger('pca', n_molecules) as ml:
                 if self.pca == None:
                     self.pca = cuDaskPCA(client=dask_client, n_components=n_pca)
                     self.pca.fit(embedding)
-                df_molecular_embedding = embedding.copy()
                 embedding = self.pca.transform(embedding)
-        else:
-            df_molecular_embedding = embedding
 
         with MetricsLogger('kmeans', n_molecules) as ml:
             if n_molecules < MIN_RECLUSTER_SIZE:
@@ -127,7 +126,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
             if self.context.is_benchmark:
                 (embedding_sample, kmeans_labels_sample), _ = self._random_sample_from_arrays(
-                    [embedding, kmeans_labels], n_samples=self.n_silhouette)
+                    embedding, kmeans_labels, n_samples=self.n_silhouette)
                 ml.metric_func_args = (embedding_sample, kmeans_labels_sample)
 
         with MetricsLogger('umap', n_molecules) as ml:
@@ -148,9 +147,9 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
             ml.metric_func = self._compute_spearman_rho
             ml.metric_func_args = (None, None)
             if self.context.is_benchmark:
-                (df_molecular_embedding_sample, X_train_sample), _ = self._random_sample_from_arrays(
-                    [df_molecular_embedding, X_train], n_samples=self.n_spearman)
-                ml.metric_func_args = (df_molecular_embedding_sample, X_train_sample)
+                X_train_sample, _ = self._random_sample_from_arrays(
+                    X_train, index=spearman_index)
+                ml.metric_func_args = (molecular_embedding_sample, X_train_sample)
 
         # Add back the column required for plotting and to correlating data
         # between re-clustering

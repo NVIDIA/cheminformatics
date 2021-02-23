@@ -114,7 +114,8 @@ def prepare_benchmark_df(benchmark_file, step_type_dict=STEP_TYPE_DICT, step_typ
     # Standardize columns for output
     bench_time_df_output = bench_time_df.copy().round(2)
     columns = bench_time_df_output.columns.get_level_values('step').to_list()
-    bench_time_df_output.columns = pd.Categorical(columns, categories=['n_molecules', 'benchmark_type', 'n_workers'] + columns, ordered=True)
+    bench_time_df_output.columns = pd.Categorical(
+        columns, categories=['n_molecules', 'benchmark_type', 'n_workers'] + columns, ordered=True)
 
     basename = os.path.splitext(benchmark_file)[0]
     with pd.ExcelWriter(basename + '.xlsx') as writer:
@@ -147,7 +148,6 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
         axList = [axList]
     else:
         axList = axList.flatten()
-
 
     df_plot = df[('stats', 'total')].reset_index(
         level='n_molecules').pivot(columns='n_molecules')
@@ -194,5 +194,5 @@ if __name__ == '__main__':
 
     # Read and prepare the dataframe then plot
     bench_df, machine_config = prepare_benchmark_df(benchmark_file=args.benchmark_file, step_type_dict=STEP_TYPE_DICT,
-                                    step_type_cat=STEP_TYPE_CAT)
+                                                    step_type_cat=STEP_TYPE_CAT)
     prepare_acceleration_stacked_plot(bench_df, machine_config, output_path=args.output_path)

@@ -30,73 +30,44 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def batched_silhouette_scores(embeddings, clusters, batch_size=5000, seed=0, downsample_size=500000, on_gpu=True):
+def batched_silhouette_scores(embeddings, clusters, batch_size=5000):
     """Calculate silhouette score in batches on the CPU. Compatible with data on GPU or CPU
 
     Args:
         embeddings (cudf.DataFrame or cupy.ndarray): input features to clustering
         clusters (cudf.DataFrame or cupy.ndarray): cluster values for each data point
         batch_size (int, optional): Size for batching. Defaults to 5000.
-        seed (int, optional): Random seed. Defaults to 0.
-        downsample_size (int, optional): Limit on size of data used for silhouette score. Defaults to 500000.
-        on_gpu (bool, optional): Input data is on GPU. Defaults to True.
 
     Returns:
         float: mean silhouette score from batches
     """
 
-    if on_gpu:
-        arraylib = cupy
-        dflib = cudf
-        AsArray = cupy.asnumpy
-    else:
-        arraylib = numpy
-        dflib = pandas
-        AsArray = numpy.asarray
-
-    # Function to calculate results
+    # Function to calculate batched results
     def _silhouette_scores(input_data):
         embeddings, clusters = input_data
-        return silhouette_score(AsArray(embeddings), AsArray(clusters))
+        return silhouette_score(cupy.asnumpy(embeddings), cupy.asnumpy(clusters))
 
-    # Compute dask objects
-    if isinstance(embeddings, dask_cudf.core.DataFrame) | isinstance(embeddings, dask.array.core.Array):
-        embeddings = embeddings.compute()
+    if hasattr(embeddings, 'values'):
+        embeddings = embeddings.values
+    embeddings = cupy.asarray(embeddings)
 
-    if isinstance(clusters, dask_cudf.core.Series) | isinstance(clusters, dask.array.core.Array):
-        clusters = clusters.compute()
+    if hasattr(clusters, 'values'):
+        clusters = clusters.values
+    clusters = cupy.asarray(clusters)
 
-    # Shuffle
-    combined = dflib.DataFrame(embeddings) if not isinstance(embeddings, dflib.DataFrame) else embeddings.copy()
-    embeddings_columns = combined.columns
-    cluster_column = 'clusters'
+    n_data = len(embeddings)
+    msg = 'Calculating silhouette score on {} molecules'.format(n_data)
+    if batch_size < n_data:
+        msg += ' with batch size of {}'.format(batch_size)
+    logger.info(msg + ' ...')
 
-    clusters = dflib.Series(clusters, name=cluster_column)
-    combined[cluster_column] = clusters
-
-    # Drop null values
-    mask = combined.notnull().any(axis=1)
-    combined = combined[mask]
-
-    n_data = min(len(combined), downsample_size)
-    logger.info('Calculating silhouette score on {} molecules with batch size of {}...'.format(n_data, batch_size))
-    combined = combined.sample(n=n_data, replace=False, random_state=seed) # shuffle via sampling
-
-    embeddings = combined[embeddings_columns]
-    clusters = combined[cluster_column]
-
-    # Chunk arrays
-    if on_gpu:
-        embeddings = cupy.fromDlpack(embeddings.to_dlpack())
-        clusters = cupy.fromDlpack(clusters.to_dlpack())
-
-    n_chunks = int(math.ceil(len(embeddings) / batch_size))
-    embeddings_chunked = arraylib.array_split(embeddings, n_chunks)
-    clusters_chunked = arraylib.array_split(clusters, n_chunks)
+    n_chunks = int(math.ceil(n_data / batch_size))
+    embeddings_chunked = cupy.array_split(embeddings, n_chunks)
+    clusters_chunked = cupy.array_split(clusters, n_chunks)
 
     # Calculate scores on batches and return the average
     scores = list(map(_silhouette_scores, zip(embeddings_chunked, clusters_chunked)))
-    return numpy.array(scores).mean()
+    return numpy.nanmean(numpy.array(scores))
 
 
 def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=False):
@@ -134,25 +105,25 @@ def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=Fals
     ranks : cupy ndarray
          An array of size equal to the size of `a`, containing rank
          scores.
-         
+
     See also scipy.stats.rankdata, for which this function is a replacement
     """
 
     dtype = cupy.result_type(data.dtype, cupy.float64)
     data = cupy.asarray(data, dtype=dtype)
-    
+
     if is_symmetric:
         assert data.ndim == 2
         assert data.shape[0] == data.shape[1]
-    
+
     if data.ndim < 2:
         data = data[:, None]
     elif (data.ndim == 2) & (axis == 1) & (not is_symmetric):
         data = data.T
-    
+
     ranks = cudf.DataFrame(data).rank(axis=0, method=method, na_option=na_option)
     ranks = ranks.values
-    
+
     if axis == 1:
         ranks = ranks.T
     return ranks
@@ -163,7 +134,7 @@ def _get_kth_unique_kernel(data, kth_values, k, axis):
     """Numba kernel to get the kth unique rank from a sorted array"""
 
     i = cuda.grid(1)
-    
+
     if axis == 1:
         vector = data[i, :]
     else:
@@ -171,12 +142,12 @@ def _get_kth_unique_kernel(data, kth_values, k, axis):
 
     pos = 0
     prev_val = cupy.NaN
-    
+
     for val in vector:
         if not isnan(val):
             if val != prev_val:
                 prev_val = val
-                pos +=1
+                pos += 1
 
         if pos == k:
             break
@@ -186,7 +157,7 @@ def _get_kth_unique_kernel(data, kth_values, k, axis):
 
 def get_kth_unique_value(data, k, axis=1):
     """Find the kth value along an axis of a matrix on the GPU
-    
+
     Parameters
     ----------
     data : array_like
@@ -201,38 +172,38 @@ def get_kth_unique_value(data, k, axis=1):
     kth_values : cupy ndarray
          An array of kth values.
     """
-        
+
     # Coerce data into array -- make a copy since it needs to be sorted
     # TODO -- should the sort be done in Numba kernel (and how to do it)?
     dtype = cupy.result_type(data, cupy.float64)
     data_id = id(data)
     data = cupy.ascontiguousarray(data, dtype=dtype)
-    
-    if data_id == id(data): # Ensure sort is being done on a copy
+
+    if data_id == id(data):  # Ensure sort is being done on a copy
         data = data.copy()
 
     assert data.ndim <= 2
-    
+
     if data.ndim < 2:
         if axis == 0:
             data = data[:, None]
         else:
             data = data[None, :]
-    
+
     if axis == 0:
         n_obs, n_samples = data.shape
     else:
         n_samples, n_obs = data.shape
-        
+
     data.sort(axis=axis)
     kth_values = cupy.zeros(n_samples, dtype=data.dtype)
     _get_kth_unique_kernel.forall(n_samples, 1)(data, kth_values, k, axis)
-    
+
     if axis == 0:
         kth_values = kth_values[None, :]
     else:
         kth_values = kth_values[:, None]
-    
+
     return kth_values
 
 
@@ -252,7 +223,7 @@ def corr_pairwise(x, y, return_pearson=False):
     corr : cupy ndarray
          Array of correlation values
     """
-    
+
     def _cov_pairwise(x1, x2, factor):
         return cupy.nansum(x1 * x2, axis=1, keepdims=True) * cupy.true_divide(1, factor)
 
@@ -266,19 +237,19 @@ def corr_pairwise(x, y, return_pearson=False):
         x = x[None, :]
         y = y[None, :]
     n_samples, n_obs = x.shape
-    
+
     # Calculate degrees of freedom for each sample pair
     ddof = 1
     nan_count = (cupy.isnan(x) | cupy.isnan(y)).sum(axis=1, keepdims=True)
     fact = n_obs - nan_count - ddof
-    
+
     # Mean normalize
     x -= cupy.nanmean(x, axis=1, keepdims=True)
     y -= cupy.nanmean(y, axis=1, keepdims=True)
-    
+
     # Calculate covariance matrix
     corr = _cov_pairwise(x, y, fact)
-    
+
     if return_pearson:
         x_corr = _cov_pairwise(x, x, fact)
         y_corr = _cov_pairwise(y, y, fact)
@@ -286,13 +257,13 @@ def corr_pairwise(x, y, return_pearson=False):
         corr = corr / auto_corr
         corr = cupy.clip(corr.real, -1, 1, out=corr.real)
         return corr
-    
+
     return corr.squeeze()
 
 
 def spearmanr(x, y, axis=1, top_k=None):
     """GPU implementation of Spearman R correlation coefficient for paired data with NaN support
-    
+
     Parameters
     ----------
     x : array_like
@@ -310,7 +281,12 @@ def spearmanr(x, y, axis=1, top_k=None):
          Array of spearmanr rank correlation values
     """
 
+    if hasattr(x, 'values'):
+        x = x.values
     x = cupy.array(x, copy=True)
+
+    if hasattr(y, 'values'):
+        y = y.values
     y = cupy.array(y, copy=True)
 
     assert x.ndim <= 2
@@ -328,9 +304,14 @@ def spearmanr(x, y, axis=1, top_k=None):
         n_obs, n_samples = x.shape
     else:
         n_samples, n_obs = x.shape
-    
+
     n_obs -= 1
     assert n_obs > 2
+
+    msg = 'Calculating Spearman correlation coefficient on {} molecules'.format(n_samples)
+    if top_k is not None:
+        msg += ' with selection of top {} molecules'.format(top_k)
+    logger.info(msg + ' ...')
 
     # Force diagonal to be last in ranking so it can be ignored
     cupy.fill_diagonal(x, cupy.NaN)

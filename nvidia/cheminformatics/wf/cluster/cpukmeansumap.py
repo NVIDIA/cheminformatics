@@ -20,6 +20,7 @@ from nvidia.cheminformatics.data.helper.chembldata import ADDITIONAL_FEILD, IMP_
 from dask_ml.decomposition import PCA as dask_PCA
 from dask_ml.cluster import KMeans as dask_KMeans
 import dask.array
+import dask
 import umap
 import pandas as pd
 
@@ -39,12 +40,12 @@ class CpuKmeansUmap(BaseClusterWorkflow):
     def __init__(self,
                  n_molecules=None,
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
-                 n_pca=64,
+                 pca_comps=64,
                  n_clusters=7,
                  seed=0):
         self.dao = dao
         self.n_molecules = n_molecules
-        self.n_pca = n_pca
+        self.n_pca = pca_comps
         self.n_clusters = n_clusters
 
         self.seed = seed
@@ -104,9 +105,9 @@ class CpuKmeansUmap(BaseClusterWorkflow):
                 ml.metric_func_args = (embedding_sample, kmeans_labels_sample)
 
         with MetricsLogger('umap', self.n_molecules) as ml:
+            df_molecular_embedding = df_molecular_embedding.compute()
             umap_model = umap.UMAP()  # TODO: Use dask to distribute umap. https://github.com/dask/dask/issues/5229
-            X_train = umap_model.fit_transform(df_molecular_embedding)
-            X_train = dask.array.from_array(X_train)
+            X_train = umap_model.fit_transform(df_embedding)
 
             ml.metric_name = 'spearman_rho'
             ml.metric_func = self._compute_spearman_rho
@@ -116,16 +117,9 @@ class CpuKmeansUmap(BaseClusterWorkflow):
                     X_train, index=spearman_index)
                 ml.metric_func_args = (molecular_embedding_sample, X_train_sample)
 
-        # df_molecular_embedding['x'] = X_train[:, 0]
-        # df_molecular_embedding['y'] = X_train[:, 1]
-
-        # workaround for Dask partition issues caused by UMAP
-        index = df_molecular_embedding.index.compute()
-        X_train = pd.DataFrame(X_train.compute(), index=index, columns=['x', 'y'])
-        X_train = dask.dataframe.io.from_pandas(X_train, npartitions=df_molecular_embedding.npartitions)
-        df_molecular_embedding = df_molecular_embedding.merge(X_train, how='left', left_index=True, right_index=True)
-
-        df_molecular_embedding['cluster'] = kmeans_labels.to_dask_dataframe(index=df_molecular_embedding.index)
+        df_molecular_embedding['x'] = X_train[:, 0]
+        df_molecular_embedding['y'] = X_train[:, 1]
+        df_molecular_embedding['cluster'] = kmeans_labels.compute()
         df_molecular_embedding['id'] = ids
 
         self.df_embedding = df_molecular_embedding

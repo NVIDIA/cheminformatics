@@ -3,12 +3,26 @@ import logging
 
 from tests.utils import _fetch_chembl_test_dataset, _create_context
 
+from nvidia.cheminformatics.wf.cluster.cpukmeansumap import CpuKmeansUmap
 from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
 from nvidia.cheminformatics.wf.cluster.gpurandomprojection import GpuWorkflowRandomProjection
 from nvidia.cheminformatics.data.helper.chembldata import ChEmblData
 
 
 logger = logging.getLogger(__name__)
+
+
+def test_cpukmeansumap():
+    """
+    Verify fetching data from chemblDB when the input is a pandas df.
+    """
+    n_molecules, dao, mol_df = _fetch_chembl_test_dataset(n_molecules=10000)
+
+    context = _create_context()
+    wf = CpuKmeansUmap(n_molecules=n_molecules,
+                       dao=dao, pca_comps=64)
+    embedding = wf.cluster(df_molecular_embedding=mol_df)
+    logger.info(embedding.head())
 
 
 def test_random_proj():

@@ -1,6 +1,5 @@
-from nvidia.cheminformatics.config import Context
-from nvidia.cheminformatics.utils.singleton import Singleton
 import os
+import math
 import cudf
 import dask_cudf
 import dask
@@ -11,7 +10,9 @@ from contextlib import closing
 from typing import List
 
 from . import ClusterWfDAO
-from nvidia.cheminformatics.data.helper.chembldata import ChEmblData
+from nvidia.cheminformatics.data.helper.chembldata import BATCH_SIZE, ChEmblData
+from nvidia.cheminformatics.config import Context
+from nvidia.cheminformatics.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,8 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
             mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
 
             if n_molecules > 0:
-                mol_df = mol_df.head(n_molecules, compute=False, npartitions=-1)
+                npartitions = math.ceil(n_molecules / BATCH_SIZE)
+                mol_df = mol_df.head(n_molecules, compute=False, npartitions=npartitions)
         else:
             logger.info('Reading molecules from database...')
             mol_df = chem_data.fetch_mol_embedding(num_recs=n_molecules)

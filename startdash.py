@@ -230,7 +230,7 @@ To create cache:
                                      n_clusters=args.num_clusters)
         else:
             workflow = CpuKmeansUmap(n_molecules=n_molecules,
-                                     n_pca=args.pca_comps,
+                                     pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
 
         mol_df = workflow.cluster()

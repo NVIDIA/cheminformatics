@@ -169,12 +169,11 @@ class ChemVisualization:
                                  gradient_prop=gradient_prop,
                                  north_stars=north_stars)
 
-    def create_graph(self, df, color_col='cluster', north_stars=None, gradient_prop=None):
+    def create_graph(self, ldf, color_col='cluster', north_stars=None, gradient_prop=None):
         fig = go.Figure(layout={'colorscale': {}})
 
-        ldf = df
-        if hasattr(df, 'compute'):
-            ldf = df.compute()
+        if hasattr(ldf, 'compute'):
+            ldf = ldf.compute()
 
         moi_molregno = []
         if north_stars:
@@ -396,7 +395,7 @@ class ChemVisualization:
                                         options=[{'label': 'Gpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
                                                  {'label': 'GPU Random Projection - Single GPU', 'value': 'nvidia.cheminformatics.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
                                                  {'label': 'Cpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
-                                        value='alogp',
+                                        value=self.wf,
                                         clearable=False),
                         ], className='nine columns'),
                         dbc.Button('Apply',

@@ -80,7 +80,7 @@ class BaseClusterWorkflow:
         """
         Runs clustering workflow on the data fetched from database/cache.
         """
-        NotImplemented
+        raise NotImplementedError
 
     def recluster(self,
                   filter_column=None,
@@ -91,14 +91,14 @@ class BaseClusterWorkflow:
         The new dataframe is usually a subset of the original dataframe.
         Caller may ask to include additional molecules.
         """
-        NotImplemented
+        raise NotImplementedError
 
     def add_molecules(self, chemblids: List):
         """
         ChembleId's accepted as argument to the existing database. Duplicates
         must be ignored.
         """
-        NotImplemented
+        raise NotImplementedError
 
     def compute_qa_matric(self):
         """

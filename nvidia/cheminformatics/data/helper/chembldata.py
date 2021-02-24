@@ -47,6 +47,8 @@ ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
                          pandas.Series([], dtype='object')]
 
 
+BATCH_SIZE = 5000
+
 # DEPRECATED. Please add code to DAO classes.
 class ChEmblData(object, metaclass=Singleton):
 
@@ -206,7 +208,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def fetch_mol_embedding(self,
                             num_recs=None,
-                            batch_size=5000,
+                            batch_size=BATCH_SIZE,
                             molregnos=None,
                             **transformation_kwargs):
         """

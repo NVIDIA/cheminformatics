@@ -82,6 +82,8 @@ class GpuWorkflowRandomProjection(BaseClusterWorkflow, metaclass=Singleton):
         self.n_clusters = n_clusters
         self.pca = None
         self.seed = seed
+        self.n_silhouette = 500000
+        self.context = Context()
         self.srp_embedding = SparseRandomProjection(n_components=2)
 
     def rand_jitter(self, arr):
@@ -114,8 +116,12 @@ class GpuWorkflowRandomProjection(BaseClusterWorkflow, metaclass=Singleton):
 
             ml.metric_name = 'silhouette_score'
             ml.metric_func = batched_silhouette_scores
-            ml.metric_func_args = (srp, kmeans_labels)
-            ml.metric_func_kwargs = {'on_gpu': True,  'seed': self.seed}
+            ml.metric_func_kwargs = {}
+            ml.metric_func_args = (None, None)
+            if self.context.is_benchmark:
+                (srp_sample, kmeans_labels_sample), _ = self._random_sample_from_arrays(
+                    srp, kmeans_labels, n_samples=self.n_silhouette)
+                ml.metric_func_args = (srp_sample, kmeans_labels_sample)
 
         # Add back the column required for plotting and to correlating data
         # between re-clustering
@@ -134,11 +140,11 @@ class GpuWorkflowRandomProjection(BaseClusterWorkflow, metaclass=Singleton):
         logger.info("Executing GPU workflow...")
 
         if df_mol_embedding is None:
-            self.n_molecules = Context().n_molecule
+            self.n_molecules = self.context.n_molecule
 
             df_mol_embedding = self.dao.fetch_molecular_embedding(
                 self.n_molecules,
-                cache_directory=Context().cache_directory)
+                cache_directory=self.context.cache_directory)
             df_mol_embedding = df_mol_embedding.persist()
 
         self.df_embedding = _gpu_random_proj_wrapper(df_mol_embedding, self)
@@ -159,7 +165,7 @@ class GpuWorkflowRandomProjection(BaseClusterWorkflow, metaclass=Singleton):
         self.df_embedding = _gpu_random_proj_wrapper(self.df_embedding, self)
         return self.df_embedding
 
-    def add_molecules(self, chemblids:List):
+    def add_molecules(self, chemblids: List):
 
         chem_mol_map = {row[0]: row[1] for row in self.dao.fetch_id_from_chembl(chemblids)}
         molregnos = list(chem_mol_map.keys())

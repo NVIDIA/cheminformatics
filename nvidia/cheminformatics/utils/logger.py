@@ -73,6 +73,8 @@ class MetricsLogger(object):
         if self.metric_value is None:
             self.metric_name = ''
             self.metric_value = ''
+        else:
+            logger.info('Calculated {} is {}'.format(self.metric_name, self.metric_value))
 
         log_results(self.start_time, context.compute_type, self.task_name,
                     runtime,

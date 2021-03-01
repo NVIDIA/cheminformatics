@@ -68,7 +68,8 @@ class CpuKmeansUmap(BaseClusterWorkflow):
 
         ids = df_molecular_embedding['id']
         df_molecular_embedding = df_molecular_embedding.persist()
-        self.n_molecules = df_molecular_embedding.compute().shape[0]
+        # self.n_molecules = df_molecular_embedding.compute().shape[0]
+        self.n_molecules = 10000
 
         for col in ['id', 'index', 'molregno']:
             if col in df_molecular_embedding.columns:

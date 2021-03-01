@@ -14,6 +14,7 @@ dependencies:
   - plotly==4.9.0
   - pytest==6.2.2
   - umap-learn==0.5.1
+  - grpcio
   - pip
   - pip:
     - tensorflow-gpu==1.15.5
@@ -32,4 +33,6 @@ dependencies:
     - chembl_webresource_client==0.10.2
     - dask_ml==1.8.0
     - matplotlib==3.3.4
+    - waitress==1.4.3
+    - flask-restplus==0.13.0
     - git+https://github.com/jrwnter/cddd.git

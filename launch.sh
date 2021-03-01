@@ -240,6 +240,36 @@ cache() {
 }
 
 
+service() {
+	echo $@
+	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
+		# Executed within container or a managed env.
+		dbSetup '/data/db'
+	    python3 startdash.py service $@
+	else
+		dbSetup "${DATA_PATH}/db"
+		# run a container and start dash inside container.
+		${DOCKER_CMD} -it ${CONT} python startdash.py service $@
+	fi
+	exit
+}
+
+
+grpc() {
+	echo $@
+	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
+		# Executed within container or a managed env.
+		dbSetup '/data/db'
+	    python3 startdash.py grpc $@
+	else
+		dbSetup "${DATA_PATH}/db"
+		# run a container and start dash inside container.
+		${DOCKER_CMD} -it ${CONT} python startdash.py grpc $@
+	fi
+	exit
+}
+
+
 test() {
 	dbSetup "${DATA_PATH}/db"
 	# run a container and start dash inside container.
@@ -268,6 +298,12 @@ case $1 in
 	dbSetup)
 		;&
 	dash)
+		$@
+		;;
+	service)
+		$@
+		;;
+	grpc)
 		$@
 		;;
 	cache)

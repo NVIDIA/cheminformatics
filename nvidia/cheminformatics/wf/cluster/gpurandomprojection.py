@@ -61,7 +61,7 @@ def _(embedding, self):
 def _(embedding, self):
     logger.info('Converting from pandas.DataFrame...')
     embedding = cudf.from_pandas(embedding)
-    return self._cluster(embedding)
+    return _gpu_random_proj_wrapper(embedding, self)
 
 
 @_gpu_random_proj_wrapper.register(cudf.DataFrame)
@@ -87,6 +87,9 @@ class GpuWorkflowRandomProjection(BaseClusterWorkflow, metaclass=Singleton):
         self.srp_embedding = SparseRandomProjection(n_components=2)
 
     def rand_jitter(self, arr):
+        """
+        Introduces random displacements to spread the points
+        """
         stdev = .023 * cupy.subtract(cupy.max(arr), cupy.min(arr))
         for i in range(arr.shape[1]):
             rnd = cupy.multiply(cupy.random.randn(len(arr)), stdev)

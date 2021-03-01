@@ -52,7 +52,7 @@ class MorganFingerprint(BaseTransformation):
         return self.kwargs['nBits']
 
 class Embeddings(BaseTransformation):
-    MODEL_DIR = '/workspace/cddd/default_model'
+    MODEL_DIR = '/data/cddd/default_model'
 
     def __init__(self, use_gpu=True, cpu_threads=5, model_dir=None, **kwargs):
         self.name = __class__.__name__.split('.')[-1]

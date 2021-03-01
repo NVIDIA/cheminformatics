@@ -31,3 +31,14 @@ class ClusterWfDAO(object):
         ChemblId or molreg_id for Chemble database.
         """
         NotImplemented
+
+
+class GenerativeWfDao(object):
+
+    def fetch_id_from_chembl(self, id: List):
+        """
+        Fetch molecular details for a list of molecules. The values in the list
+        of molecules depends on database/service used. For e.g. it could be
+        ChemblId or molreg_id for Chemble database.
+        """
+        NotImplemented

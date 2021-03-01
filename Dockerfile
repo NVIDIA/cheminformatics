@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 FROM nvidia/cuda:11.0-base
 
-RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git\
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip\
     && rm -rf /var/lib/apt/lists/*
 
 SHELL ["/bin/bash", "-c"]
@@ -24,6 +24,10 @@ ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
+
+RUN mkdir -p /opt/cddd && wget --quiet -O /opt/cddd/download_default_model.sh \
+        https://raw.githubusercontent.com/jrwnter/cddd/master/download_default_model.sh \
+        && chmod +x /opt/cddd/download_default_model.sh
 
 RUN mkdir -p /opt/nvidia/ \
     && cd /opt/nvidia/ \

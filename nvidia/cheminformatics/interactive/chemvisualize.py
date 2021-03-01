@@ -7,7 +7,6 @@ import logging
 from pydoc import locate
 from rdkit import Chem
 from rdkit.Chem import Draw
-import numpy as np
 
 import cupy
 import plotly.graph_objects as go
@@ -19,8 +18,8 @@ from dash.dependencies import Input, Output, State, ALL
 
 from nvidia.cheminformatics.utils import generate_colors, report_ui_error
 from nvidia.cheminformatics.data.helper.chembldata import ChEmblData, IMP_PROPS
-from nvidia.cheminformatics.fingerprint import MorganFingerprint
-
+from nvidia.cheminformatics.decorator import LipinskiRuleOfFiveDecorator
+from nvidia.cheminformatics.decorator import MolecularStructureDecorator
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +30,12 @@ main_fig_height = 700
 CHEMBL_DB = '/data/db/chembl_27.db'
 PAGE_SIZE = 10
 DOT_SIZE = 5
+
+LEVEL_TO_STYLE = {
+    'info': {'color': 'black'},
+    'warning': {'color': 'orange'},
+    'error': {'color': 'red'}
+}
 
 
 class ChemVisualization:
@@ -43,6 +48,7 @@ class ChemVisualization:
         self.n_clusters = workflow.n_clusters
         self.chem_data = ChEmblData()
         self.wf = 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'
+        self.generative_wf = 'nvidia.cheminformatics.wf.generate.latentspaceinterpolation.LatentSpaceInterpolation'
 
         # Store colors to avoid plots changes colors on events such as
         # molecule selection, etc.
@@ -71,10 +77,10 @@ class ChemVisualization:
             [Input('bt_recluster_clusters', 'n_clicks'),
              Input('bt_recluster_points', 'n_clicks'),
              Input('bt_north_star', 'n_clicks'),
-             Input('hidden_northstar', 'value'),
+             Input('hidden_northstar', 'children'),
              Input('sl_prop_gradient', 'value'),
              Input('sl_nclusters', 'value'),
-             Input('refresh_main_fig', 'value') ],
+             Input('refresh_main_fig', 'children') ],
             [State("selected_clusters", "value"),
              State("main-figure", "selectedData"),
              State('north_star', 'value'), ])(self.handle_re_cluster)
@@ -85,18 +91,19 @@ class ChemVisualization:
              Output('sl_mol_props', 'options'),
              Output('current_page', 'children'),
              Output('total_page', 'children'),
-             Output('section_molecule_details', 'style'),
-             Output('mol_selection_error', 'children')],
+             Output('mol_selection_error', 'children'),
+             Output('show_selected_mol', 'children')],
             [Input('main-figure', 'selectedData'),
              Input('sl_mol_props', 'value'),
              Input('sl_prop_gradient', 'value'),
              Input('bt_page_prev', 'n_clicks'),
              Input('bt_page_next', 'n_clicks'),
              Input('north_star_clusterid_map', 'children')],
-            State('current_page', 'children'))(self.handle_molecule_selection)
+            [State('current_page', 'children'),
+             State('show_selected_mol', 'children')])(self.handle_molecule_selection)
 
         self.app.callback(
-            Output("refresh_main_fig", "value"),
+            Output("refresh_main_fig", "children"),
             [Input("bt_reset", "n_clicks"),
              Input("bt_apply_wf", "n_clicks")],
             [State("refresh_main_fig", "children"),
@@ -104,10 +111,10 @@ class ChemVisualization:
 
         self.app.callback(
             [Output('north_star', 'value'),
-             Output('hidden_northstar', 'value')],
-            [Input({'role': 'bt_star_candidate', 'chemblId': ALL, 'molregno': ALL}, 'n_clicks')],
+             Output('hidden_northstar', 'children')],
+            [Input({'role': 'bt_star_candidate', 'chemblId': ALL, 'molregno': ALL, 'x': ALL, 'y': ALL}, 'n_clicks')],
             [State('north_star', 'value'),
-             State('hidden_northstar', 'value')])(self.handle_mark_north_star)
+             State('hidden_northstar', 'children')])(self.handle_mark_north_star)
 
         self.app.callback(
             [Output('error_msg', 'children'),
@@ -115,10 +122,113 @@ class ChemVisualization:
             [Input('recluster_error', 'children'),
              Input('bt_close_err', 'n_clicks')])(self.handle_error)
 
+        self.app.callback(
+            Output('ckl_mol_id', 'options'),
+            [Input('north_star', 'value')])(self.handle_north_star_change)
+
+        self.app.callback(
+            Output('ckl_mol_id', 'value'),
+            [Input('ckl_mol_id', 'value')])(self.handle_ckl_selection)
+
+        self.app.callback(
+            [Output('section_generated_molecules', 'children'),
+             Output('show_generated_mol', 'children'),],
+            [Input("bt_generate_fr_selected_chemble", "n_clicks"),],
+            [State('sl_generative_wf', 'value'),
+             State('ckl_mol_id', 'value'),
+             State('n2generate', 'value'),
+             State('show_generated_mol', 'children')])(self.handle_generate)
+
+        self.app.callback(
+            [Output('section_generated_molecules', 'style'),
+             Output('section_selected_molecules', 'style'),],
+            [Input('show_generated_mol', 'children'),
+             Input('show_selected_mol', 'children')])(self.handle_property_tables)
+
     def _fetch_event_data(self):
         if not dash.callback_context.triggered:
             raise dash.exceptions.PreventUpdate
-        return dash.callback_context.triggered[0]['prop_id'].split('.')
+        prop_id = dash.callback_context.triggered[0]['prop_id']
+        split_at = prop_id.rindex('.')
+        return [prop_id[:split_at], prop_id[split_at + 1:]]
+
+    def handle_property_tables(self, show_generated_mol, show_selected_mol):
+        comp_id, event_type = self._fetch_event_data()
+
+        if comp_id == 'show_selected_mol' and event_type == 'children':
+            return {'display': 'none'}, {'display': 'block'}
+        elif comp_id == 'show_generated_mol' and event_type == 'children':
+            return {'display': 'block'}, {'display': 'none'}
+        return dash.no_update, dash.no_update
+
+    def handle_generate(self, bt_generate_fr_selected_chemble,
+                        sl_generative_wf, ckl_mol_id, n2generate, show_generated_mol):
+        comp_id, event_type = self._fetch_event_data()
+
+        chemble_ids = []
+        if comp_id == 'bt_generate_fr_selected_chemble' and event_type == 'n_clicks':
+            chemble_ids = ckl_mol_id
+        else:
+            return dash.no_update, dash.no_update
+
+        wf_class = locate(self.generative_wf)
+        generative_wf = wf_class()
+        genreated_df = generative_wf.interpolate_from_id(chemble_ids, num_points=n2generate)
+
+        if show_generated_mol is None:
+            show_generated_mol = 0
+        show_generated_mol += 1
+
+        # Add other useful attributes to be added for rendering
+        genreated_df = MolecularStructureDecorator().decorate(genreated_df)
+        genreated_df = LipinskiRuleOfFiveDecorator().decorate(genreated_df)
+
+        # Create Table header
+        table_headers = []
+        columns = genreated_df.columns
+        for column in columns.to_list():
+            table_headers.append(html.Th(column))
+
+        prop_recs = [html.Tr(table_headers)]
+        for row_idx in range(genreated_df.shape[0]):
+            td = []
+            for col_id in range(len(columns)):
+                col_data = genreated_df.iat[row_idx, col_id]
+
+                col_level = 'info'
+                if isinstance(col_data, dict):
+                    col_value = col_data['value']
+                    if 'level' in col_data:
+                        col_level = col_data['level']
+                else:
+                    col_value = col_data
+
+                if isinstance(col_value, str) and col_value.startswith('data:image/png;base64,'):
+                    td.append(html.Td(html.Img(src=col_value)))
+                else:
+                    td.append(html.Td(col_value, style=LEVEL_TO_STYLE[col_level]))
+
+            prop_recs.append(html.Tr(td))
+
+        return html.Table(prop_recs, style={'width': '100%', 'marginLeft': 60}), show_generated_mol
+
+    def handle_ckl_selection(self, ckl_mol_id):
+        if not ckl_mol_id:
+            raise dash.exceptions.PreventUpdate
+
+        if len(ckl_mol_id) > 2:
+            ckl_mol_id = ckl_mol_id[-2:]
+
+        logger.info(ckl_mol_id)
+
+        return ckl_mol_id
+
+    def handle_north_star_change(self, north_star):
+        if not north_star:
+            raise dash.exceptions.PreventUpdate
+
+        options = [{'label': i.strip(), 'value': i.strip()} for i in north_star.split(',')]
+        return options
 
     def handle_reset(self, bt_reset, bt_apply_wf, refresh_main_fig, sl_wf):
         comp_id, event_type = self._fetch_event_data()
@@ -141,7 +251,6 @@ class ChemVisualization:
         return refresh_main_fig + 1
 
     def recluster(self, filter_values=None, filter_column=None, reload_data=False):
-
         self.workflow.n_clusters = self.n_clusters
         if reload_data:
             return self.workflow.cluster()
@@ -316,7 +425,6 @@ class ChemVisualization:
 
         # Create Table header
         table_headers = [html.Th("Molecular Structure", style={'width': '30%'}),
-                         html.Th("Chembl"),
                          html.Th("smiles")]
         for prop in display_properties:
             table_headers.append(html.Th(prop))
@@ -327,13 +435,16 @@ class ChemVisualization:
         table_headers.append(html.Th(""))
         prop_recs = [html.Tr(table_headers)]
 
+        mol_position = {}
         if chembl_ids:
             selected_chembl_ids = chembl_ids
         else:
             selected_chembl_ids = []
             for point in selected_points['points'][((page - 1) * pageSize): page * pageSize]:
                 if 'customdata' in point:
-                    selected_chembl_ids.append(point['customdata'])
+                    molregid = point['customdata']
+                    selected_chembl_ids.append(molregid)
+                    mol_position[molregid] = {'x': point['x'], 'y': point['y']}
 
         props, selected_molecules = self.chem_data.fetch_props_by_molregno(
             selected_chembl_ids)
@@ -357,19 +468,27 @@ class ChemVisualization:
             img_binary = "data:image/png;base64," + \
                 base64.b64encode(drawer.GetDrawingText()).decode("utf-8")
 
-            td.append(html.Img(src=img_binary))
-            td.append(html.Td(self.href_ify(selected_chembl_id)))
+            td.append(html.Td(html.Img(src=img_binary)))
             td.append(html.Td(smiles))
             for key in display_properties:
                 td.append(html.Td(selected_molecule[props.index(key)]))
 
             if chembl_ids:
                 td.append(html.Td(chembl_ids[selected_chembl_id]))
+            x = None
+            y = None
+            molregno = selected_molecule[0]
+            if molregno in mol_position:
+                x = mol_position[molregno]['x']
+                y = mol_position[molregno]['y']
             td.append(html.Td(
                 dbc.Button('Add as MoI',
                            id={'role': 'bt_star_candidate',
                                'chemblId': selected_chembl_id,
-                               'molregno': str(selected_molecule[0])},
+                               'molregno': str(molregno),
+                               'x': x,
+                               'y': y,
+                            },
                            n_clicks=0)
             ))
 
@@ -383,91 +502,106 @@ class ChemVisualization:
 
         return html.Div([
             html.Div(className='row', children=[
-                html.Div([dcc.Graph(id='main-figure', figure=fig), ],
-                         className='nine columns',
-                         style={'verticalAlign': 'text-top', }),
+                dcc.Graph(id='main-figure', figure=fig,
+                          className='nine columns',
+                          style={'verticalAlign': 'text-top'}),
+
                 html.Div([
-                    html.Div(children=[
-                        dcc.Markdown("""**Select Workflow**"""), ]),
-                    html.Div(className='row', children=[
-                        html.Div(children=[
-                            dcc.Dropdown(id='sl_wf', multi=False,
-                                        options=[{'label': 'Gpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
-                                                 {'label': 'GPU Random Projection - Single GPU', 'value': 'nvidia.cheminformatics.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
-                                                 {'label': 'Cpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
-                                        value=self.wf,
-                                        clearable=False),
-                        ], className='nine columns'),
-                        dbc.Button('Apply',
-                                   id='bt_apply_wf', n_clicks=0,
-                                   style={'marginLeft': 6, }),
-                    ], style={'marginLeft': 0, 'marginTop': 18, }),
+                    dcc.Markdown("""**Molecule(s) of Interest (MoI)**"""),
+                    dcc.Markdown("Please enter ChEMBLE id."),
 
-                    html.Div(children=[
-                        dcc.Markdown("""
-                            **Molecule(s) of Interest (MoI)**
-
-                            Please enter Chembl id."""), ],
-                        style={'marginTop': 18, 'marginLeft': 6}),
                     html.Div(className='row', children=[
                         dcc.Input(id='north_star', type='text', debounce=True),
                         dbc.Button('Highlight',
                                    id='bt_north_star', n_clicks=0,
                                    style={'marginLeft': 6, }),
-                    ], style={'marginLeft': 0, 'marginTop': 18, }),
+                    ], style={'marginLeft': 0, 'marginBottom': 18,}),
 
-                    html.Div(children=[
-                        dcc.Markdown("Set number of clusters")],
-                        style={'marginTop': 18, 'marginLeft': 6},
-                        className='row'),
+                    dcc.Tabs([
+                        dcc.Tab(label='Cluster', children=[
+                            dcc.Markdown("""**Select Workflow**""", style={'marginTop': 12}),
 
-                    html.Div(children=[
-                        dcc.Input(id='sl_nclusters', value=self.n_clusters)],
-                        style={'marginLeft': 0},
-                        className='row'),
+                            html.Div(className='row', children=[
+                                html.Div(children=[
+                                    dcc.Dropdown(id='sl_wf',
+                                                 multi=False,
+                                                 options=[{'label': 'Gpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
+                                                          {'label': 'GPU Random Projection - Single GPU', 'value': 'nvidia.cheminformatics.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
+                                                          {'label': 'Cpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
+                                                 value=self.wf,
+                                                 clearable=False),
+                                ], className='nine columns'),
 
-                    html.Div(children=[
-                        dcc.Markdown("""
-                            **Cluster Selection**
+                                dbc.Button('Apply',
+                                        id='bt_apply_wf', n_clicks=0,
+                                        className='three columns'),
+                            ], style={'marginLeft': 0, 'marginTop': 6, }),
 
-                            Click a point to select a cluster.
-                        """)],
-                        style={'marginTop': 18, 'marginLeft': 6},
-                        className='row'),
+                            dcc.Markdown("Set number of clusters", style={'marginTop': 18,}),
+                            dcc.Input(id='sl_nclusters', value=self.n_clusters),
+
+                            dcc.Markdown("""**Cluster Selection**""", style={'marginTop': 18,}),
+                            dcc.Markdown("Click a point to select a cluster."),
+
+                            html.Div(className='row', children=[
+                                dcc.Input(id='selected_clusters', type='text', className='nine columns'),
+                                dbc.Button('Recluster',
+                                        id='bt_recluster_clusters', n_clicks=0,
+                                        className='three columns'),
+                            ], style={'marginLeft': 0}),
+
+                            dcc.Markdown("""
+                                **Selection Points**
+
+                                Choose the lasso or rectangle tool in the graph's menu
+                                bar and then select points in the graph.
+                                """, style={'marginTop': 18}),
+                            dbc.Button('Recluster Selection', id='bt_recluster_points', n_clicks=0),
+                            html.Div(children=[html.Div(id='selected_point_cnt'), ]),
+
+                            dbc.Button('Reload', id='bt_reset', n_clicks=0, style={'marginLeft': 0, 'marginTop': 18, }),
+                        ]),
+
+                        dcc.Tab(label='Generate', children=[
+                            dcc.Markdown("""**Select Generative Model**""", style={'marginTop': 12}),
+
+                            html.Div(children=[
+                                dcc.Dropdown(id='sl_generative_wf', multi=False,
+                                             options=[{'label': 'Latent Space Interpolation',
+                                                       'value': 'nvidia.cheminformatics.wf.generate.latentspaceinterpolation.LatentSpaceInterpolation'},
+                                                     ],
+                                             value=self.generative_wf,
+                                             clearable=False),
+                            ]),
+
+                            dcc.Markdown("Set number molecules to generate", style={'marginTop': 18,}),
+                            dcc.Input(id='n2generate', value=10),
+
+                            dcc.Markdown("""**Please Select Two**""", style={'marginTop': 18}),
+                            dcc.Checklist(
+                                id='ckl_mol_id',
+                                options=[],
+                                value=[],
+                                labelStyle={'display': 'block', 'marginLeft': 6, 'marginRight': 6}
+                            ),
+                            dbc.Button('Generate', id='bt_generate_fr_selected_chemble', n_clicks=0),
+                        ]),
+                    ]),
 
                     html.Div(className='row', children=[
-                        dcc.Input(id='selected_clusters', type='text'),
-                        dbc.Button('Recluster',
-                                   id='bt_recluster_clusters', n_clicks=0,
-                                   style={'marginLeft': 6, }),
-                    ], style={'marginLeft': 0}),
-
-                    html.Div(children=[
-                        dcc.Markdown("""
-                            **Selection Points**
-
-                            Choose the lasso or rectangle tool in the graph's menu
-                            bar and then select points in the graph.
-                        """), ], style={'marginTop': 18, }),
-                    dbc.Button('Recluster Selection',
-                               id='bt_recluster_points', n_clicks=0),
-                    html.Div(children=[html.Div(id='selected_point_cnt'), ]),
-
-                    html.Div(className='row', children=[
-                        dbc.Button('Reload', id='bt_reset', n_clicks=0),
-                    ], style={'marginLeft': 0, 'marginTop': 18, }),
-
-                    html.Div(id='section_prop_gradient', children=[
                         html.Label([
                             "Select Molecular Property for color gradient",
                             dcc.Dropdown(id='sl_prop_gradient', multi=False,  clearable=False,
-                                         options=[{"label": p, "value": p} for p in IMP_PROPS],),
+                                        options=[{"label": p, "value": p} for p in IMP_PROPS],),
                         ], style={'marginTop': 18})],
                     ),
-
                 ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
             ]),
-            html.Div(id='section_molecule_details', className='row', children=[
+
+            html.Div(id='section_generated_molecules', className='row', children=[
+            ]),
+
+            html.Div(id='section_selected_molecules', className='row', children=[
                 html.Div(className='row', children=[
                     html.Div(id='section_display_properties', children=[
                         html.Label([
@@ -506,8 +640,11 @@ class ChemVisualization:
             html.Div(id='northstar_cluster', style={'display': 'none'}),
             html.Div(id='hidden_northstar', style={'display': 'none'}),
             html.Div(id='north_star_clusterid_map', style={'display': 'none'}),
-            html.Div(id='recluster_error'),
-            html.Div(id='mol_selection_error'),
+            html.Div(id='recluster_error', style={'display': 'none'}),
+            html.Div(id='mol_selection_error', style={'display': 'none'}),
+            html.Div(id='show_selected_mol', style={'display': 'none'}),
+            html.Div(id='show_generated_mol', style={'display': 'none'}),
+
             html.Div(className='row', children=[
                 dbc.Modal([
                     dbc.ModalHeader("Error"),
@@ -531,11 +668,10 @@ class ChemVisualization:
             raise dash.exceptions.PreventUpdate
         return recluster_error, True
 
-    @report_ui_error(5)
+    @report_ui_error(6)
     def handle_molecule_selection(self, mf_selected_data, selected_columns,
                                   sl_prop_gradient, prev_click, next_click,
-                                  north_star_clusterid_map,
-                                  current_page):
+                                  north_star_clusterid_map, current_page, show_selected_mol):
         comp_id, event_type = self._fetch_event_data()
 
         if (not mf_selected_data) and comp_id != 'north_star_clusterid_map':
@@ -560,6 +696,7 @@ class ChemVisualization:
         if selected_columns and sl_prop_gradient:
             if sl_prop_gradient not in selected_columns:
                 selected_columns.append(sl_prop_gradient)
+
         module_details, all_props = self.construct_molecule_detail(
             mf_selected_data, selected_columns, current_page,
             pageSize=PAGE_SIZE, chembl_ids=chembl_ids)
@@ -569,7 +706,11 @@ class ChemVisualization:
         else:
             last_page = ' of ' + str(len(mf_selected_data['points'])//PAGE_SIZE)
 
-        return module_details, all_props, current_page, last_page, {'display': 'block'}, dash.no_update
+        if show_selected_mol is None:
+            show_selected_mol = 0
+        show_selected_mol += 1
+
+        return module_details, all_props, current_page, last_page, dash.no_update, show_selected_mol
 
     def handle_data_selection(self, mf_click_data, mf_selected_data,
                               bt_cluster_clicks, bt_point_clicks,
@@ -679,12 +820,12 @@ class ChemVisualization:
                 north_star_hidden = ''
                 recluster_data = False
 
-        elif comp_id == 'hidden_northstar' and event_type == 'value':
+        elif comp_id == 'hidden_northstar' and event_type == 'children':
             recluster_data = False
             if not north_star_hidden:
                 raise dash.exceptions.PreventUpdate
 
-        elif comp_id == 'refresh_main_fig' and event_type == 'value':
+        elif comp_id == 'refresh_main_fig' and event_type == 'children':
             reload_data = True
 
         figure, northstar_cluster, chembl_clusterid_map = self.recluster_selection(

@@ -73,12 +73,18 @@ class Launcher(object):
 Following commands are supported:
    cache      : Create cache
    analyze    : Start Jupyter notebook in a container
+   service    : Start in service mode
+   grpc       : Start in grpc service
 
 To start dash:
     ./start analyze
 
 To create cache:
     ./start cache -p
+
+To start dash:
+    ./start service
+
 ''')
 
         parser.add_argument('command', help='Subcommand to run')
@@ -130,6 +136,62 @@ To create cache:
 
             logger.info('Fingerprint generated in (hh:mm:ss.ms) {}'.format(
                 datetime.now() - task_start_time))
+
+    def service(self):
+        """
+        Start services
+        """
+        parser = argparse.ArgumentParser(description='Service')
+        parser.add_argument('-d', '--debug',
+                            dest='debug',
+                            action='store_true',
+                            default=False,
+                            help='Show debug message')
+
+        args = parser.parse_args(sys.argv[2:])
+
+        if args.debug:
+            logger.setLevel(logging.DEBUG)
+
+        from waitress import serve
+        from nvidia.cheminformatics.api import app
+
+        context = Context()
+        # port = context.get_config('plotly_port', 6000)
+        port = 8081
+        serve(app, host='0.0.0.0', port=port)
+
+    def grpc(self):
+        """
+        Start services
+        """
+        parser = argparse.ArgumentParser(description='Service')
+        parser.add_argument('-d', '--debug',
+                            dest='debug',
+                            action='store_true',
+                            default=False,
+                            help='Show debug message')
+
+        args = parser.parse_args(sys.argv[2:])
+
+        if args.debug:
+            logger.setLevel(logging.DEBUG)
+
+        sys.path.insert(0, "generated")
+        from waitress import serve
+        from nvidia.cheminformatics.api import app
+        import grpc
+        import interpolator_pb2_grpc
+        import interpolator_pb2
+        from concurrent import futures
+        from nvidia.cheminformatics.grpc.interpolator import InterpolatorService
+
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        interpolator_pb2_grpc.add_InterpolatorServicer_to_server(InterpolatorService(), server)
+        server.add_insecure_port('[::]:50051')
+        server.start()
+        server.wait_for_termination()
+
 
     def analyze(self):
         """

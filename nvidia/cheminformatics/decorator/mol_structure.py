@@ -37,8 +37,8 @@ class MolecularStructureDecorator(BaseMolPropertyDecorator):
                 logger.exception(ex)
                 mol_struct.append(
                     {'value': 'Error interpreing SMILES using RDKIT',
-                     'level': 'warning'})
+                     'level': 'error'})
 
-        df['mol_structure'] = mol_struct
+        df['Chemical Structure'] = mol_struct
 
         return df

@@ -200,7 +200,7 @@ dbSetup() {
 		if [[ ! -e "${DATA_DIR}/chembl_27_sqlite.tar.gz" ]]; then
 			wget -q --show-progress \
 				-O ${DATA_DIR}/chembl_27_sqlite.tar.gz \
-				ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/latest/chembl_27_sqlite.tar.gz
+				ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
 		fi
 		echo "Unzipping chembl db to ${DATA_DIR}..."
 		tar -C ${DATA_DIR}/db \

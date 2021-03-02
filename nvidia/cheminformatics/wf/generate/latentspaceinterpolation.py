@@ -51,8 +51,8 @@ class LatentSpaceInterpolation(metaclass=Singleton):
                                                     arr=embeddings,
                                                     num_points=num_points)
 
-            interp_df = pd.DataFrame({'smiles': cddd_embeddings.inverse_transform(interp_embeddings),
-                                      'generated': [True for i in range(num_points)]},
+            interp_df = pd.DataFrame({'SMILES': cddd_embeddings.inverse_transform(interp_embeddings),
+                                      'Generated': [True for i in range(num_points)]},
                                       )
 
             # Mark the source and desinations as not generated

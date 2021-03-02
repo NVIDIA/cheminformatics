@@ -187,7 +187,7 @@ class ChemVisualization:
         table_headers = []
         columns = genreated_df.columns
         for column in columns.to_list():
-            table_headers.append(html.Th(column))
+            table_headers.append(html.Th(column, style={'fontSize': '150%'}))
 
         prop_recs = [html.Tr(table_headers)]
         for row_idx in range(genreated_df.shape[0]):
@@ -206,7 +206,7 @@ class ChemVisualization:
                 if isinstance(col_value, str) and col_value.startswith('data:image/png;base64,'):
                     td.append(html.Td(html.Img(src=col_value)))
                 else:
-                    td.append(html.Td(col_value, style=LEVEL_TO_STYLE[col_level]))
+                    td.append(html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level]))
 
             prop_recs.append(html.Tr(td))
 
@@ -424,13 +424,13 @@ class ChemVisualization:
             return None, None
 
         # Create Table header
-        table_headers = [html.Th("Molecular Structure", style={'width': '30%'}),
-                         html.Th("smiles")]
+        table_headers = [html.Th("Chemical Structure", style={'width': '30%', 'fontSize': '150%'}),
+                         html.Th("SMILES", style={'fontSize': '150%'})]
         for prop in display_properties:
-            table_headers.append(html.Th(prop))
+            table_headers.append(html.Th(prop, style={'fontSize': '150%'}))
 
         if chembl_ids:
-            table_headers.append(html.Th('Cluster'))
+            table_headers.append(html.Th('Cluster', style={'fontSize': '150%'}))
 
         table_headers.append(html.Th(""))
         prop_recs = [html.Tr(table_headers)]
@@ -507,14 +507,14 @@ class ChemVisualization:
                           style={'verticalAlign': 'text-top'}),
 
                 html.Div([
-                    dcc.Markdown("""**Molecule(s) of Interest (MoI)**"""),
-                    dcc.Markdown("Please enter ChEMBLE id."),
+                    dcc.Markdown("""**Molecule(s) of Interest**"""),
+                    dcc.Markdown("Please enter ChEMBLE ID."),
 
                     html.Div(className='row', children=[
-                        dcc.Input(id='north_star', type='text', debounce=True),
+                        dcc.Input(id='north_star', type='text', debounce=True, className='nine columns'),
                         dbc.Button('Highlight',
                                    id='bt_north_star', n_clicks=0,
-                                   style={'marginLeft': 6, }),
+                                   className='three columns'),
                     ], style={'marginLeft': 0, 'marginBottom': 18,}),
 
                     dcc.Tabs([
@@ -531,7 +531,6 @@ class ChemVisualization:
                                                  value=self.wf,
                                                  clearable=False),
                                 ], className='nine columns'),
-
                                 dbc.Button('Apply',
                                         id='bt_apply_wf', n_clicks=0,
                                         className='three columns'),
@@ -562,7 +561,7 @@ class ChemVisualization:
                             dbc.Button('Reload', id='bt_reset', n_clicks=0, style={'marginLeft': 0, 'marginTop': 18, }),
                         ]),
 
-                        dcc.Tab(label='Generate', children=[
+                        dcc.Tab(label='Interpolate', children=[
                             dcc.Markdown("""**Select Generative Model**""", style={'marginTop': 12}),
 
                             html.Div(children=[
@@ -582,6 +581,7 @@ class ChemVisualization:
                                 id='ckl_mol_id',
                                 options=[],
                                 value=[],
+                                inputStyle={'display': 'inline-block', 'marginLeft': 6, 'marginRight': 6},
                                 labelStyle={'display': 'block', 'marginLeft': 6, 'marginRight': 6}
                             ),
                             dbc.Button('Generate', id='bt_generate_fr_selected_chemble', n_clicks=0),

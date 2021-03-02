@@ -1,3 +1,4 @@
+from nvidia.cheminformatics.utils.data_peddler import CDDD_DEFAULT_MODLE_LOC
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
@@ -52,13 +53,12 @@ class MorganFingerprint(BaseTransformation):
         return self.kwargs['nBits']
 
 class Embeddings(BaseTransformation):
-    MODEL_DIR = '/data/cddd/default_model'
 
     def __init__(self, use_gpu=True, cpu_threads=5, model_dir=None, **kwargs):
         self.name = __class__.__name__.split('.')[-1]
         self.kwargs = TransformationDefaults[self.name].value
         self.kwargs.update(kwargs)
-        model_dir = self.MODEL_DIR if model_dir is None else model_dir
+        model_dir = CDDD_DEFAULT_MODLE_LOC if model_dir is None else model_dir
         self.func = InferenceModel(model_dir, use_gpu=use_gpu, cpu_threads=cpu_threads)
 
     def transform(self, data):

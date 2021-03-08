@@ -76,6 +76,7 @@ class GpuWorkflowRandomProjection(BaseClusterWorkflow, metaclass=Singleton):
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
                  n_clusters=7,
                  seed=0):
+        super(GpuWorkflowRandomProjection, self).__init__()
 
         self.dao = dao
         self.n_molecules = n_molecules

@@ -202,6 +202,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
     def add_molecules(self, chemblids: List):
 
+        chemblids = [x.upper() for x in chemblids]
         chem_mol_map = {row[0]: row[1] for row in self.dao.fetch_id_from_chembl(chemblids)}
         molregnos = list(chem_mol_map.keys())
 

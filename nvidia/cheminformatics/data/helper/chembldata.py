@@ -1,3 +1,5 @@
+import os
+import sys
 import warnings
 warnings.filterwarnings("ignore", message=r"deprecated", category=FutureWarning)
 
@@ -6,6 +8,7 @@ import pandas
 import sqlite3
 import logging
 
+from typing import List
 from dask import delayed, dataframe
 
 from contextlib import closing
@@ -30,6 +33,7 @@ WHERE cp.molregno = md.molregno
 logger = logging.getLogger(__name__)
 
 
+BATCH_SIZE = 5000
 IMP_PROPS = [
     'alogp',
     'aromatic_rings',
@@ -57,11 +61,16 @@ class ChEmblData(object, metaclass=Singleton):
 
         context = Context()
         db_file = context.get_config('data_mount_path', default='/data')
+        db_file = os.path.join(db_file, 'db/chembl_27.db')
 
-        self.chembl_db = 'file:%s/db/chembl_27.db?mode=ro' % db_file
+        if not os.path.exists(db_file):
+            logger.error('%s not found', db_file)
+            sys.exit(1)
+
+        self.chembl_db = 'file:%s?mode=ro' % db_file
         self.fp_type = fp_type
 
-        logger.info('Reading ChEMBL database at %s...' % self.chembl_db)
+        logger.info('ChEMBL database: %s...' % self.chembl_db)
 
     def fetch_props_by_molregno(self, molregnos):
         """
@@ -106,6 +115,22 @@ class ChEmblData(object, metaclass=Singleton):
             cur.execute(select_stmt)
             return cur.fetchall()
 
+    def fetch_id_from_chembl(self, new_molecules: List):
+        logger.debug('Fetch ChEMBL ID using molregno...')
+
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+                closing(con.cursor()) as cur:
+            select_stmt = '''
+                SELECT cs.molregno as molregno, md.chembl_id as chembl_id,
+                       cs.canonical_smiles as smiles
+                FROM compound_structures cs,
+                    molecule_dictionary md
+                WHERE md.molregno = cs.molregno
+                    AND md.chembl_id in (%s)
+            ''' %  "'%s'" %"','".join([ x.upper() for x in new_molecules])
+            cur.execute(select_stmt)
+
+            return cur.fetchall()
 
     def fetch_chemblId_by_molregno(self, molregnos):
         logger.debug('Fetch ChEMBL ID using molregno...')
@@ -147,7 +172,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def _fetch_mol_embedding(self,
                              start=0,
-                             batch_size=5000,
+                             batch_size=BATCH_SIZE,
                              smiles_transforms=SMILES_TRANSFORMS,
                              molregnos=None,
                              **transformation_kwargs):

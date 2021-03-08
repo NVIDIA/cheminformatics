@@ -1,8 +1,10 @@
+from nvidia.cheminformatics.utils.data_peddler import CDDD_DEFAULT_MODLE_LOC
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 
 import pandas as pd
+import numpy as np
 
 import logging
 from abc import ABC
@@ -51,19 +53,24 @@ class MorganFingerprint(BaseTransformation):
         return self.kwargs['nBits']
 
 class Embeddings(BaseTransformation):
-    MODEL_DIR = '/workspace/cddd/default_model'
 
-    def __init__(self, use_gpu=True, cpu_threads=5, **kwargs):
+    def __init__(self, use_gpu=True, cpu_threads=5, model_dir=None, **kwargs):
         self.name = __class__.__name__.split('.')[-1]
         self.kwargs = TransformationDefaults[self.name].value
         self.kwargs.update(kwargs)
-        self.func = InferenceModel(self.MODEL_DIR, use_gpu=use_gpu, cpu_threads=cpu_threads)
+        model_dir = CDDD_DEFAULT_MODLE_LOC if model_dir is None else model_dir
+        self.func = InferenceModel(model_dir, use_gpu=use_gpu, cpu_threads=cpu_threads)
 
     def transform(self, data):
         smile = data['transformed_smiles']
         if isinstance(smile, str):
             smile = [smile]
         return self.func.seq_to_emb(smile).squeeze()
+
+    def inverse_transform(self, embeddings):
+        "Embedding array -- individual compound embeddings are in rows"
+        embeddings = np.asarray(embeddings)
+        return self.func.emb_to_seq(embeddings)
 
     def __len__(self):
         return self.func.hparams.emb_size

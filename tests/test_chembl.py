@@ -5,6 +5,8 @@ import dask
 
 from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 
+from tests.utils import _create_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -12,6 +14,7 @@ def test_dataframe():
     """
     Verify fetching data from chemblDB.
     """
+    context = _create_context()
 
     dao = ChemblClusterWfDao()
     mol_df = dao.fetch_molecular_embedding(n_molecules=100)

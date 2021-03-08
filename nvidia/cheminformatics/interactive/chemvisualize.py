@@ -241,7 +241,8 @@ class ChemVisualization:
             else:
                 raise dash.exceptions.PreventUpdate
 
-        self.recluster(reload_data=True)
+#            self.recluster(reload_data=True)
+
         if refresh_main_fig is None:
             refresh_main_fig = 1
         else:
@@ -267,11 +268,12 @@ class ChemVisualization:
                            recluster_data=True,
                            color_col='cluster'):
 
-        df_embedding = self.workflow.df_embedding
-        if recluster_data:
+        if recluster_data or self.workflow.df_embedding is None:
             df_embedding = self.recluster(filter_values=filter_value,
                                           filter_column=filter_column,
                                           reload_data=reload_data)
+        else:
+            df_embedding = self.workflow.df_embedding
 
         return self.create_graph(df_embedding,
                                  color_col=color_col,
@@ -281,7 +283,15 @@ class ChemVisualization:
     def create_graph(self, ldf, color_col='cluster', north_stars=None, gradient_prop=None):
         fig = go.Figure(layout={'colorscale': {}})
 
+        # Filter out relevant columns in this method.
         if hasattr(ldf, 'compute'):
+            relevant_cols = ['id', 'x', 'y', 'cluster']
+            if gradient_prop:
+                relevant_cols.append(gradient_prop)
+            if color_col is not 'cluster':
+                relevant_cols.append(color_col)
+
+            ldf = ldf.iloc[:, ldf.columns.isin(relevant_cols)]
             ldf = ldf.compute()
 
         moi_molregno = []
@@ -290,9 +300,6 @@ class ChemVisualization:
 
         moi_filter = ldf['id'].isin(moi_molregno)
         northstar_df = ldf[moi_filter]
-
-        if hasattr(ldf, 'compute'):
-            ldf = ldf.compute()
 
         # Create a map with MoI and cluster to which they belong
         chemble_cluster_map = {}
@@ -591,9 +598,9 @@ class ChemVisualization:
                     html.Div(className='row', children=[
                         html.Label([
                             "Select Molecular Property for color gradient",
-                            dcc.Dropdown(id='sl_prop_gradient', multi=False,  clearable=False,
+                            dcc.Dropdown(id='sl_prop_gradient', multi=False,  clearable=True,
                                         options=[{"label": p, "value": p} for p in IMP_PROPS],),
-                        ], style={'marginTop': 18})],
+                        ], style={'marginTop': 18, 'marginLeft': 0})],
                     ),
                 ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
             ]),
@@ -827,6 +834,13 @@ class ChemVisualization:
 
         elif comp_id == 'refresh_main_fig' and event_type == 'children':
             reload_data = True
+            recluster_data = True
+
+        else:
+            # Event that are expected to reach this block are
+            #   'sl_prop_gradient' and event_type == 'value':
+            reload_data = False
+            recluster_data = False
 
         figure, northstar_cluster, chembl_clusterid_map = self.recluster_selection(
             filter_value=filter_values,

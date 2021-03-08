@@ -15,9 +15,9 @@ def test_random_proj():
     """
     Verify fetching data from chemblDB when the input is a pandas df.
     """
+    context = _create_context()
     n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
 
-    context = _create_context()
     wf = GpuWorkflowRandomProjection(n_molecules=n_molecules,
                                      dao=dao)
     wf.cluster(df_mol_embedding=mol_df)
@@ -27,9 +27,9 @@ def test_gpukmeansumap_dask():
     """
     Verify fetching data from chemblDB when the input is a pandas df.
     """
+    context = _create_context()
     n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
 
-    context = _create_context()
     wf = GpuKmeansUmap(n_molecules=n_molecules,
                        dao=dao, pca_comps=64)
     wf.cluster(df_mol_embedding=mol_df)
@@ -40,8 +40,8 @@ def test_gpukmeansumap_cudf():
     Verify fetching data from chemblDB when the input is a cudf df.
     """
     context = _create_context()
-
     n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
+
     wf = GpuKmeansUmap(n_molecules=n_molecules,
                        dao=dao, pca_comps=64)
     mol_df = mol_df.compute()
@@ -53,7 +53,6 @@ def test_add_molecule():
     Verify fetching data from chemblDB when the input is a cudf df.
     """
     context = _create_context()
-
     n_molecules, dao, mol_df = _fetch_chembl_test_dataset()
 
     if hasattr(mol_df, 'compute'):

@@ -29,6 +29,7 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
                                   n_molecules:int,
                                   cache_directory:str=None):
         chem_data = ChEmblData()
+        context = Context()
         if cache_directory:
             hdf_path = os.path.join(cache_directory, FINGER_PRINT_FILES)
             logger.info('Reading %d rows from %s...', n_molecules, hdf_path)
@@ -39,14 +40,17 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
                 mol_df = mol_df.head(n_molecules, compute=False, npartitions=npartitions)
         else:
             logger.info('Reading molecules from database...')
-            mol_df = chem_data.fetch_mol_embedding(num_recs=n_molecules)
+            mol_df = chem_data.fetch_mol_embedding(num_recs=n_molecules,
+                                                   batch_size=context.batch_size)
 
         return mol_df
 
     def fetch_molecular_embedding_by_id(self, molecule_id:List):
         chem_data = ChEmblData()
+        context = Context()
         meta = chem_data._meta_df()
-        fp_df = chem_data._fetch_mol_embedding(molregnos=molecule_id) \
+        fp_df = chem_data._fetch_mol_embedding(molregnos=molecule_id,
+                                               batch_size=context.batch_size) \
                          .astype(meta.dtypes)
 
         fp_df = cudf.from_pandas(fp_df)

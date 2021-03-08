@@ -17,7 +17,7 @@ def test_latent_space_interpolation():
     context = _create_context()
     wf = LatentSpaceInterpolation()
 
-    smiles = ['CHEMBL263882', 'CHEMBL7214']
+    smiles = ['CHEMBL10454', 'CHEMBL10469']
     genreated_df = wf.interpolate_from_id(smiles, num_points=num_points)
 
     logger.info(genreated_df.head(10))

@@ -107,6 +107,13 @@ To start dash:
                             type=str,
                             default='./.cache_dir',
                             help='Location to create fingerprint cache')
+
+        parser.add_argument('--batch_size',
+                            dest='batch_size',
+                            type=int,
+                            default=100000,
+                            help='Chunksize.')
+
         parser.add_argument('-d', '--debug',
                             dest='debug',
                             action='store_true',
@@ -132,7 +139,8 @@ To start dash:
 
             chem_data = ChEmblData()
             chem_data.save_fingerprints(
-                os.path.join(args.cache_directory, FINGER_PRINT_FILES))
+                os.path.join(args.cache_directory, FINGER_PRINT_FILES),
+                batch_size=args.batch_size)
 
             logger.info('Fingerprint generated in (hh:mm:ss.ms) {}'.format(
                 datetime.now() - task_start_time))
@@ -235,6 +243,12 @@ To start dash:
                             default=10000,
                             help='Number of molecules for analysis. Use negative numbers for using the whole dataset.')
 
+        parser.add_argument('--batch_size',
+                            dest='batch_size',
+                            type=int,
+                            default=100000,
+                            help='Chunksize.')
+
         parser.add_argument('-o', '--output_dir',
                             dest='output_dir',
                             default=".",
@@ -278,6 +292,7 @@ To start dash:
         context.benchmark_file = benchmark_file
         context.cache_directory = args.cache_directory
         context.n_molecule = args.n_mol
+        context.batch_size = args.batch_size
 
         if args.cpu:
             context.compute_type = 'cpu'

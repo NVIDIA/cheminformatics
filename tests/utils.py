@@ -26,7 +26,8 @@ def _fetch_chembl_test_dataset(n_molecules=None):
 def _create_context(use_gpu=True,
                     n_workers=-1,
                     benchmark_file=None,
-                    cache_directory=None):
+                    cache_directory=None,
+                    batch_size=None):
     context = Context()
     if context.dask_client is None:
         context.dask_client = initialize_cluster(use_gpu=use_gpu,
@@ -41,5 +42,9 @@ def _create_context(use_gpu=True,
     context.benchmark_file = benchmark_file
     if benchmark_file is None:
         context.benchmark_file = os.path.join(tempfile.tempdir, 'benchmark.csv')
+
+    context.batch_size = batch_size
+    if batch_size is None:
+        context.batch_size = 10000
 
     return context

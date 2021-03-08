@@ -21,6 +21,7 @@ class Context(metaclass=Singleton):
         self.benchmark_file = None
         self.cache_directory = None
         self.n_molecule = None
+        self.batch_size = None
 
         self.config = None
         if os.path.exists(CONFIG_FILE):

@@ -11,6 +11,9 @@ from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, spea
 
 class BaseClusterWorkflow:
 
+    def __init__(self):
+        self.df_embedding = None
+
     def _remove_ui_columns(self, embedding):
         for col in ['x', 'y', 'cluster', 'filter_col', 'index', 'molregno']:
             if col in embedding.columns:

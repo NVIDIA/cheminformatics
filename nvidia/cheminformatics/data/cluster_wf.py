@@ -21,14 +21,6 @@ FINGER_PRINT_FILES = 'filter_*.h5'
 
 class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
 
-    def __init__(self):
-
-        context = Context()
-        db_file = context.get_config('data_mount_path', default='/data')
-
-        self.chembl_db = 'file:%s/db/chembl_27.db?mode=ro' % db_file
-        logger.info('Reading ChEMBL database at %s...' % self.chembl_db)
-
     def meta_df(self):
         chem_data = ChEmblData()
         return chem_data._meta_df()
@@ -39,7 +31,7 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
         chem_data = ChEmblData()
         if cache_directory:
             hdf_path = os.path.join(cache_directory, FINGER_PRINT_FILES)
-            logger.info('Reading molecules from %s...' % hdf_path)
+            logger.info('Reading %d rows from %s...', n_molecules, hdf_path)
             mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
 
             if n_molecules > 0:
@@ -63,16 +55,5 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
 
     def fetch_id_from_chembl(self, new_molecules: List):
         logger.debug('Fetch ChEMBL ID using molregno...')
-
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
-                closing(con.cursor()) as cur:
-            select_stmt = '''
-                SELECT cs.molregno as molregno, md.chembl_id as chembl_id
-                FROM compound_structures cs,
-                    molecule_dictionary md
-                WHERE md.molregno = cs.molregno
-                    AND md.chembl_id in (%s)
-            ''' %  "'%s'" %"','".join(new_molecules)
-            cur.execute(select_stmt)
-
-            return cur.fetchall()
+        chem_data = ChEmblData()
+        return chem_data.fetch_id_from_chembl(new_molecules)

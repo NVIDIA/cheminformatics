@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 FROM nvidia/cuda:11.0-base
 
-RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git\
+RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip\
     && rm -rf /var/lib/apt/lists/*
 
 SHELL ["/bin/bash", "-c"]

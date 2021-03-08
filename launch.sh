@@ -180,7 +180,7 @@ pull() {
 
 
 bash() {
-	${DOCKER_CMD} -it ${CONT} bash
+	${DOCKER_CMD} -it $@ ${CONT} bash
 	exit
 }
 
@@ -211,7 +211,6 @@ dbSetup() {
 
 
 dash() {
-	echo $@
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
@@ -226,7 +225,6 @@ dash() {
 
 
 cache() {
-	echo $@
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
@@ -241,7 +239,6 @@ cache() {
 
 
 service() {
-	echo $@
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
@@ -256,7 +253,6 @@ service() {
 
 
 grpc() {
-	echo $@
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'

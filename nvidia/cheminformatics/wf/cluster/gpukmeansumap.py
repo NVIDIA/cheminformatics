@@ -72,6 +72,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
                  pca_comps=64,
                  n_clusters=7,
                  seed=0):
+        super(GpuKmeansUmap, self).__init__()
 
         self.dao = dao
         self.n_molecules = n_molecules

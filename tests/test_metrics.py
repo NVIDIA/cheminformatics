@@ -139,9 +139,9 @@ def test_run_silhouette_score(pca_approved_csv, cluster_column):
 
     # TODO copy pca_data or ensure it doesn't modify original
     n_data = pca_data.shape[0]
-    score_gpu1 = batched_silhouette_scores(pca_data, clusters, batch_size=n_data, on_gpu=False)
+    score_gpu1 = batched_silhouette_scores(pca_data, clusters, batch_size=n_data)
     score_gpu2 = batched_silhouette_scores(cudf.DataFrame(
-        pca_data), cudf.Series(clusters), batch_size=n_data, on_gpu=True)
+        pca_data), cudf.Series(clusters), batch_size=n_data)
 
     assert np.allclose(score_cpu, score_gpu1) & np.allclose(score_cpu, score_gpu2)
 

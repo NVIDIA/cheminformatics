@@ -43,6 +43,8 @@ class CpuKmeansUmap(BaseClusterWorkflow):
                  pca_comps=64,
                  n_clusters=7,
                  seed=0):
+        super(CpuKmeansUmap, self).__init__()
+
         self.dao = dao
         self.n_molecules = n_molecules
         self.n_pca = pca_comps

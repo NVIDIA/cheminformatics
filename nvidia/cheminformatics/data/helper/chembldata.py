@@ -33,7 +33,7 @@ WHERE cp.molregno = md.molregno
 logger = logging.getLogger(__name__)
 
 
-BATCH_SIZE = 5000
+BATCH_SIZE = 100000
 IMP_PROPS = [
     'alogp',
     'aromatic_rings',

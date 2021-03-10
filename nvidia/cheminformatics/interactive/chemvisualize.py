@@ -533,6 +533,7 @@ class ChemVisualization:
                                     dcc.Dropdown(id='sl_wf',
                                                  multi=False,
                                                  options=[{'label': 'Gpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
+                                                          {'label': 'Gpu KmeansUmap - Single and Multiple GPUs', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmapHybrid'},
                                                           {'label': 'GPU Random Projection - Single GPU', 'value': 'nvidia.cheminformatics.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
                                                           {'label': 'Cpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
                                                  value=self.wf,

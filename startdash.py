@@ -296,6 +296,8 @@ To start dash:
 
         if args.cpu:
             context.compute_type = 'cpu'
+        else:
+            logger.info('Number of workers %d.', len(client.scheduler_info()['workers'].keys()))
 
         start_time = datetime.now()
         task_start_time = datetime.now()

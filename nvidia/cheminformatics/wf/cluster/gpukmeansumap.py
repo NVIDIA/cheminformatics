@@ -74,7 +74,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
                  pca_comps=64,
                  n_clusters=7,
                  seed=0):
-        super(GpuKmeansUmap, self).__init__()
+        super().__init__()
 
         self.dao = dao
         self.n_molecules = n_molecules
@@ -224,11 +224,17 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         if self.pca and len(missing_molregno) > 0:
             new_fingerprints = self.dao.fetch_molecular_embedding_by_id(missing_molregno)
             new_fingerprints, prop_series = self._remove_non_numerics(new_fingerprints)
+
+            if isinstance(self.pca, cuml.PCA) and hasattr(new_fingerprints, 'compute'):
+                new_fingerprints = new_fingerprints.compute()
             new_fingerprints = self.pca.transform(new_fingerprints)
 
             # Add back the prop columns
             for col in prop_series.keys():
-                new_fingerprints[col] = prop_series[col]
+                prop_ser = prop_series[col]
+                if isinstance(self.pca, cuml.PCA) and hasattr(prop_ser, 'compute'):
+                    prop_ser = prop_ser.compute()
+                new_fingerprints[col] = prop_ser
 
             self.df_embedding = self._remove_ui_columns(self.df_embedding)
 
@@ -246,14 +252,11 @@ class GpuKmeansUmapHybrid(GpuKmeansUmap, metaclass=Singleton):
                  pca_comps=64,
                  n_clusters=7,
                  seed=0):
-        super(GpuKmeansUmapHybrid, self).__init__(
-            n_molecules=n_molecules,
-            dao=dao,
-            pca_comps=pca_comps,
-            n_clusters=n_clusters,
-            seed=seed)
-
-        self.pca_single_gpu = None
+        super().__init__(n_molecules=n_molecules,
+                         dao=dao,
+                         pca_comps=pca_comps,
+                         n_clusters=n_clusters,
+                         seed=seed)
 
     def _cluster(self, embedding, n_pca):
         """
@@ -275,10 +278,10 @@ class GpuKmeansUmapHybrid(GpuKmeansUmap, metaclass=Singleton):
 
         if n_pca and n_obs > n_pca:
             with MetricsLogger('pca', self.n_molecules) as ml:
-                if self.pca_single_gpu == None:
-                    self.pca_single_gpu = cuml.PCA(n_components=n_pca)
-                    self.pca_single_gpu.fit(embedding)
-                embedding = self.pca_single_gpu.transform(embedding)
+                if self.pca == None:
+                    self.pca = cuml.PCA(n_components=n_pca)
+                    self.pca.fit(embedding)
+                embedding = self.pca.transform(embedding)
 
         with MetricsLogger('kmeans', self.n_molecules) as ml:
             if self.n_molecules < MIN_RECLUSTER_SIZE:

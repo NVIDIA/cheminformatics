@@ -45,7 +45,7 @@ def report_ui_error(num_returns):
                 raise e
             except Exception as e:
                 traceback.print_exception(*sys.exc_info())
-                ret_value = [dash.no_update for i in range(num_returns)]
+                ret_value = [dash.no_update for i in range(num_returns - 1)]
                 ret_value.append(str(e))
                 return ret_value
         return func_wrapper

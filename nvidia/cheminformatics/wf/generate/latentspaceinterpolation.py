@@ -39,7 +39,7 @@ class LatentSpaceInterpolation(metaclass=Singleton):
         """
 
         def _addjitter(embeddings, idx):
-            noise = np.random.normal(0, 0.5, embeddings[idx].shape)
+            noise = np.random.normal(0, 0.599, embeddings[idx].shape)
             embeddings[idx] += noise
 
         for idx in range(1, interp_df.shape[0] - 1):
@@ -48,12 +48,12 @@ class LatentSpaceInterpolation(metaclass=Singleton):
                 _addjitter(embeddings, idx)
 
         regen = False
-        if interp_df.shape[0] > 3:
+        if interp_df.shape[0] > 2:
             # If first three molecules are same, previous loop changes the sec
             # molecule. This block will fix the third one.
-            if interp_df.iat[0, 0] == interp_df.iat[2, 0]:
+            if interp_df.iat[0, 0] == interp_df.iat[1, 0]:
                 regen = True
-                _addjitter(embeddings, 2)
+                _addjitter(embeddings, 1)
 
         if regen:
             interp_df['SMILES'] = cddd_embeddings.inverse_transform(embeddings)

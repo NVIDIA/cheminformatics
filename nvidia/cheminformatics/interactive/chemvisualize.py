@@ -37,6 +37,34 @@ LEVEL_TO_STYLE = {
     'error': {'color': 'red'}
 }
 
+PROP_DISP_NAME = {
+    'chembl_id': 'ChEMBL Id',
+    'mw_freebase': 'Molecular Weight (Free Base)',
+    'alogp': 'AlogP',
+    'hba': 'H-Bond Acceptors',
+    'hbd': 'H-Bond Donors',
+    'psa': 'Polar Surface Area',
+    'rtb': 'Rotatable Area',
+    'ro3_pass': 'Rule of 3 Passes',
+    'num_ro5_violations': 'Lipinski Ro5 Violation',
+    'cx_most_apka': 'Acidic pKa (ChemAxon)',
+    'cx_most_bpka': 'Basic pKa (ChemAxon)',
+    'cx_logp': 'logP (ChemAxon)',
+    'cx_logd': 'LogD pKa (ChemAxon)',
+    'molecular_species': 'Molecular Species',
+    'full_mwt': 'MW (Full)',
+    'aromatic_rings': 'Aromatic Rings',
+    'heavy_atoms': 'Heavy Atoms',
+    'qed_weighted': 'QED (Weighted)',
+    'mw_monoisotopic': 'MW (Mono)',
+    'full_molformula': 'Full Formula',
+    'hba_lipinski': 'H-Bond Acceptors (Lipinski)',
+    'hbd_lipinski': 'H-Bond Donors (Lipinski)',
+    'num_lipinski_ro5_violations': 'Lipinski Ro5 Violations',
+    'standard_inchi': 'Standard InChi',
+    'standard_inchi_key': 'Standard InChi Key'
+}
+
 
 class ChemVisualization:
 
@@ -72,18 +100,18 @@ class ChemVisualization:
         self.app.callback(
             [Output('main-figure', 'figure'),
              Output('northstar_cluster', 'children'),
-             Output('north_star_clusterid_map', 'children'),
+             Output('refresh_moi_prop_table', 'children'),
              Output('recluster_error', 'children')],
             [Input('bt_recluster_clusters', 'n_clicks'),
              Input('bt_recluster_points', 'n_clicks'),
              Input('bt_north_star', 'n_clicks'),
-             Input('hidden_northstar', 'children'),
              Input('sl_prop_gradient', 'value'),
              Input('sl_nclusters', 'value'),
              Input('refresh_main_fig', 'children') ],
             [State("selected_clusters", "value"),
              State("main-figure", "selectedData"),
-             State('north_star', 'value'), ])(self.handle_re_cluster)
+             State('north_star', 'value'),
+             State('refresh_moi_prop_table', 'children')])(self.handle_re_cluster)
 
         # Register callbacks for selection inside main figure to update module details
         self.app.callback(
@@ -91,16 +119,17 @@ class ChemVisualization:
              Output('sl_mol_props', 'options'),
              Output('current_page', 'children'),
              Output('total_page', 'children'),
-             Output('mol_selection_error', 'children'),
-             Output('show_selected_mol', 'children')],
+             Output('show_selected_mol', 'children'),
+             Output('mol_selection_error', 'children')],
             [Input('main-figure', 'selectedData'),
              Input('sl_mol_props', 'value'),
-             Input('sl_prop_gradient', 'value'),
              Input('bt_page_prev', 'n_clicks'),
              Input('bt_page_next', 'n_clicks'),
-             Input('north_star_clusterid_map', 'children')],
-            [State('current_page', 'children'),
-             State('show_selected_mol', 'children')])(self.handle_molecule_selection)
+             Input('refresh_moi_prop_table', 'children')],
+            [State('north_star', 'value'),
+             State('current_page', 'children'),
+             State('show_selected_mol', 'children'),
+             State('sl_prop_gradient', 'value')])(self.handle_molecule_selection)
 
         self.app.callback(
             Output("refresh_main_fig", "children"),
@@ -110,11 +139,9 @@ class ChemVisualization:
              State("sl_wf", "value")])(self.handle_reset)
 
         self.app.callback(
-            [Output('north_star', 'value'),
-             Output('hidden_northstar', 'children')],
-            [Input({'role': 'bt_star_candidate', 'chemblId': ALL, 'molregno': ALL, 'x': ALL, 'y': ALL}, 'n_clicks')],
-            [State('north_star', 'value'),
-             State('hidden_northstar', 'children')])(self.handle_mark_north_star)
+            Output('north_star', 'value'),
+            Input({'role': 'bt_star_candidate', 'chemblId': ALL, 'molregno': ALL}, 'n_clicks'),
+            State('north_star', 'value'))(self.handle_mark_north_star)
 
         self.app.callback(
             [Output('error_msg', 'children'),
@@ -123,8 +150,14 @@ class ChemVisualization:
              Input('bt_close_err', 'n_clicks')])(self.handle_error)
 
         self.app.callback(
+            Output('interpolation_candidates', 'children'),
+            [Input({'role': 'bt_add_interpolation_candidate', 'chemblId': ALL, 'molregno': ALL}, 'n_clicks'),
+             Input('bt_reset_interpolation_list', 'n_clicks')],
+            State('interpolation_candidates', 'children'))(self.handle_add_interpolation_candidate)
+
+        self.app.callback(
             Output('ckl_mol_id', 'options'),
-            [Input('north_star', 'value')])(self.handle_north_star_change)
+            Input('interpolation_candidates', 'children'))(self.handle_north_star_change)
 
         self.app.callback(
             Output('ckl_mol_id', 'value'),
@@ -144,6 +177,29 @@ class ChemVisualization:
              Output('section_selected_molecules', 'style'),],
             [Input('show_generated_mol', 'children'),
              Input('show_selected_mol', 'children')])(self.handle_property_tables)
+
+
+    def handle_add_interpolation_candidate(self, bt_add_interpolation_candidate, bt_reset_interpolation_list, interpolation_candidates):
+        comp_id, event_type = self._fetch_event_data()
+
+        if comp_id == 'bt_reset_interpolation_list' and event_type == 'n_clicks':
+            return ''
+
+        if event_type != 'n_clicks' or dash.callback_context.triggered[0]['value'] == 0:
+            raise dash.exceptions.PreventUpdate
+
+        selected_candidates = []
+
+        if interpolation_candidates:
+            selected_candidates = interpolation_candidates.split(",")
+
+        comp_detail = json.loads(comp_id)
+        selected_chembl_id = comp_detail['chemblId']
+
+        if selected_chembl_id not in selected_candidates:
+            selected_candidates.append(selected_chembl_id)
+
+        return ','.join(selected_candidates)
 
     def _fetch_event_data(self):
         if not dash.callback_context.triggered:
@@ -225,7 +281,7 @@ class ChemVisualization:
 
     def handle_north_star_change(self, north_star):
         if not north_star:
-            raise dash.exceptions.PreventUpdate
+            return []
 
         options = [{'label': i.strip(), 'value': i.strip()} for i in north_star.split(',')]
         return options
@@ -240,8 +296,6 @@ class ChemVisualization:
                 self.workflow = wf_class()
             else:
                 raise dash.exceptions.PreventUpdate
-
-#            self.recluster(reload_data=True)
 
         if refresh_main_fig is None:
             refresh_main_fig = 1
@@ -299,19 +353,16 @@ class ChemVisualization:
             moi_molregno = north_stars.split(",")
 
         moi_filter = ldf['id'].isin(moi_molregno)
-        northstar_df = ldf[moi_filter]
 
         # Create a map with MoI and cluster to which they belong
-        chemble_cluster_map = {}
         northstar_cluster = []
         if gradient_prop is not None:
             cmin = ldf[gradient_prop].min()
             cmax = ldf[gradient_prop].max()
 
-            df_size = moi_filter
             # Compute size of northstar and normal points
-            df_shape = df_size.copy()
-            df_size = (df_size * 18) + DOT_SIZE
+            df_shape = moi_filter.copy()
+            df_size = (moi_filter * 18) + DOT_SIZE
             df_shape = df_shape * 2
 
             x_data = ldf['x']
@@ -351,6 +402,7 @@ class ChemVisualization:
             if self.workflow.is_gpu_enabled():
                 clusters = clusters.values_host
 
+            northstar_df = ldf[moi_filter]
             scatter_traces = []
             for cluster_id in clusters:
                 cdf = ldf.query('cluster == ' + str(cluster_id))
@@ -413,7 +465,7 @@ class ChemVisualization:
                 dict(x=-0.05, y=0.5, showarrow=False, text="y",
                      textangle=-90, xref="paper", yref="paper")])
         del ldf
-        return fig, northstar_cluster, json.dumps(chemble_cluster_map)
+        return fig, northstar_cluster
 
     def start(self, host=None, port=5000):
         return self.app.run_server(
@@ -427,37 +479,37 @@ class ChemVisualization:
     def construct_molecule_detail(self, selected_points, display_properties,
                                   page, pageSize=10, chembl_ids=None):
 
-        if not selected_points:
-            return None, None
-
         # Create Table header
         table_headers = [html.Th("Chemical Structure", style={'width': '30%', 'fontSize': '150%'}),
                          html.Th("SMILES", style={'fontSize': '150%'})]
         for prop in display_properties:
-            table_headers.append(html.Th(prop, style={'fontSize': '150%'}))
+            if prop in PROP_DISP_NAME:
+                table_headers.append(html.Th(PROP_DISP_NAME[prop], style={'fontSize': '150%'}))
 
         if chembl_ids:
-            table_headers.append(html.Th('Cluster', style={'fontSize': '150%'}))
+            table_headers.append(html.Th('ChEMBLE', style={'fontSize': '150%'}))
+        else:
+            table_headers.append(html.Th(""))
 
-        table_headers.append(html.Th(""))
         prop_recs = [html.Tr(table_headers)]
 
-        mol_position = {}
         if chembl_ids:
-            selected_chembl_ids = chembl_ids
-        else:
-            selected_chembl_ids = []
+            props, selected_molecules = self.chem_data.fetch_props_by_chemble(chembl_ids)
+        elif selected_points:
+            selected_molregno = []
             for point in selected_points['points'][((page - 1) * pageSize): page * pageSize]:
                 if 'customdata' in point:
                     molregid = point['customdata']
-                    selected_chembl_ids.append(molregid)
-                    mol_position[molregid] = {'x': point['x'], 'y': point['y']}
+                    selected_molregno.append(molregid)
+            props, selected_molecules = self.chem_data.fetch_props_by_molregno(
+                selected_molregno)
+        else:
+            return None, None
 
-        props, selected_molecules = self.chem_data.fetch_props_by_molregno(
-            selected_chembl_ids)
         all_props = []
         for k in props:
-            all_props.append({"label": k, "value": k})
+            if k in PROP_DISP_NAME:
+                all_props.append({"label": PROP_DISP_NAME[k], "value": k})
 
         for selected_molecule in selected_molecules:
             td = []
@@ -467,7 +519,7 @@ class ChemVisualization:
             mol = selected_molecule[props.index('molfile')]
             m = Chem.MolFromMolBlock(mol)
 
-            drawer = Draw.rdMolDraw2D.MolDraw2DCairo(400, 200)
+            drawer = Draw.rdMolDraw2D.MolDraw2DCairo(500, 150)
             drawer.SetFontSize(1.0)
             drawer.DrawMolecule(m)
             drawer.FinishDrawing()
@@ -478,25 +530,29 @@ class ChemVisualization:
             td.append(html.Td(html.Img(src=img_binary)))
             td.append(html.Td(smiles))
             for key in display_properties:
-                td.append(html.Td(selected_molecule[props.index(key)]))
+                if key in PROP_DISP_NAME:
+                    td.append(html.Td(selected_molecule[props.index(key)]))
 
-            if chembl_ids:
-                td.append(html.Td(chembl_ids[selected_chembl_id]))
-            x = None
-            y = None
             molregno = selected_molecule[0]
-            if molregno in mol_position:
-                x = mol_position[molregno]['x']
-                y = mol_position[molregno]['y']
+            if chembl_ids:
+                td.append(html.Td(selected_chembl_id))
+            else:
+                td.append(html.Td(
+                    dbc.Button('Add as MoI',
+                            id={'role': 'bt_star_candidate',
+                                'chemblId': selected_chembl_id,
+                                'molregno': str(molregno)
+                                },
+                            n_clicks=0)
+                ))
+
             td.append(html.Td(
-                dbc.Button('Add as MoI',
-                           id={'role': 'bt_star_candidate',
-                               'chemblId': selected_chembl_id,
-                               'molregno': str(molregno),
-                               'x': x,
-                               'y': y,
+                dbc.Button('Add for Interpolation',
+                        id={'role': 'bt_add_interpolation_candidate',
+                            'chemblId': selected_chembl_id,
+                            'molregno': str(molregno)
                             },
-                           n_clicks=0)
+                        n_clicks=0)
             ))
 
             prop_recs.append(html.Tr(td))
@@ -505,7 +561,7 @@ class ChemVisualization:
 
     def constuct_layout(self):
         # TODO: avoid calling self.workflow.df_embedding
-        fig, _, _ = self.create_graph(self.workflow.df_embedding)
+        fig, _ = self.create_graph(self.workflow.df_embedding)
 
         return html.Div([
             html.Div(className='row', children=[
@@ -592,7 +648,10 @@ class ChemVisualization:
                                 inputStyle={'display': 'inline-block', 'marginLeft': 6, 'marginRight': 6},
                                 labelStyle={'display': 'block', 'marginLeft': 6, 'marginRight': 6}
                             ),
-                            dbc.Button('Generate', id='bt_generate_fr_selected_chemble', n_clicks=0),
+                            html.Div(className='row', children=[
+                                dbc.Button('Generate', id='bt_generate_fr_selected_chemble', n_clicks=0, style={'marginRight': 12}),
+                                dbc.Button('Reset', id='bt_reset_interpolation_list', n_clicks=0),
+                            ], style={'marginLeft': 0}),
                         ]),
                     ]),
 
@@ -600,7 +659,7 @@ class ChemVisualization:
                         html.Label([
                             "Select Molecular Property for color gradient",
                             dcc.Dropdown(id='sl_prop_gradient', multi=False,  clearable=True,
-                                        options=[{"label": p, "value": p} for p in IMP_PROPS],),
+                                        options=[{"label": PROP_DISP_NAME[p], "value": p} for p in IMP_PROPS],),
                         ], style={'marginTop': 18, 'marginLeft': 0})],
                     ),
                 ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
@@ -646,12 +705,12 @@ class ChemVisualization:
 
             html.Div(id='refresh_main_fig', style={'display': 'none'}),
             html.Div(id='northstar_cluster', style={'display': 'none'}),
-            html.Div(id='hidden_northstar', style={'display': 'none'}),
-            html.Div(id='north_star_clusterid_map', style={'display': 'none'}),
             html.Div(id='recluster_error', style={'display': 'none'}),
             html.Div(id='mol_selection_error', style={'display': 'none'}),
             html.Div(id='show_selected_mol', style={'display': 'none'}),
             html.Div(id='show_generated_mol', style={'display': 'none'}),
+            html.Div(id='interpolation_candidates', style={'display': 'none'}),
+            html.Div(id='refresh_moi_prop_table', style={'display': 'none'}),
 
             html.Div(className='row', children=[
                 dbc.Modal([
@@ -678,12 +737,10 @@ class ChemVisualization:
 
     @report_ui_error(6)
     def handle_molecule_selection(self, mf_selected_data, selected_columns,
-                                  sl_prop_gradient, prev_click, next_click,
-                                  north_star_clusterid_map, current_page, show_selected_mol):
+                                  prev_click, next_click, refresh_moi_prop_table,
+                                  north_star, current_page, show_selected_mol,
+                                  sl_prop_gradient):
         comp_id, event_type = self._fetch_event_data()
-
-        if (not mf_selected_data) and comp_id != 'north_star_clusterid_map':
-            raise dash.exceptions.PreventUpdate
 
         module_details = None
         chembl_ids = None
@@ -696,10 +753,13 @@ class ChemVisualization:
             if len(mf_selected_data['points']) < PAGE_SIZE * (current_page + 1):
                 raise dash.exceptions.PreventUpdate
             current_page += 1
-        elif comp_id == 'north_star_clusterid_map' and event_type == 'children':
-            chembl_ids = json.loads(north_star_clusterid_map)
-            if len(chembl_ids) == 0:
-                raise dash.exceptions.PreventUpdate
+        elif north_star and \
+            ((comp_id == 'refresh_moi_prop_table' and event_type == 'children') or (comp_id == 'sl_mol_props' and event_type == 'value')):
+            chembl_ids = north_star.split(",")
+        elif comp_id == 'main-figure' and event_type == 'selectedData':
+            pass
+        else:
+            raise dash.exceptions.PreventUpdate
 
         if selected_columns and sl_prop_gradient:
             if sl_prop_gradient not in selected_columns:
@@ -708,6 +768,10 @@ class ChemVisualization:
         module_details, all_props = self.construct_molecule_detail(
             mf_selected_data, selected_columns, current_page,
             pageSize=PAGE_SIZE, chembl_ids=chembl_ids)
+
+        if module_details is None and all_props is None:
+            return dash.no_update, dash.no_update, dash.no_update, \
+                dash.no_update, dash.no_update, dash.no_update,
 
         if chembl_ids:
             last_page = ''
@@ -718,7 +782,7 @@ class ChemVisualization:
             show_selected_mol = 0
         show_selected_mol += 1
 
-        return module_details, all_props, current_page, last_page, dash.no_update, show_selected_mol
+        return module_details, all_props, current_page, last_page, show_selected_mol, dash.no_update
 
     def handle_data_selection(self, mf_click_data, mf_selected_data,
                               bt_cluster_clicks, bt_point_clicks,
@@ -763,7 +827,7 @@ class ChemVisualization:
 
         return selected_clusters, selected_point_cnt
 
-    def handle_mark_north_star(self, bt_north_star_click, north_star, hidden_northstar):
+    def handle_mark_north_star(self, bt_north_star_click, north_star):
         comp_id, event_type = self._fetch_event_data()
 
         if event_type != 'n_clicks' or dash.callback_context.triggered[0]['value'] == 0:
@@ -774,11 +838,8 @@ class ChemVisualization:
 
         if north_star:
             selected_north_star = north_star.split(",")
-            if hidden_northstar:
-                selected_north_star_mol_reg_id = hidden_northstar.split(",")
-            else:
-                selected_north_star_mol_reg_id = [
-                    str(row[0]) for row in self.chem_data.fetch_molregno_by_chemblId(selected_north_star)]
+            selected_north_star_mol_reg_id = [
+                str(row[0]) for row in self.chem_data.fetch_molregno_by_chemblId(selected_north_star)]
 
         comp_detail = json.loads(comp_id)
         selected_chembl_id = comp_detail['chemblId']
@@ -786,13 +847,14 @@ class ChemVisualization:
         if selected_chembl_id not in selected_north_star:
             selected_north_star.append(selected_chembl_id)
             selected_north_star_mol_reg_id.append(comp_detail['molregno'])
-        return ','.join(selected_north_star), ','.join(selected_north_star_mol_reg_id)
+        return ','.join(selected_north_star)
 
-    @report_ui_error(3)
+    @report_ui_error(4)
     def handle_re_cluster(self, bt_cluster_clicks, bt_point_clicks, bt_north_star_clicks,
-                          north_star_hidden, sl_prop_gradient, sl_nclusters, refresh_main_fig,
-                          selected_clusters, selected_points, north_star):
+                          sl_prop_gradient, sl_nclusters, refresh_main_fig,
+                          selected_clusters, selected_points, north_star, refresh_moi_prop_table):
         comp_id, event_type = self._fetch_event_data()
+
         if comp_id == 'sl_nclusters':
             if sl_nclusters:
                 self.n_clusters = int(sl_nclusters)
@@ -804,52 +866,50 @@ class ChemVisualization:
         filter_column = None
         reload_data = False
         recluster_data = True
+        moi_molregno = None
         error_msg = ''
+        _refresh_moi_prop_table = dash.no_update
 
         if selected_clusters and comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks':
             filter_values = list(map(int, selected_clusters.split(",")))
             filter_column = 'cluster'
-
         elif selected_points and comp_id == 'bt_recluster_points' and event_type == 'n_clicks':
             filter_values = []
             for point in selected_points['points']:
                 if 'customdata' in point:
                     filter_values.append(point['customdata'])
             filter_column = 'id'
-
         elif comp_id == 'bt_north_star' and event_type == 'n_clicks':
             if north_star:
                 north_star = north_star.split(',')
                 missing_mols, molregnos, _ = self.workflow.add_molecules(north_star)
                 recluster_data = len(missing_mols) > 0
+                logger.info("%d missing molecules added...", len(missing_mols))
+                logger.debug("Missing molecules werew %s", missing_mols)
 
-                north_star_hidden = " ,".join(list(map(str, molregnos)))
+                moi_molregno = " ,".join(list(map(str, molregnos)))
+                if refresh_moi_prop_table is None:
+                    refresh_moi_prop_table = 0
+                _refresh_moi_prop_table = refresh_moi_prop_table + 1
             else:
-                north_star_hidden = ''
-                recluster_data = False
-
-        elif comp_id == 'hidden_northstar' and event_type == 'children':
-            recluster_data = False
-            if not north_star_hidden:
                 raise dash.exceptions.PreventUpdate
 
         elif comp_id == 'refresh_main_fig' and event_type == 'children':
             reload_data = True
             recluster_data = True
-
         else:
             # Event that are expected to reach this block are
             #   'sl_prop_gradient' and event_type == 'value':
             reload_data = False
             recluster_data = False
 
-        figure, northstar_cluster, chembl_clusterid_map = self.recluster_selection(
+        figure, northstar_cluster = self.recluster_selection(
             filter_value=filter_values,
             filter_column=filter_column,
             gradient_prop=sl_prop_gradient,
-            north_stars=north_star_hidden,
+            north_stars=moi_molregno,
             color_col='cluster',
             reload_data = reload_data,
             recluster_data=recluster_data)
 
-        return figure, ','.join(northstar_cluster), chembl_clusterid_map, error_msg
+        return figure, ','.join(northstar_cluster), _refresh_moi_prop_table, error_msg

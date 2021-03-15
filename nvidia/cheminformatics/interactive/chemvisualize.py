@@ -23,9 +23,6 @@ from nvidia.cheminformatics.decorator import MolecularStructureDecorator
 
 logger = logging.getLogger(__name__)
 
-external_stylesheets = [
-    'https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP]
-
 main_fig_height = 700
 CHEMBL_DB = '/data/db/chembl_27.db'
 PAGE_SIZE = 10
@@ -69,8 +66,8 @@ PROP_DISP_NAME = {
 class ChemVisualization:
 
     def __init__(self, workflow):
-        self.app = dash.Dash(
-            __name__, external_stylesheets=external_stylesheets)
+        self.app = dash.Dash(__name__,
+                             external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP])
 
         self.workflow = workflow
         self.n_clusters = workflow.n_clusters
@@ -516,8 +513,7 @@ class ChemVisualization:
             selected_chembl_id = selected_molecule[1]
             smiles = selected_molecule[props.index('canonical_smiles')]
 
-            mol = selected_molecule[props.index('molfile')]
-            m = Chem.MolFromMolBlock(mol)
+            m = Chem.MolFromSmiles(smiles)
 
             drawer = Draw.rdMolDraw2D.MolDraw2DCairo(500, 150)
             drawer.SetFontSize(1.0)
@@ -660,7 +656,7 @@ class ChemVisualization:
                             "Select Molecular Property for color gradient",
                             dcc.Dropdown(id='sl_prop_gradient', multi=False,  clearable=True,
                                         options=[{"label": PROP_DISP_NAME[p], "value": p} for p in IMP_PROPS],),
-                        ], style={'marginTop': 18, 'marginLeft': 0})],
+                        ], style={'marginTop': 18, 'marginLeft': 18})],
                     ),
                 ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
             ]),

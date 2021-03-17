@@ -30,6 +30,22 @@ RUN mkdir -p /opt/nvidia/ \
     && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
     && rm -rf /opt/nvidia/cheminfomatics/.git
 
+# TODO: Replace the following lines once the repo is available.
+RUN wget  --quiet -O /tmp/pysmilesutils-mirror.tgz \
+    http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
+    && tar -xf /tmp/pysmilesutils-mirror.tgz -C /opt \
+    && cd /opt/pysmilesutils-mirror; pip install .
+RUN wget  --quiet -O /tmp/molbart-mirror.tgz \
+    http://rilango-work.nvidia.com/molbart/molbart-mirror.tgz \
+    && tar -xf /tmp/molbart-mirror.tgz -C /opt \
+    && cd /opt/molbart-mirror; pip install -r requirements.txt; pip install .
+RUN mkdir -p /models/molbart \
+    && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
+    http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \
+    && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
+    http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
+
+
 ENV UCX_LOG_LEVEL error
 
 CMD /opt/nvidia/cheminfomatics/launch.sh dash

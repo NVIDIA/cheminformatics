@@ -5,7 +5,7 @@ from flask import request
 from flask_restplus import Resource
 
 from nvidia.cheminformatics.api import api_rest
-from nvidia.cheminformatics.wf.generate.latentspaceinterpolation import LatentSpaceInterpolation
+from nvidia.cheminformatics.wf.interpolation.latentspaceinterpolation import LatentSpaceInterpolation
 
 
 logger = logging.getLogger(__name__)

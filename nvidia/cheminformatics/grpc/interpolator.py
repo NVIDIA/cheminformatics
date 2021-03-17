@@ -5,7 +5,7 @@ import logging
 import interpolator_pb2_grpc
 import interpolator_pb2
 
-from nvidia.cheminformatics.wf.generate.latentspaceinterpolation import LatentSpaceInterpolation
+from nvidia.cheminformatics.wf.interpolation.latentspaceinterpolation import LatentSpaceInterpolation
 
 
 logger = logging.getLogger(__name__)

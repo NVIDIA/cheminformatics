@@ -73,7 +73,7 @@ class ChemVisualization:
         self.n_clusters = workflow.n_clusters
         self.chem_data = ChEmblData()
         self.wf = 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'
-        self.generative_wf = 'nvidia.cheminformatics.wf.generate.latentspaceinterpolation.LatentSpaceInterpolation'
+        self.generative_wf = 'nvidia.cheminformatics.wf.interpolation.LatentSpaceInterpolation'
 
         # Store colors to avoid plots changes colors on events such as
         # molecule selection, etc.
@@ -144,6 +144,7 @@ class ChemVisualization:
             [Output('error_msg', 'children'),
              Output('md_error', 'is_open')],
             [Input('recluster_error', 'children'),
+             Input('interpolation_error', 'children'),
              Input('bt_close_err', 'n_clicks')])(self.handle_error)
 
         self.app.callback(
@@ -162,7 +163,8 @@ class ChemVisualization:
 
         self.app.callback(
             [Output('section_generated_molecules', 'children'),
-             Output('show_generated_mol', 'children'),],
+             Output('show_generated_mol', 'children'),
+             Output('interpolation_error', 'children'),],
             [Input("bt_generate_fr_selected_chemble", "n_clicks"),],
             [State('sl_generative_wf', 'value'),
              State('ckl_mol_id', 'value'),
@@ -214,6 +216,7 @@ class ChemVisualization:
             return {'display': 'block'}, {'display': 'none'}
         return dash.no_update, dash.no_update
 
+    @report_ui_error(3)
     def handle_generate(self, bt_generate_fr_selected_chemble,
                         sl_generative_wf, ckl_mol_id, n2generate, show_generated_mol):
         comp_id, event_type = self._fetch_event_data()
@@ -224,9 +227,11 @@ class ChemVisualization:
         else:
             return dash.no_update, dash.no_update
 
+        self.generative_wf = sl_generative_wf
+        logger.info(self.generative_wf)
         wf_class = locate(self.generative_wf)
         generative_wf = wf_class()
-        genreated_df = generative_wf.interpolate_from_id(chemble_ids, num_points=n2generate)
+        genreated_df = generative_wf.interpolate_from_id(chemble_ids, num_points=n2generate, add_jitter=True)
 
         if show_generated_mol is None:
             show_generated_mol = 0
@@ -263,7 +268,7 @@ class ChemVisualization:
 
             prop_recs.append(html.Tr(td))
 
-        return html.Table(prop_recs, style={'width': '100%', 'marginLeft': 60}), show_generated_mol
+        return html.Table(prop_recs, style={'width': '100%', 'marginLeft': 60}), show_generated_mol, dash.no_update
 
     def handle_ckl_selection(self, ckl_mol_id):
         if not ckl_mol_id:
@@ -515,7 +520,7 @@ class ChemVisualization:
 
             m = Chem.MolFromSmiles(smiles)
 
-            drawer = Draw.rdMolDraw2D.MolDraw2DCairo(500, 150)
+            drawer = Draw.rdMolDraw2D.MolDraw2DCairo(500, 125)
             drawer.SetFontSize(1.0)
             drawer.DrawMolecule(m)
             drawer.FinishDrawing()
@@ -627,7 +632,9 @@ class ChemVisualization:
                             html.Div(children=[
                                 dcc.Dropdown(id='sl_generative_wf', multi=False,
                                              options=[{'label': 'Latent Space Interpolation',
-                                                       'value': 'nvidia.cheminformatics.wf.generate.latentspaceinterpolation.LatentSpaceInterpolation'},
+                                                       'value': 'nvidia.cheminformatics.wf.interpolation.LatentSpaceInterpolation'},
+                                                      {'label': 'MolBART',
+                                                       'value': 'nvidia.cheminformatics.wf.interpolation.MolBARTInterpolation'},
                                                      ],
                                              value=self.generative_wf,
                                              clearable=False),
@@ -707,6 +714,7 @@ class ChemVisualization:
             html.Div(id='show_generated_mol', style={'display': 'none'}),
             html.Div(id='interpolation_candidates', style={'display': 'none'}),
             html.Div(id='refresh_moi_prop_table', style={'display': 'none'}),
+            html.Div(id='interpolation_error', style={'display': 'none'}),
 
             html.Div(className='row', children=[
                 dbc.Modal([
@@ -721,15 +729,21 @@ class ChemVisualization:
             ]),
         ])
 
-    def handle_error(self, recluster_error, bt_close_err):
+    def handle_error(self, recluster_error, interpolation_error, bt_close_err):
         comp_id, event_type = self._fetch_event_data()
 
         if comp_id == 'bt_close_err' and event_type == 'n_clicks':
             return '', False
 
-        if not recluster_error:
+        msg = None
+        if comp_id == 'interpolation_error' and event_type == 'children':
+            msg = interpolation_error
+        elif comp_id == 'interpolation_error' and event_type == 'children':
+            msg = recluster_error
+
+        if msg is None:
             raise dash.exceptions.PreventUpdate
-        return recluster_error, True
+        return msg, True
 
     @report_ui_error(6)
     def handle_molecule_selection(self, mf_selected_data, selected_columns,
@@ -863,7 +877,6 @@ class ChemVisualization:
         reload_data = False
         recluster_data = True
         moi_molregno = None
-        error_msg = ''
         _refresh_moi_prop_table = dash.no_update
 
         if selected_clusters and comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks':
@@ -899,6 +912,10 @@ class ChemVisualization:
             reload_data = False
             recluster_data = False
 
+        if north_star and moi_molregno is None:
+            molregnos = [row[0] for row in self.workflow.dao.fetch_id_from_chembl(north_star.split(','))]
+            moi_molregno = " ,".join(list(map(str, molregnos)))
+
         figure, northstar_cluster = self.recluster_selection(
             filter_value=filter_values,
             filter_column=filter_column,
@@ -908,4 +925,4 @@ class ChemVisualization:
             reload_data = reload_data,
             recluster_data=recluster_data)
 
-        return figure, ','.join(northstar_cluster), _refresh_moi_prop_table, error_msg
+        return figure, ','.join(northstar_cluster), _refresh_moi_prop_table, ''

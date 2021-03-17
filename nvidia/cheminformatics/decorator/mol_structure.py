@@ -24,7 +24,7 @@ class MolecularStructureDecorator(BaseMolPropertyDecorator):
             smiles = df.iat[idx, smile_cols]
             try:
                 m = Chem.MolFromSmiles(smiles)
-                drawer = Draw.rdMolDraw2D.MolDraw2DCairo(500, 150)
+                drawer = Draw.rdMolDraw2D.MolDraw2DCairo(500, 125)
                 drawer.SetFontSize(1.0)
                 drawer.DrawMolecule(m)
                 drawer.FinishDrawing()

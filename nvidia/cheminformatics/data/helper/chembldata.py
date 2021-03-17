@@ -99,7 +99,7 @@ class ChEmblData(object, metaclass=Singleton):
             """
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
                 closing(con.cursor()) as cur:
-            select_stmt = sql_stml % "'%s'" %"','".join(chemble_ids)
+            select_stmt = sql_stml % "'%s'" %"','".join([ x.strip().upper() for x in chemble_ids])
             cur.execute(select_stmt)
 
             cols = list(map(lambda x: x[0], cur.description))
@@ -133,7 +133,7 @@ class ChEmblData(object, metaclass=Singleton):
                     molecule_dictionary md
                 WHERE md.molregno = cs.molregno
                     AND md.chembl_id in (%s)
-            ''' %  "'%s'" %"','".join([ x.upper() for x in new_molecules])
+            ''' %  "'%s'" %"','".join([ x.strip().upper() for x in new_molecules])
             cur.execute(select_stmt)
 
             return cur.fetchall()

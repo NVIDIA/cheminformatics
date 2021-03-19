@@ -243,13 +243,23 @@ class ChemVisualization:
 
         # Create Table header
         table_headers = []
-        columns = genreated_df.columns
-        for column in columns.to_list():
+        columns = genreated_df.columns.to_list()
+        for column in columns:
             table_headers.append(html.Th(column, style={'fontSize': '150%'}))
 
         prop_recs = [html.Tr(table_headers)]
         for row_idx in range(genreated_df.shape[0]):
             td = []
+
+            try:
+                col_pos = columns.index('Chemical Structure')
+                col_data = genreated_df.iat[row_idx, col_pos]
+
+                if 'value' in col_data and col_data['value'] == 'Error interpreing SMILES using RDKIT':
+                    continue
+            except ValueError:
+                pass
+
             for col_id in range(len(columns)):
                 col_data = genreated_df.iat[row_idx, col_id]
 

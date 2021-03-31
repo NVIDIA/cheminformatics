@@ -4,8 +4,8 @@ import traceback
 from functools import wraps
 
 import numpy as np
-import dask
-import dask_cudf
+# import dask
+# import dask_cudf
 import dash
 
 from typing import Union
@@ -13,7 +13,7 @@ from typing import Union
 logger = logging.getLogger(__name__)
 
 
-DELAYED_DF_TYPES = Union[dask.dataframe.core.DataFrame, dask_cudf.core.DataFrame]
+# DELAYED_DF_TYPES = Union[dask.dataframe.core.DataFrame, dask_cudf.core.DataFrame]
 
 
 def generate_colors(num_colors):

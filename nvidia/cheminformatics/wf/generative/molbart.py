@@ -17,22 +17,28 @@ from rdkit import Chem
 from nvidia.cheminformatics.data import GenerativeWfDao
 from nvidia.cheminformatics.data.generative_wf import ChemblGenerativeWfDao
 from nvidia.cheminformatics.utils.singleton import Singleton
-from nvidia.cheminformatics.wf.interpolation import BaseGenerativeWorkflow
+from nvidia.cheminformatics.wf.generative import BaseGenerativeWorkflow
 
 
 logger = logging.getLogger(__name__)
 
 
-class MolBARTInterpolation(BaseGenerativeWorkflow, metaclass=Singleton):
+class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
         super().__init__(dao)
         max_seq_len = 64
         tokenizer_path = '/models/molbart/mol_opt_tokeniser.pickle'
         model_chk_path = '/models/molbart/az_molbart_pretrain.ckpt'
+        if torch.cuda.is_available():
+            self.device = 'cuda'
+        else:
+            self.device = 'cpu'
 
         self.tokenizer = self.load_tokenizer(tokenizer_path)
         self.bart_model = self.load_model(model_chk_path, self.tokenizer, max_seq_len)
+
+        self.bart_model.to('cuda')
 
     def load_tokenizer(self, tokenizer_path):
         """Load pickled tokenizer
@@ -157,6 +163,25 @@ class MolBARTInterpolation(BaseGenerativeWorkflow, metaclass=Singleton):
                     break
 
         return smiles_interp_list
+
+    def find_similars_smiles_list(self, smiles:str, num_requested:int=10, radius=0.0001):
+        embedding, pad_mask = self.smiles2embedding(self.bart_model,
+                                                    smiles,
+                                                    self.tokenizer)
+
+        neighboring_embeddings = self.addjitter(embedding, radius, cnt=num_requested)
+
+        generated_mols = self.inverse_transform(neighboring_embeddings, k=1, mem_pad_mask=pad_mask.bool().cuda())
+        generated_mols = [smiles] + generated_mols
+        return generated_mols
+
+    def find_similars_smiles(self, smiles:str, num_requested:int=10, radius=0.0001):
+        generated_mols = self.find_similars_smiles_list(smiles, num_requested=num_requested, radius=radius)
+        generated_df = pd.DataFrame({'SMILES': generated_mols,
+                                     'Generated': [True for i in range(len(generated_mols))]},
+                                   )
+        generated_df.iat[ 0, 1] = False
+        return generated_df
 
     def interpolate_from_smiles(self, smiles:List, num_points:int=10, add_jitter=False):
         num_points = int(num_points)

@@ -15,6 +15,13 @@
 .vscode/
 cddd/
 .viminfo
+.conda/
+.gitconfig
+.gnupg/
+.pip/
+.ssh/
+.vscode-server/
+.wget-hsts
 
 __pycache__
 dask-worker-space

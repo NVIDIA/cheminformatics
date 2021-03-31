@@ -5,7 +5,7 @@ from flask import request
 from flask_restplus import Resource
 
 from nvidia.cheminformatics.api import api_rest
-from nvidia.cheminformatics.wf.interpolation.latentspaceinterpolation import LatentSpaceInterpolation
+from nvidia.cheminformatics.wf.generative.cddd import Cddd
 
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class Interpolator(Resource):
 
     def get(self, model, request_ids, num_points=10):
         request_ids = request_ids.split(',')
-        genreated_df = LatentSpaceInterpolation().interpolate_from_smiles(
+        genreated_df = Cddd().interpolate_from_smiles(
             request_ids,
             num_points=num_points)
 

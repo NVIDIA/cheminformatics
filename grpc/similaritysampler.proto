@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package nvidia.cheminformatics.grpc;
+
+// python -m grpc_tools.protoc -I./grpc/ \
+//            --python_out=generated \
+//            --experimental_allow_proto3_optional \
+//            --grpc_python_out=generated \
+//            ./grpc/similaritysampler.proto
+
+
+enum SimilarityModel {
+  CDDD = 0;
+  MolBART = 1;
+}
+
+
+service SimilaritySampler {
+  rpc FindSimilars(SimilaritySpec) returns (SmilesList) {};
+}
+
+
+message SimilaritySpec {
+  SimilarityModel model = 1;
+  string smiles = 2;
+  optional float radius = 3;
+  optional int32 numRequested = 4;
+}
+
+
+message SmilesList {
+  repeated string generatedSmiles = 1;
+}

@@ -174,6 +174,11 @@ To start dash:
         Start services
         """
         parser = argparse.ArgumentParser(description='Service')
+        parser.add_argument('-p', '--port',
+                            dest='port',
+                            type=int,
+                            default=50051,
+                            help='GRPC server Port')
         parser.add_argument('-d', '--debug',
                             dest='debug',
                             action='store_true',
@@ -186,17 +191,14 @@ To start dash:
             logger.setLevel(logging.DEBUG)
 
         sys.path.insert(0, "generated")
-        from waitress import serve
-        from nvidia.cheminformatics.api import app
         import grpc
-        import interpolator_pb2_grpc
-        import interpolator_pb2
+        import similaritysampler_pb2_grpc
         from concurrent import futures
-        from nvidia.cheminformatics.grpc.interpolator import InterpolatorService
+        from nvidia.cheminformatics.grpc import SimilaritySampler
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        interpolator_pb2_grpc.add_InterpolatorServicer_to_server(InterpolatorService(), server)
-        server.add_insecure_port('[::]:50051')
+        similaritysampler_pb2_grpc.add_SimilaritySamplerServicer_to_server(SimilaritySampler(), server)
+        server.add_insecure_port(f'[::]:{args.port}')
         server.start()
         server.wait_for_termination()
 

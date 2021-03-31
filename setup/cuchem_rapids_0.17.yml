@@ -35,4 +35,5 @@ dependencies:
     - matplotlib==3.3.4
     - waitress==1.4.3
     - flask-restplus==0.13.0
+    - locust==1.4.3
     - git+https://github.com/jrwnter/cddd.git

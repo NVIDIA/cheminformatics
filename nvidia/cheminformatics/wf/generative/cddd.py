@@ -22,13 +22,13 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         self.dao = dao
         self.cddd_embeddings = Embeddings(model_dir=self.default_model_loc)
 
-    def find_similars_smiles_list(self, smiles:str, num_requested:int=10, radius=0.5):
+    def find_similars_smiles_list(self, smiles:str, num_requested:int=10, radius=0.75):
         embedding = self.cddd_embeddings.func.seq_to_emb(smiles).squeeze()
         neighboring_embeddings = self.addjitter(embedding, radius, cnt=num_requested)
 
         return self.cddd_embeddings.inverse_transform(neighboring_embeddings)
 
-    def find_similars_smiles(self, smiles:str, num_requested:int=10, radius=0.5):
+    def find_similars_smiles(self, smiles:str, num_requested:int=10, radius=0.75):
         generated_mols = self.find_similars_smiles_list(smiles, num_requested=num_requested, radius=radius)
         generated_df = pd.DataFrame({'SMILES': generated_mols,
                                      'Generated': [True for i in range(len(generated_mols))]},
@@ -37,7 +37,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         return generated_df
 
 
-    def interpolate_from_smiles(self, smiles:List, num_points:int=10, add_jitter=False):
+    def interpolate_from_smiles(self, smiles:List, num_points:int=10, add_jitter=False, radius=0.75):
         num_points = int(num_points) + 2
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')
@@ -59,7 +59,10 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                       'Generated': [True for i in range(num_points)]},
                                       )
             if add_jitter:
-                interp_df = self._jitter(interp_df, interp_embeddings, self.cddd_embeddings.inverse_transform)
+                interp_df = self._jitter(interp_df,
+                                         interp_embeddings,
+                                         self.cddd_embeddings.inverse_transform,
+                                         radius=radius)
 
             # Mark the source and desinations as not generated
             interp_df.iat[ 0, 1] = False

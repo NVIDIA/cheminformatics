@@ -749,7 +749,7 @@ class ChemVisualization(metaclass=Singleton):
                     download="rawdata.sdf",
                     href="/cheminfo/downloadSDF",
                     target="_blank",
-                    n_clicks=0, style={'marginLeft': 60}
+                    n_clicks=0, style={'marginLeft': 60, 'fontSize': '150%'}
                 ),
                 html.Div(id='table_generated_molecules', className='row', children=[
                 ])

@@ -26,7 +26,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         embedding = self.cddd_embeddings.func.seq_to_emb(smiles).squeeze()
         neighboring_embeddings = self.addjitter(embedding, radius, cnt=num_requested)
 
-        return self.cddd_embeddings.inverse_transform(neighboring_embeddings, add_jitter=True)
+        return self.cddd_embeddings.inverse_transform(neighboring_embeddings)
 
     def find_similars_smiles(self, smiles:str, num_requested:int=10, radius=0.75):
         generated_mols = self.find_similars_smiles_list(smiles, num_requested=num_requested, radius=radius)

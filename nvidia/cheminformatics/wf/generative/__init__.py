@@ -1,7 +1,6 @@
 import logging
 from typing import List
 import numpy as np
-import torch
 from functools import singledispatch
 
 from nvidia.cheminformatics.data.generative_wf import ChemblGenerativeWfDao
@@ -23,12 +22,12 @@ def _(embedding, radius, cnt):
     return noise + embedding
 
 
-@add_jitter.register(torch.Tensor)
-def _(embedding, radius, cnt):
-    permuted_emb = embedding.permute(1, 0, 2)
-    noise = torch.normal(0,  radius, (cnt,) + permuted_emb.shape[1:]).to(embedding.device)
+# @add_jitter.register(torch.Tensor)
+# def _(embedding, radius, cnt):
+#     permuted_emb = embedding.permute(1, 0, 2)
+#     noise = torch.normal(0,  radius, (cnt,) + permuted_emb.shape[1:]).to(embedding.device)
 
-    return noise + permuted_emb
+#     return noise + permuted_emb
 
 
 class BaseGenerativeWorkflow:

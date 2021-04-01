@@ -19,7 +19,7 @@ COPY setup/cuchem_rapids_0.17.yml /tmp
 
 RUN conda env create --name cuchem -f /tmp/cuchem_rapids_0.17.yml \
     && rm /tmp/cuchem_rapids_0.17.yml\
-    && conda clean -ay
+    && conda clean -afy
 ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
@@ -29,10 +29,6 @@ RUN mkdir -p /opt/nvidia/ \
     && cd /opt/nvidia/ \
     && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
     && rm -rf /opt/nvidia/cheminfomatics/.git
-
-RUN /opt/conda/envs/cuchem/bin/python3 -m pip install \
-    torch==1.8.0 \
-    torchvision==0.9.0 torchaudio==0.8.0
 
 ENV UCX_LOG_LEVEL error
 

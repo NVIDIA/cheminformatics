@@ -85,19 +85,27 @@ class ChEmblData(object, metaclass=Singleton):
             cols = list(map(lambda x: x[0], cur.description))
             return cols, cur.fetchall()
 
-    def fetch_props_df_by_molregno(self, molregnos, gpu=True):
+    def fetch_props_by_chemble(self, chemble_ids):
         """
-        Returns compound properties and structure filtered by ChEMBL IDs in a
-        dataframe.
+        Returns compound properties and structure filtered by ChEMBL IDs along
+        with a list of columns.
         """
-        select_stmt = SQL_MOLECULAR_PROP % " ,".join(molregnos)
-        df = pandas.read_sql(select_stmt,
-                             sqlite3.connect(self.chembl_db, uri=True),
-                             index_col='molregno')
-        if gpu:
-            return cudf.from_pandas(df)
-        else:
-            return df
+        sql_stml = """
+            SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
+            FROM compound_properties cp,
+                    compound_structures cs,
+                    molecule_dictionary md
+            WHERE cp.molregno = md.molregno
+                    AND md.molregno = cs.molregno
+                    AND md.chembl_id in (%s)
+            """
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+                closing(con.cursor()) as cur:
+            select_stmt = sql_stml % "'%s'" %"','".join([ x.strip().upper() for x in chemble_ids])
+            cur.execute(select_stmt)
+
+            cols = list(map(lambda x: x[0], cur.description))
+            return cols, cur.fetchall()
 
     def fetch_molregno_by_chemblId(self, chemblIds):
         logger.debug('Fetch ChEMBL ID using molregno...')
@@ -127,7 +135,7 @@ class ChEmblData(object, metaclass=Singleton):
                     molecule_dictionary md
                 WHERE md.molregno = cs.molregno
                     AND md.chembl_id in (%s)
-            ''' %  "'%s'" %"','".join([ x.upper() for x in new_molecules])
+            ''' %  "'%s'" %"','".join([ x.strip().upper() for x in new_molecules])
             cur.execute(select_stmt)
 
             return cur.fetchall()

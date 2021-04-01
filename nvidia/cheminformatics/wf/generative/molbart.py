@@ -10,8 +10,6 @@ from pathlib import Path
 import numpy as np
 from functools import partial
 
-from molbart.models import BARTModel
-from molbart.decode import DecodeSampler
 from rdkit import Chem
 
 from nvidia.cheminformatics.data import GenerativeWfDao
@@ -68,6 +66,8 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         Returns:
             MolBART trained model
         """
+        from molbart.decode import DecodeSampler
+        from molbart.models import BARTModel
 
         sampler = DecodeSampler(tokenizer, max_seq_len)
         pad_token_idx = tokenizer.vocab[tokenizer.pad_token]

@@ -28,9 +28,7 @@ def download_cddd_models(target_dir=CDDD_DEFAULT_MODLE_LOC):
              'wget --quiet -O %s https://raw.githubusercontent.com/jrwnter/cddd/master/download_default_model.sh && chmod +x %s' % (download_script, download_script)])
 
     run(['bash', '-c',
-         'mkdir -p %s && cd %s; %s' % (os.path.join(target_dir, 'default_model'),
-                                       target_dir,
-                                       download_script)],
+         'mkdir -p %s && cd %s; %s' % (target_dir, target_dir, download_script)],
         check=True)
 
     return os.path.join(target_dir, 'default_model')

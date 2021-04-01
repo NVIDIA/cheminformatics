@@ -5,8 +5,15 @@ import json
 import base64
 import logging
 from pydoc import locate
+from io import StringIO
+
+import flask
+from flask import send_file, Response
+
 from rdkit import Chem
-from rdkit.Chem import Draw
+from rdkit.Chem import Draw, PandasTools
+
+import pandas as pd
 
 import cupy
 import plotly.graph_objects as go
@@ -20,6 +27,7 @@ from nvidia.cheminformatics.utils import generate_colors, report_ui_error
 from nvidia.cheminformatics.data.helper.chembldata import ChEmblData, IMP_PROPS
 from nvidia.cheminformatics.decorator import LipinskiRuleOfFiveDecorator
 from nvidia.cheminformatics.decorator import MolecularStructureDecorator
+from nvidia.cheminformatics.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
@@ -62,16 +70,46 @@ PROP_DISP_NAME = {
     'standard_inchi_key': 'Standard InChi Key'
 }
 
+app = dash.Dash(__name__, external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP])
 
-class ChemVisualization:
+
+@app.server.route('/cheminfo/downloadSDF')
+def download_sdf():
+    logger.info('Exporting generated data...')
+
+    vis = ChemVisualization()
+    output = StringIO()
+
+    valid_idx = []
+    col_list = ['SMILES', 'Molecular Weight', 'LogP', 'H-Bond Donors', 'H-Bond Acceptors', 'Rotatable Bonds']
+    for row, data in vis.genreated_df.iterrows():
+        mol = Chem.MolFromSmiles(data['SMILES'])
+        if (mol is not None):
+            valid_idx.append(row)
+
+    valid_df = vis.genreated_df.iloc[valid_idx]
+    valid_df = valid_df[col_list]
+
+    PandasTools.AddMoleculeColumnToFrame(valid_df,'SMILES')
+    PandasTools.WriteSDF(valid_df, output, properties=list(valid_df.columns))
+
+    output.seek(0)
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/application",
+        headers={"Content-disposition":
+                 "attachment; filename=download.sdf"})
+
+
+class ChemVisualization(metaclass=Singleton):
 
     def __init__(self, cluster_wf):
-        self.app = dash.Dash(__name__,
-                             external_stylesheets=['https://codepen.io/chriddyp/pen/bWLwgP.css', dbc.themes.BOOTSTRAP])
-
+        self.app = app
         self.cluster_wf = cluster_wf
         self.n_clusters = cluster_wf.n_clusters
         self.chem_data = ChEmblData()
+        self.genreated_df = None
         self.cluster_wf_cls = 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'
         self.generative_wf_cls = 'nvidia.cheminformatics.wf.generative.Cddd'
 
@@ -164,7 +202,7 @@ class ChemVisualization:
              Input('rd_generation_type', 'value')])(self.handle_ckl_selection)
 
         self.app.callback(
-            [Output('section_generated_molecules', 'children'),
+            [Output('table_generated_molecules', 'children'),
              Output('show_generated_mol', 'children'),
              Output('interpolation_error', 'children'),],
             [Input("bt_generate", "n_clicks"),],
@@ -238,10 +276,10 @@ class ChemVisualization:
         generative_wf = wf_class()
         n2generate = int(n2generate)
         if rd_generation_type == 'SAMPLE':
-            genreated_df = generative_wf.find_similars_smiles_from_id(chemble_ids,
+            self.genreated_df = generative_wf.find_similars_smiles_from_id(chemble_ids,
                                                                         num_requested=n2generate)
         else:
-            genreated_df = generative_wf.interpolate_from_id(chemble_ids,
+            self.genreated_df = generative_wf.interpolate_from_id(chemble_ids,
                                                              num_points=n2generate,
                                                              add_jitter=True)
 
@@ -250,22 +288,22 @@ class ChemVisualization:
         show_generated_mol += 1
 
         # Add other useful attributes to be added for rendering
-        genreated_df = MolecularStructureDecorator().decorate(genreated_df)
-        genreated_df = LipinskiRuleOfFiveDecorator().decorate(genreated_df)
+        self.genreated_df = MolecularStructureDecorator().decorate(self.genreated_df)
+        self.genreated_df = LipinskiRuleOfFiveDecorator().decorate(self.genreated_df)
 
         # Create Table header
         table_headers = []
-        columns = genreated_df.columns.to_list()
+        columns = self.genreated_df.columns.to_list()
         for column in columns:
             table_headers.append(html.Th(column, style={'fontSize': '150%'}))
 
         prop_recs = [html.Tr(table_headers)]
-        for row_idx in range(genreated_df.shape[0]):
+        for row_idx in range(self.genreated_df.shape[0]):
             td = []
 
             try:
                 col_pos = columns.index('Chemical Structure')
-                col_data = genreated_df.iat[row_idx, col_pos]
+                col_data = self.genreated_df.iat[row_idx, col_pos]
 
                 if 'value' in col_data and col_data['value'] == 'Error interpreing SMILES using RDKIT':
                     continue
@@ -273,7 +311,7 @@ class ChemVisualization:
                 pass
 
             for col_id in range(len(columns)):
-                col_data = genreated_df.iat[row_idx, col_id]
+                col_data = self.genreated_df.iat[row_idx, col_id]
 
                 col_level = 'info'
                 if isinstance(col_data, dict):
@@ -705,7 +743,17 @@ class ChemVisualization:
             ]),
 
             html.Div(id='section_generated_molecules', className='row', children=[
-            ]),
+                 html.A(
+                    'Export',
+                    id='download-link',
+                    download="rawdata.sdf",
+                    href="/cheminfo/downloadSDF",
+                    target="_blank",
+                    n_clicks=0, style={'marginLeft': 60, 'fontSize': '150%'}
+                ),
+                html.Div(id='table_generated_molecules', className='row', children=[
+                ])
+            ], style={'display': 'none'}),
 
             html.Div(id='section_selected_molecules', className='row', children=[
                 html.Div(className='row', children=[

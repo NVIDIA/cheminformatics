@@ -3,7 +3,6 @@ import dask
 import tempfile
 import logging
 
-from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
 from nvidia.cheminformatics.utils.dask import initialize_cluster
 from nvidia.cheminformatics.config import Context
 
@@ -15,6 +14,7 @@ def _fetch_chembl_test_dataset(n_molecules=None):
     if n_molecules is None:
         n_molecules = 1000
 
+    from nvidia.cheminformatics.data.cluster_wf import ChemblClusterWfDao
     dao = ChemblClusterWfDao()
     mol_df = dao.fetch_molecular_embedding(n_molecules=n_molecules)
     assert isinstance(mol_df, dask.dataframe.core.DataFrame),\

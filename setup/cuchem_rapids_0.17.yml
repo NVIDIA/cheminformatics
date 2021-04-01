@@ -11,6 +11,7 @@ dependencies:
   - python=3.7
   - cudatoolkit=11.0 # Ensure version matches with base image in Dockerfile
   - rdkit==2020.09.1
+  - dask==2021.03.0
   - plotly==4.9.0
   - pytest==6.2.2
   - umap-learn==0.5.1
@@ -35,4 +36,5 @@ dependencies:
     - matplotlib==3.3.4
     - waitress==1.4.3
     - flask-restplus==0.13.0
+    - locust==1.4.3
     - git+https://github.com/jrwnter/cddd.git

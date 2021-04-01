@@ -30,6 +30,10 @@ RUN mkdir -p /opt/nvidia/ \
     && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
     && rm -rf /opt/nvidia/cheminfomatics/.git
 
+RUN /opt/conda/envs/cuchem/bin/python3 -m pip install \
+    torch==1.8.0 \
+    torchvision==0.9.0 torchaudio==0.8.0
+
 ENV UCX_LOG_LEVEL error
 
 CMD /opt/nvidia/cheminfomatics/launch.sh dash

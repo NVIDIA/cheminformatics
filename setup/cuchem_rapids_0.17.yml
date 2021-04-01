@@ -11,6 +11,7 @@ dependencies:
   - python=3.7
   - cudatoolkit=11.0 # Ensure version matches with base image in Dockerfile
   - rdkit==2020.09.1
+  - dask==2021.03.0
   - plotly==4.9.0
   - pytest==6.2.2
   - umap-learn==0.5.1

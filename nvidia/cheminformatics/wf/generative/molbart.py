@@ -10,8 +10,6 @@ from pathlib import Path
 import numpy as np
 from functools import partial
 
-from molbart.models import BARTModel
-from molbart.decode import DecodeSampler
 from rdkit import Chem
 
 from nvidia.cheminformatics.data import GenerativeWfDao
@@ -23,7 +21,7 @@ from nvidia.cheminformatics.wf.generative import BaseGenerativeWorkflow
 logger = logging.getLogger(__name__)
 
 
-class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
+class MolBART(BaseGenerativeWorkflow):
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
         super().__init__(dao)
@@ -68,6 +66,8 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         Returns:
             MolBART trained model
         """
+        from molbart.models import BARTModel
+        from molbart.decode import DecodeSampler
 
         sampler = DecodeSampler(tokenizer, max_seq_len)
         pad_token_idx = tokenizer.vocab[tokenizer.pad_token]
@@ -164,7 +164,11 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         return smiles_interp_list
 
-    def find_similars_smiles_list(self, smiles:str, num_requested:int=10, radius=0.0001):
+    def find_similars_smiles_list(self,
+                                  smiles:str,
+                                  num_requested:int=10,
+                                  radius=0.0001,
+                                  force_unique=False):
         embedding, pad_mask = self.smiles2embedding(self.bart_model,
                                                     smiles,
                                                     self.tokenizer)
@@ -173,17 +177,38 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         generated_mols = self.inverse_transform(neighboring_embeddings, k=1, mem_pad_mask=pad_mask.bool().cuda())
         generated_mols = [smiles] + generated_mols
-        return generated_mols
+        return generated_mols, neighboring_embeddings, pad_mask
 
-    def find_similars_smiles(self, smiles:str, num_requested:int=10, radius=0.0001):
-        generated_mols = self.find_similars_smiles_list(smiles, num_requested=num_requested, radius=radius)
+    def find_similars_smiles(self,
+                             smiles:str,
+                             num_requested:int=10,
+                             radius=0.0001,
+                             force_unique=False):
+
+        generated_mols, neighboring_embeddings, pad_mask = \
+            self.find_similars_smiles_list(smiles,
+                                           num_requested=num_requested,
+                                           radius=radius,
+                                           force_unique=force_unique)
+
         generated_df = pd.DataFrame({'SMILES': generated_mols,
-                                     'Generated': [True for i in range(len(generated_mols))]},
-                                   )
+                                     'Generated': [True for i in range(len(generated_mols))]})
         generated_df.iat[ 0, 1] = False
+
+        if force_unique:
+            inv_transform_funct = partial(self.inverse_transform,
+                                   mem_pad_mask=pad_mask)
+            generated_df = self.compute_unique_smiles(generated_df,
+                                                   neighboring_embeddings,
+                                                   inv_transform_funct,
+                                                   radius=radius)
         return generated_df
 
-    def interpolate_from_smiles(self, smiles:List, num_points:int=10, add_jitter=False):
+    def interpolate_from_smiles(self,
+                                smiles:List,
+                                num_points:int=10,
+                                radius=0.0001,
+                                force_unique=False):
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')
@@ -204,14 +229,19 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                                       'Generated': [True for i in range(len(interplocated_mol))]},
                                       )
 
-            jitter_funct = partial(self.inverse_transform,
-                                mem_pad_mask=combined_mask)
-            if add_jitter:
-                interp_df = self._jitter(interp_df, interplocated_mol, jitter_funct)
+            inv_transform_funct = partial(self.inverse_transform,
+                                   mem_pad_mask=combined_mask)
 
             # Mark the source and desinations as not generated
             interp_df.iat[ 0, 1] = False
             interp_df.iat[-1, 1] = False
+
+            if force_unique:
+                interp_df = self.compute_unique_smiles(interp_df,
+                                                       interplocated_mol,
+                                                       inv_transform_funct,
+                                                       radius=radius)
+
 
             result_df.append(interp_df)
 

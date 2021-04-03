@@ -1,6 +1,9 @@
 import logging
 from typing import List
+
+from rdkit.Chem import Draw, PandasTools
 import numpy as np
+import pandas as pd
 import torch
 from functools import singledispatch
 
@@ -36,31 +39,92 @@ class BaseGenerativeWorkflow:
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
         self.dao = dao
 
-    def _jitter(self, interp_df, embeddings, embedding_funct, radius=0.5):
-        """
-        Add jitter to embedding if the generated SMILES are same.
-        """
-        for idx in range(1, interp_df.shape[0] - 1):
-            if interp_df.iat[idx, 0] == interp_df.iat[idx + 1, 0]:
-                regen = True
-                add_jitter(embeddings[idx], radius, 1)
+    def interpolate_from_smiles(self,
+                                smiles:List,
+                                num_points:int=10,
+                                radius=0.5,
+                                force_unique=False):
+        NotImplemented
 
-        regen = False
-        if interp_df.shape[0] > 3:
-            # If first three molecules are same, previous loop changes the sec
-            # molecule. This block will fix the third one.
-            if interp_df.iat[0, 0] == interp_df.iat[2, 0]:
-                regen = True
-                add_jitter(embeddings[2], radius, 1)
+    def find_similars_smiles_list(self,
+                                  smiles:str,
+                                  num_requested:int=10,
+                                  radius=0.5,
+                                  force_unique=False):
+        NotImplemented
 
-        if regen:
-            interp_df['SMILES'] = embedding_funct(embeddings)
+    def find_similars_smiles(self,
+                             smiles:str,
+                             num_requested:int=10,
+                             radius=0.5,
+                             force_unique=False):
+        NotImplemented
+
+    def addjitter(self,
+                  embedding,
+                  radius,
+                  cnt=1):
+        return add_jitter(embedding, radius, cnt)
+
+    def compute_unique_smiles(self,
+                              interp_df,
+                              embeddings,
+                              embedding_funct,
+                              radius=0.5):
+        """
+        Identify duplicate SMILES and distorts the embedding. The input df
+        must have columns 'SMILES' and 'Generated' at 0th and 1st position.
+        'Generated' colunm must contain boolean to classify SMILES into input
+        SMILES(False) and generated SMILES(True).
+
+        This function does not make any assumptions about order of embeddings.
+        Instead it simply orders the df by SMILES to identify the duplicates.
+        """
+
+        for i in range(5):
+            smiles = interp_df['SMILES'].sort_values()
+            duplicates = set()
+            for idx in range(0, smiles.shape[0] - 1):
+                if smiles.iat[idx] == smiles.iat[idx + 1]:
+                    duplicates.add(smiles.index[idx])
+                    duplicates.add(smiles.index[idx + 1])
+
+            if len(duplicates) > 0:
+                for dup_idx in duplicates:
+                    if interp_df.iat[dup_idx, 1]:
+                        # add jitter to generated molecules only
+                        embeddings[dup_idx] = self.addjitter(
+                            embeddings[dup_idx], radius, 1)
+                interp_df['SMILES'] = embedding_funct(embeddings)
+            else:
+                break
+
+        # Ensure all generated molecules are valid.
+        for i in range(5):
+            PandasTools.AddMoleculeColumnToFrame(interp_df,'SMILES')
+            invalid_mol_df = interp_df[interp_df['ROMol'].isnull()]
+
+            if not invalid_mol_df.empty:
+                invalid_index = invalid_mol_df.index.to_list()
+                for idx in invalid_index:
+                    embeddings[idx] = self.addjitter(embeddings[idx],
+                                                        radius,
+                                                        cnt=1)
+                interp_df['SMILES'] = embedding_funct(embeddings)
+            else:
+                break
+
+        # Cleanup
+        if 'ROMol' in interp_df.columns:
+            interp_df = interp_df.drop('ROMol', axis=1)
+
         return interp_df
 
-    def addjitter(self, embedding, radius, cnt=1):
-        return add_jitter(embedding, radius, cnt=cnt)
-
-    def interpolate_from_id(self, ids:List, id_type:str='chembleid', num_points=10, add_jitter=False):
+    def interpolate_from_id(self,
+                            ids:List,
+                            id_type:str='chembleid',
+                            num_points=10,
+                            force_unique=False):
         smiles = None
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(ids)]
@@ -69,24 +133,27 @@ class BaseGenerativeWorkflow:
         else:
             raise Exception('id type %s not supported' % id_type)
 
-        return self.interpolate_from_smiles(smiles, num_points=num_points, add_jitter=add_jitter)
+        return self.interpolate_from_smiles(smiles,
+                                            num_points=num_points,
+                                            force_unique=force_unique)
 
-    def interpolate_from_smiles(self, smiles:List, num_points:int=10, add_jitter=False):
-        NotImplemented
-
-    def find_similars_smiles_from_id(self, chemble_id:str, id_type:str='chembleid', num_requested=10):
+    def find_similars_smiles_from_id(self,
+                                     chemble_id:str,
+                                     id_type:str='chembleid',
+                                     num_requested=10,
+                                     force_unique=False,
+                                     radius=0.5):
         smiles = None
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(chemble_id)]
             if len(smiles) != len(chemble_id):
-                raise Exception('One of the ids is invalid %s', chemble_id)
+                raise Exception('One of the ids is invalid %s' + chemble_id)
         else:
             raise Exception('id type %s not supported' % id_type)
 
-        return self.find_similars_smiles(smiles[0], num_requested=num_requested)
-
-    def find_similars_smiles(self, smiles:str, num_requested:int=10, radius=0.5):
-        NotImplemented
+        return self.find_similars_smiles(smiles[0],
+                                         num_requested=num_requested,
+                                         force_unique=force_unique)
 
 
 from nvidia.cheminformatics.wf.generative.molbart import MolBART as MolBART

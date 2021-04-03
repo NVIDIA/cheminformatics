@@ -277,11 +277,12 @@ class ChemVisualization(metaclass=Singleton):
         n2generate = int(n2generate)
         if rd_generation_type == 'SAMPLE':
             self.genreated_df = generative_wf.find_similars_smiles_from_id(chemble_ids,
-                                                                        num_requested=n2generate)
+                                                                           num_requested=n2generate,
+                                                                           force_unique=True)
         else:
             self.genreated_df = generative_wf.interpolate_from_id(chemble_ids,
                                                              num_points=n2generate,
-                                                             add_jitter=True)
+                                                             force_unique=True)
 
         if show_generated_mol is None:
             show_generated_mol = 0
@@ -295,9 +296,9 @@ class ChemVisualization(metaclass=Singleton):
         table_headers = []
         columns = self.genreated_df.columns.to_list()
         for column in columns:
-            table_headers.append(html.Th(column, style={'fontSize': '150%'}))
+            table_headers.append(html.Th(column, style={'fontSize': '150%', 'text-align': 'center'}))
 
-        prop_recs = [html.Tr(table_headers)]
+        prop_recs = [html.Tr(table_headers, style={'background': 'lightgray'})]
         for row_idx in range(self.genreated_df.shape[0]):
             td = []
 
@@ -324,11 +325,11 @@ class ChemVisualization(metaclass=Singleton):
                 if isinstance(col_value, str) and col_value.startswith('data:image/png;base64,'):
                     td.append(html.Td(html.Img(src=col_value)))
                 else:
-                    td.append(html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level]))
+                    td.append(html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level].update({'maxWidth': '100px', 'wordWrap':'break-word'})))
 
             prop_recs.append(html.Tr(td))
 
-        return html.Table(prop_recs, style={'width': '100%', 'marginLeft': 60}), show_generated_mol, dash.no_update
+        return html.Table(prop_recs, style={'width': '100%', 'margin': 12, 'border': '1px solid lightgray'}), show_generated_mol, dash.no_update
 
     def handle_ckl_selection(self, ckl_candidate_mol_id, rd_generation_type):
         selection_msg = '**Please Selection Two**'
@@ -544,18 +545,19 @@ class ChemVisualization(metaclass=Singleton):
                                   page, pageSize=10, chembl_ids=None):
 
         # Create Table header
-        table_headers = [html.Th("Chemical Structure", style={'width': '30%', 'fontSize': '150%'}),
-                         html.Th("SMILES", style={'fontSize': '150%'})]
+        table_headers = [html.Th("Chemical Structure", style={'width': '30%', 'fontSize': '150%', 'text-align': 'center'}),
+                         html.Th("SMILES", style={'maxWidth': '100px', 'fontSize': '150%', 'text-align': 'center'})]
         for prop in display_properties:
             if prop in PROP_DISP_NAME:
-                table_headers.append(html.Th(PROP_DISP_NAME[prop], style={'fontSize': '150%'}))
+                table_headers.append(html.Th(PROP_DISP_NAME[prop], style={'fontSize': '150%', 'text-align': 'center'}))
 
         if chembl_ids:
-            table_headers.append(html.Th('ChEMBLE', style={'fontSize': '150%'}))
+            table_headers.append(html.Th('ChEMBLE', style={'fontSize': '150%', 'text-align': 'center'}))
         else:
-            table_headers.append(html.Th(""))
+            table_headers.append(html.Th("", style={'width': '10px'}))
+        table_headers.append(html.Th("", style={'width': '10px'}))
 
-        prop_recs = [html.Tr(table_headers)]
+        prop_recs = [html.Tr(table_headers, style={'background': 'lightgray'})]
 
         if chembl_ids:
             props, selected_molecules = self.chem_data.fetch_props_by_chemble(chembl_ids)
@@ -591,7 +593,7 @@ class ChemVisualization(metaclass=Singleton):
                 base64.b64encode(drawer.GetDrawingText()).decode("utf-8")
 
             td.append(html.Td(html.Img(src=img_binary)))
-            td.append(html.Td(smiles))
+            td.append(html.Td(smiles, style={'maxWidth': '100px', 'wordWrap':'break-word'}))
             for key in display_properties:
                 if key in PROP_DISP_NAME:
                     td.append(html.Td(selected_molecule[props.index(key)]))
@@ -620,7 +622,7 @@ class ChemVisualization(metaclass=Singleton):
 
             prop_recs.append(html.Tr(td))
 
-        return html.Table(prop_recs, style={'width': '100%'}), all_props
+        return html.Table(prop_recs, style={'width': '100%', 'margin': 12, 'border': '1px solid lightgray'}), all_props
 
     def constuct_layout(self):
         # TODO: avoid calling self.cluster_wf.df_embedding
@@ -742,20 +744,21 @@ class ChemVisualization(metaclass=Singleton):
                 ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
             ]),
 
-            html.Div(id='section_generated_molecules', className='row', children=[
+            html.Div(id='section_generated_molecules', children=[
                  html.A(
                     'Export',
                     id='download-link',
                     download="rawdata.sdf",
                     href="/cheminfo/downloadSDF",
                     target="_blank",
-                    n_clicks=0, style={'marginLeft': 60, 'fontSize': '150%'}
+                    n_clicks=0,
+                    style={'marginLeft': 10, 'fontSize': '150%'}
                 ),
-                html.Div(id='table_generated_molecules', className='row', children=[
+                html.Div(id='table_generated_molecules', children=[
                 ])
             ], style={'display': 'none'}),
 
-            html.Div(id='section_selected_molecules', className='row', children=[
+            html.Div(id='section_selected_molecules', children=[
                 html.Div(className='row', children=[
                     html.Div(id='section_display_properties', children=[
                         html.Label([
@@ -764,7 +767,7 @@ class ChemVisualization(metaclass=Singleton):
                                          options=[
                                              {'label': 'alogp', 'value': 'alogp'}],
                                          value=['alogp']),
-                        ], style={'marginLeft': 60})],
+                        ], style={'marginLeft': 30})],
                         className='nine columns',
                     ),
                     html.Div(children=[
@@ -778,14 +781,13 @@ class ChemVisualization(metaclass=Singleton):
                                    style={"height": "25px"})
                     ],
                         className='three columns',
-                        style={'paddingRight': 60, 'verticalAlign': 'text-bottom', 'text-align': 'right'}
+                        style={'verticalAlign': 'text-bottom', 'text-align': 'right'}
                     ),
                 ]),
 
-                html.Div(className='row', children=[
+                html.Div(children=[
                     html.Div(id='tb_selected_molecules', children=[],
-                             style={'marginLeft': 60,
-                                    'verticalAlign': 'text-top'}
+                             style={'verticalAlign': 'text-top'}
                              ),
                 ])
             ], style={'display': 'none'}),
@@ -848,9 +850,10 @@ class ChemVisualization(metaclass=Singleton):
                 raise dash.exceptions.PreventUpdate
             current_page += 1
         elif north_star and \
-            ((comp_id == 'refresh_moi_prop_table' and event_type == 'children') or (comp_id == 'sl_mol_props' and event_type == 'value')):
+            ((comp_id == 'refresh_moi_prop_table' and event_type == 'children')):
             chembl_ids = north_star.split(",")
-        elif comp_id == 'main-figure' and event_type == 'selectedData':
+        elif (comp_id == 'main-figure' and event_type == 'selectedData') or \
+            (comp_id == 'sl_mol_props' and event_type == 'value') :
             pass
         else:
             raise dash.exceptions.PreventUpdate

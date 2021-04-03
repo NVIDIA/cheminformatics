@@ -9,7 +9,7 @@ from nvidia.cheminformatics.wf.generative import BaseGenerativeWorkflow
 logger = logging.getLogger(__name__)
 
 
-class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
+class MolBART(BaseGenerativeWorkflow):
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
         pass

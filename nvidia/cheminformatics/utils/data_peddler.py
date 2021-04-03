@@ -4,7 +4,7 @@ import shutil
 from subprocess import run, Popen
 
 
-CDDD_DEFAULT_MODLE_LOC = '/data/models/cddd/1/'
+CDDD_DEFAULT_MODLE_LOC = '/data/cddd'
 
 
 logger = logging.getLogger(__name__)

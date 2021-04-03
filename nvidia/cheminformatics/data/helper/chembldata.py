@@ -14,7 +14,7 @@ from dask import delayed, dataframe
 from contextlib import closing
 from nvidia.cheminformatics.utils.singleton import Singleton
 from nvidia.cheminformatics.smiles import RemoveSalt, PreprocessSmiles
-from nvidia.cheminformatics.fingerprint import MorganFingerprint
+from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
 from nvidia.cheminformatics.config import Context
 
 SMILES_TRANSFORMS = [RemoveSalt(), PreprocessSmiles()]
@@ -67,8 +67,8 @@ class ChEmblData(object, metaclass=Singleton):
             logger.error('%s not found', db_file)
             sys.exit(1)
 
-        self.chembl_db = 'file:%s?mode=ro' % db_file
         self.fp_type = fp_type
+        self.chembl_db = 'file:%s?mode=ro' % db_file
 
         logger.info('ChEMBL database: %s...' % self.chembl_db)
 
@@ -264,11 +264,11 @@ class ChEmblData(object, metaclass=Singleton):
 
         return dataframe.from_delayed(dls, meta=meta_df)
 
-    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None):
+    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None, batch_size = 5000):
         """
         Generates fingerprints for all ChEMBL ID's in the database
         """
         logger.debug('Fetching molecules from database for fingerprints...')
 
-        mol_df = self.fetch_mol_embedding(num_recs=num_recs)
+        mol_df = self.fetch_mol_embedding(num_recs=num_recs, batch_size = batch_size)
         mol_df.to_hdf(hdf_path, 'fingerprints')

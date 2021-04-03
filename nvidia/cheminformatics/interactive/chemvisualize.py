@@ -751,12 +751,8 @@ class ChemVisualization(metaclass=Singleton):
                     download="rawdata.sdf",
                     href="/cheminfo/downloadSDF",
                     target="_blank",
-<<<<<<< HEAD
-                    n_clicks=0, style={'marginLeft': 60, 'fontSize': '150%'}
-=======
                     n_clicks=0,
                     style={'marginLeft': 10, 'fontSize': '150%'}
->>>>>>> 7cc730a... Bugfix: Duplicate SMILES from generative models are still not working...
                 ),
                 html.Div(id='table_generated_molecules', children=[
                 ])

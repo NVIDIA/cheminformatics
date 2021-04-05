@@ -35,6 +35,7 @@ from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
 from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
 from nvidia.cheminformatics.utils.logger import initialize_logfile, log_results
 from nvidia.cheminformatics.config import Context
+from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
 
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
@@ -102,6 +103,14 @@ To start dash:
         Create Cache
         """
         parser = argparse.ArgumentParser(description='Create cache')
+
+        parser.add_argument('-ct', '--cache_type',
+                            dest='cache_type',
+                            type=str,
+                            default='MorganFingerprint',
+                            choices = ['MorganFingerprint','Embeddings'],
+                            help='Type of data preprocessing (MorganFingerprint or Embeddings)')
+
         parser.add_argument('-c', '--cache_directory',
                             dest='cache_directory',
                             type=str,
@@ -113,6 +122,12 @@ To start dash:
                             type=int,
                             default=100000,
                             help='Chunksize.')
+
+        parser.add_argument('--n_cpu',
+                            dest='n_cpu',
+                            type=int,
+                            default=12,
+                            help='Number of CPU workers to use')
 
         parser.add_argument('-d', '--debug',
                             dest='debug',
@@ -126,7 +141,7 @@ To start dash:
             logger.setLevel(logging.DEBUG)
 
         cluster = LocalCluster(dashboard_address=':9001',
-                               n_workers=12,
+                               n_workers=args.n_cpu,
                                threads_per_worker=4)
         client = Client(cluster)
 
@@ -137,9 +152,14 @@ To start dash:
                 logger.info('Creating folder %s...' % args.cache_directory)
                 os.makedirs(args.cache_directory)
 
-            chem_data = ChEmblData()
+            if (args.cache_type == 'MorganFingerprint'):
+                prepocess_type = MorganFingerprint
+            elif (args.cache_type == 'Embeddings'):
+                prepocess_type = Embeddings
+
+            chem_data = ChEmblData(fp_type=prepocess_type)
             chem_data.save_fingerprints(
-                os.path.join(args.cache_directory, FINGER_PRINT_FILES),
+                os.path.join(args.cache_directory, FINGER_PRINT_FILES), num_recs = -1,
                 batch_size=args.batch_size)
 
             logger.info('Fingerprint generated in (hh:mm:ss.ms) {}'.format(

@@ -746,7 +746,7 @@ class ChemVisualization(metaclass=Singleton):
 
             html.Div(id='section_generated_molecules', children=[
                  html.A(
-                    'Export',
+                    'Export to SDF',
                     id='download-link',
                     download="rawdata.sdf",
                     href="/cheminfo/downloadSDF",

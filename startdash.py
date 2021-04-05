@@ -123,6 +123,12 @@ To start dash:
                             default=100000,
                             help='Chunksize.')
 
+        parser.add_argument('--n_cpu',
+                            dest='n_cpu',
+                            type=int,
+                            default=12,
+                            help='Number of CPU workers to use')
+
         parser.add_argument('-d', '--debug',
                             dest='debug',
                             action='store_true',
@@ -135,7 +141,7 @@ To start dash:
             logger.setLevel(logging.DEBUG)
 
         cluster = LocalCluster(dashboard_address=':9001',
-                               n_workers=12,
+                               n_workers=args.n_cpu,
                                threads_per_worker=4)
         client = Client(cluster)
 

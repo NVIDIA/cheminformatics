@@ -53,6 +53,8 @@ Launch the dash interactive ChEMBL exploration tool:
 ```
 optional arguments:
   -h, --help            show this help message and exit
+  --cpu                 Use CPU
+  -b, --benchmark       Execute for benchmark
   -p PCA_COMPS, --pca_comps PCA_COMPS
                         Number of PCA components
   -n NUM_CLUSTERS, --num_clusters NUM_CLUSTERS
@@ -62,8 +64,14 @@ optional arguments:
   -m N_MOL, --n_mol N_MOL
                         Number of molecules for analysis. Use negative numbers
                         for using the whole dataset.
+  --batch_size BATCH_SIZE
+                        Chunksize.
+  -o OUTPUT_DIR, --output_dir OUTPUT_DIR
+                        Output directory for benchmark results
   --n_gpu N_GPU         Number of GPUs to use
+  --n_cpu N_CPU         Number of CPU workers to use
   -d, --debug           Show debug message
+
 ```
 
 Navigate a browser to:
@@ -93,3 +101,11 @@ Conda env. support is available for user wanting to use the tool outside of cont
 ### Acceleration
 
 The latest benchmarks reside in the [benchmarks](benchmarks) directory. The files are available in [markdown](benchmarks/benchmark.md) and [Excel](benchmarks/benchmark.xlsx). A [plot](benchmarks/benchmark.png) is also available.
+
+### Features
+ - Cluster Molecules on embedding generated from SMILES in ChEMBLE database
+ - Ability to colormap the clustered molecules based on molecular properties
+ - Ability to select molcules and clusters for recluster
+ - Follow Molecules of Interest during the analysis
+ - Generate new molecules by interpolating latent space between two selected molecules or sampling arround a selected molecule
+ - Export generated molecules in SDF format

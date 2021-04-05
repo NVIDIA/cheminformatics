@@ -13,6 +13,8 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from cddd.inference import InferenceModel
 
+from nvidia.cheminformatics.utils.data_peddler import download_cddd_models
+
 logger = logging.getLogger(__name__)
 
 class TransformationDefaults(Enum):
@@ -58,7 +60,7 @@ class Embeddings(BaseTransformation):
         self.name = __class__.__name__.split('.')[-1]
         self.kwargs = TransformationDefaults[self.name].value
         self.kwargs.update(kwargs)
-        model_dir = CDDD_DEFAULT_MODLE_LOC if model_dir is None else model_dir
+        model_dir = download_cddd_models()
         self.func = InferenceModel(model_dir, use_gpu=use_gpu, cpu_threads=cpu_threads)
 
     def transform(self, data):

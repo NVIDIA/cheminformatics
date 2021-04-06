@@ -32,4 +32,4 @@ RUN mkdir -p /opt/nvidia/ \
 
 ENV UCX_LOG_LEVEL error
 
-CMD /opt/nvidia/cheminfomatics/launch.sh dash
+CMD cd /opt/nvidia/cheminfomatics; /opt/nvidia/cheminfomatics/launch.sh dash

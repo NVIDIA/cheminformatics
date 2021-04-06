@@ -51,8 +51,6 @@ ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
                          pandas.Series([], dtype='object')]
 
 
-BATCH_SIZE = 5000
-
 # DEPRECATED. Please add code to DAO classes.
 class ChEmblData(object, metaclass=Singleton):
 

@@ -25,18 +25,19 @@ from numba import cuda
 import dask
 import dask_cudf
 from sklearn.metrics import silhouette_score
+from nvidia.cheminformatics.data.helper.chembldata import BATCH_SIZE
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-def batched_silhouette_scores(embeddings, clusters, batch_size=5000):
+def batched_silhouette_scores(embeddings, clusters, batch_size=BATCH_SIZE):
     """Calculate silhouette score in batches on the CPU. Compatible with data on GPU or CPU
 
     Args:
         embeddings (cudf.DataFrame or cupy.ndarray): input features to clustering
         clusters (cudf.DataFrame or cupy.ndarray): cluster values for each data point
-        batch_size (int, optional): Size for batching. Defaults to 5000.
+        batch_size (int, optional): Size for batching.
 
     Returns:
         float: mean silhouette score from batches

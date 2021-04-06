@@ -87,7 +87,13 @@ EOF
 #
 # if $LOCAL_ENV file exists, source it to specify my environment
 #
-#########################################################/opt/nvidia/cheminfomatics/launch.sh dash
+###############################################################################
+
+if [ -e ./$LOCAL_ENV ]
+then
+	echo sourcing environment from ./$LOCAL_ENV
+	. ./$LOCAL_ENV
+	write_env=0
 else
 	echo $LOCAL_ENV does not exist. Writing deafults to $LOCAL_ENV
 	write_env=1
@@ -208,7 +214,6 @@ dash() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
-		cd /opt/nvidia/cheminfomatics/
         python3 startdash.py analyze $@
 	else
 		dbSetup "${DATA_PATH}/db"
@@ -307,4 +312,3 @@ case $1 in
 		usage
 		;;
 esac
-

@@ -31,5 +31,6 @@ RUN mkdir -p /opt/nvidia/ \
     && rm -rf /opt/nvidia/cheminfomatics/.git
 
 ENV UCX_LOG_LEVEL error
+EXPOSE 5000
 
 CMD cd /opt/nvidia/cheminfomatics; /opt/nvidia/cheminfomatics/launch.sh dash

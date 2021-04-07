@@ -1,5 +1,3 @@
-from nvidia.cheminformatics.config import Context
-from nvidia.cheminformatics.utils.singleton import Singleton
 import os
 import math
 import cudf
@@ -13,6 +11,8 @@ from typing import List
 
 from . import ClusterWfDAO
 from nvidia.cheminformatics.data.helper.chembldata import BATCH_SIZE, ChEmblData
+from nvidia.cheminformatics.config import Context
+from nvidia.cheminformatics.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 

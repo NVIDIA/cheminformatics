@@ -23,7 +23,7 @@ class Context(metaclass=Singleton):
         self.n_molecule = None
         self.batch_size = None
 
-        self.config = None
+        self.config = {}
         if os.path.exists(CONFIG_FILE):
             logger.info('Reading properties from %s...', CONFIG_FILE)
             self.config = self._load_properties_file(CONFIG_FILE)

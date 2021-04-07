@@ -966,8 +966,9 @@ class ChemVisualization(metaclass=Singleton):
         moi_molregno = None
         _refresh_moi_prop_table = dash.no_update
 
-        if selected_clusters and comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks':
-            filter_values = list(map(int, selected_clusters.split(",")))
+        if comp_id == 'bt_recluster_clusters' and event_type == 'n_clicks':
+            if selected_clusters:
+                filter_values = list(map(int, selected_clusters.split(",")))
             filter_column = 'cluster'
         elif selected_points and comp_id == 'bt_recluster_points' and event_type == 'n_clicks':
             filter_values = []

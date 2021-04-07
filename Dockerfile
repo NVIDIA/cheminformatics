@@ -19,16 +19,11 @@ COPY setup/cuchem_rapids_0.17.yml /tmp
 
 RUN conda env create --name cuchem -f /tmp/cuchem_rapids_0.17.yml \
     && rm /tmp/cuchem_rapids_0.17.yml\
-    && conda clean -ay
+    && conda clean -afy
 ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
-
-RUN mkdir -p /opt/nvidia/ \
-    && cd /opt/nvidia/ \
-    && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
-    && rm -rf /opt/nvidia/cheminfomatics/.git
 
 # TODO: Replace the following lines once the repo is available.
 RUN wget  --quiet -O /tmp/pysmilesutils-mirror.tgz \
@@ -47,7 +42,11 @@ RUN mkdir -p /models/molbart \
     && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
     http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
 
+RUN mkdir -p /opt/nvidia/ \
+    && cd /opt/nvidia/ \
+    && git clone --single-branch --branch master https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
+    && rm -rf /opt/nvidia/cheminfomatics/.git
 
 ENV UCX_LOG_LEVEL error
 
-CMD /opt/nvidia/cheminfomatics/launch.sh dash
+CMD cd /opt/nvidia/cheminfomatics; /opt/nvidia/cheminfomatics/launch.sh dash

@@ -697,7 +697,7 @@ class ChemVisualization(metaclass=Singleton):
                                 dcc.Dropdown(id='sl_generative_wf', multi=False,
                                              options=[{'label': 'CDDD Interpolation',
                                                        'value': 'nvidia.cheminformatics.wf.generative.Cddd'},
-                                                      {'label': 'MolBART',
+                                                       {'label': 'MolBART',
                                                        'value': 'nvidia.cheminformatics.wf.generative.MolBART'},
                                                      ],
                                              value=self.generative_wf_cls,
@@ -748,7 +748,7 @@ class ChemVisualization(metaclass=Singleton):
 
             html.Div(id='section_generated_molecules', children=[
                  html.A(
-                    'Export',
+                    'Export to SDF',
                     id='download-link',
                     download="rawdata.sdf",
                     href="/cheminfo/downloadSDF",

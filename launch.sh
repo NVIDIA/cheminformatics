@@ -192,7 +192,7 @@ root() {
 
 
 dbSetup() {
-	local DATA_DIR=$DATA_PATH
+	local DATA_DIR=$DATA_MOUNT_PATH
 
 	if [[ ! -e "${DATA_DIR}/db/chembl_27.db" ]]; then
 		echo "Downloading chembl db to ${DATA_DIR}..."
@@ -312,4 +312,3 @@ case $1 in
 		usage
 		;;
 esac
-

@@ -209,6 +209,7 @@ class ChemVisualization(metaclass=Singleton):
             [State('sl_generative_wf', 'value'),
              State('ckl_candidate_mol_id', 'value'),
              State('n2generate', 'value'),
+             State('scaled_radius', 'value'),
              State('rd_generation_type', 'value'),
              State('show_generated_mol', 'children')])(self.handle_generation)
 
@@ -262,7 +263,7 @@ class ChemVisualization(metaclass=Singleton):
     @report_ui_error(3)
     def handle_generation(self, bt_generate,
                       sl_generative_wf, ckl_candidate_mol_id,
-                      n2generate, rd_generation_type, show_generated_mol):
+                      n2generate, scaled_radius, rd_generation_type, show_generated_mol):
         comp_id, event_type = self._fetch_event_data()
 
         chemble_ids = []
@@ -275,13 +276,17 @@ class ChemVisualization(metaclass=Singleton):
         wf_class = locate(self.generative_wf_cls)
         generative_wf = wf_class()
         n2generate = int(n2generate)
+        scaled_radius = int(scaled_radius)
+
         if rd_generation_type == 'SAMPLE':
             self.genreated_df = generative_wf.find_similars_smiles_from_id(chemble_ids,
                                                                            num_requested=n2generate,
+                                                                           scaled_radius=scaled_radius,
                                                                            force_unique=True)
         else:
             self.genreated_df = generative_wf.interpolate_from_id(chemble_ids,
                                                              num_points=n2generate,
+                                                             scaled_radius=scaled_radius,
                                                              force_unique=True)
 
         if show_generated_mol is None:
@@ -306,7 +311,7 @@ class ChemVisualization(metaclass=Singleton):
                 col_pos = columns.index('Chemical Structure')
                 col_data = self.genreated_df.iat[row_idx, col_pos]
 
-                if 'value' in col_data and col_data['value'] == 'Error interpreing SMILES using RDKIT':
+                if 'value' in col_data and col_data['value'] == 'Error interpreting SMILES using RDKit':
                     continue
             except ValueError:
                 pass
@@ -332,11 +337,11 @@ class ChemVisualization(metaclass=Singleton):
         return html.Table(prop_recs, style={'width': '100%', 'margin': 12, 'border': '1px solid lightgray'}), show_generated_mol, dash.no_update
 
     def handle_ckl_selection(self, ckl_candidate_mol_id, rd_generation_type):
-        selection_msg = '**Please Selection Two**'
+        selection_msg = '**Please Select Two Molecules**'
         selection_cnt = 2
 
         if rd_generation_type == 'SAMPLE':
-            selection_msg = '**Please Selection One**'
+            selection_msg = '**Please Select One Molecule**'
             selection_cnt = 1
 
         if ckl_candidate_mol_id and len(ckl_candidate_mol_id) > selection_cnt:
@@ -552,7 +557,7 @@ class ChemVisualization(metaclass=Singleton):
                 table_headers.append(html.Th(PROP_DISP_NAME[prop], style={'fontSize': '150%', 'text-align': 'center'}))
 
         if chembl_ids:
-            table_headers.append(html.Th('ChEMBLE', style={'fontSize': '150%', 'text-align': 'center'}))
+            table_headers.append(html.Th('ChEMBL', style={'fontSize': '150%', 'text-align': 'center'}))
         else:
             table_headers.append(html.Th("", style={'width': '10px'}))
         table_headers.append(html.Th("", style={'width': '10px'}))
@@ -636,7 +641,7 @@ class ChemVisualization(metaclass=Singleton):
 
                 html.Div([
                     dcc.Markdown("""**Molecule(s) of Interest**"""),
-                    dcc.Markdown("Please enter ChEMBLE ID."),
+                    dcc.Markdown("Please enter ChEMBL ID(s) separated by commas."),
 
                     html.Div(className='row', children=[
                         dcc.Input(id='north_star', type='text', debounce=True, className='nine columns'),
@@ -653,10 +658,10 @@ class ChemVisualization(metaclass=Singleton):
                                 html.Div(children=[
                                     dcc.Dropdown(id='sl_wf',
                                                  multi=False,
-                                                 options=[{'label': 'Gpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
-                                                          {'label': 'Gpu KmeansUmap - Single and Multiple GPUs', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmapHybrid'},
-                                                          {'label': 'GPU Random Projection - Single GPU', 'value': 'nvidia.cheminformatics.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
-                                                          {'label': 'Cpu KmeansUmap', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
+                                                 options=[{'label': 'GPU KMeans-UMAP', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
+                                                          {'label': 'GPU KMeans-UMAP - Single and Multiple GPUs', 'value': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmapHybrid'},
+                                                          {'label': 'GPU KMeans-Random Projection - Single GPU', 'value': 'nvidia.cheminformatics.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
+                                                          {'label': 'CPU KMeans-UMAP', 'value': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap'},],
                                                  value=self.cluster_wf_cls,
                                                  clearable=False),
                                 ], className='nine columns'),
@@ -716,8 +721,15 @@ class ChemVisualization(metaclass=Singleton):
                                 labelStyle={'display': 'block', 'marginLeft': 6, 'marginRight': 6}
                             ),
 
-                            dcc.Markdown("Set number molecules to generate", style={'marginTop': 18,}),
-                            dcc.Input(id='n2generate', value=10),
+                            html.Div(className='row', children=[
+                                dcc.Markdown("Number of molecules to generate", style={'marginLeft': 10, 'marginTop': 12}),
+                                dcc.Input(id='n2generate', value=10, style={'marginLeft': 85}),
+                            ], style={'marginLeft': 0}),
+
+                            html.Div(className='row', children=[
+                                dcc.Markdown("Scaled sampling radius (int, start with 1)", style={'marginLeft': 10, 'marginTop': 12}),
+                                dcc.Input(id='scaled_radius', value=1, style={'marginLeft': 50}),
+                            ], style={'marginLeft': 0}),
 
                             dcc.Markdown(children="""**Please Select Two**""",
                                          id="mk_selection_msg",
@@ -738,7 +750,7 @@ class ChemVisualization(metaclass=Singleton):
 
                     html.Div(className='row', children=[
                         html.Label([
-                            "Select Molecular Property for color gradient",
+                            "Select molecular property for color gradient",
                             dcc.Dropdown(id='sl_prop_gradient', multi=False,  clearable=True,
                                         options=[{"label": PROP_DISP_NAME[p], "value": p} for p in IMP_PROPS],),
                         ], style={'marginTop': 18, 'marginLeft': 18})],

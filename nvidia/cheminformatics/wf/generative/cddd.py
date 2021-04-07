@@ -21,12 +21,15 @@ class Cddd(BaseGenerativeWorkflow):
         self.default_model_loc = download_cddd_models()
         self.dao = dao
         self.cddd_embeddings = Embeddings(model_dir=self.default_model_loc)
+        self.radius_scale = 0.5
 
     def find_similars_smiles_list(self,
                                   smiles: str,
                                   num_requested: int = 10,
-                                  radius=0.5,
+                                  radius=None,
                                   force_unique=False):
+
+        radius = radius if radius else self.radius_scale
         embedding = self.cddd_embeddings.func.seq_to_emb(smiles).squeeze()
         neighboring_embeddings = self.addjitter(embedding, radius, cnt=num_requested)
 
@@ -38,8 +41,9 @@ class Cddd(BaseGenerativeWorkflow):
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=0.5,
+                             radius=None,
                              force_unique=False):
+        radius = radius if radius else self.radius_scale
         generated_mols, neighboring_embeddings = self.find_similars_smiles_list(smiles,
                                                         num_requested=num_requested,
                                                         radius=radius,
@@ -59,8 +63,10 @@ class Cddd(BaseGenerativeWorkflow):
     def interpolate_from_smiles(self,
                                 smiles: List,
                                 num_points: int = 10,
-                                radius=0.5,
+                                radius=None,
                                 force_unique=False):
+        
+        radius = radius if radius else self.radius_scale
         num_points = int(num_points) + 2
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')

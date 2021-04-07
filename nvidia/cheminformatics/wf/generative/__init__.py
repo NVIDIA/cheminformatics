@@ -36,6 +36,7 @@ class BaseGenerativeWorkflow:
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
         self.dao = dao
+        self.radius_scale = None
 
     def interpolate_from_smiles(self,
                                 smiles:List,
@@ -122,8 +123,15 @@ class BaseGenerativeWorkflow:
                             ids:List,
                             id_type:str='chembleid',
                             num_points=10,
-                            force_unique=False):
+                            force_unique=False,
+                            scaled_radius:int=1):
         smiles = None
+
+        if not self.radius_scale:
+            raise Exception('Property `radius_scale` must be defined in model class.')
+        else:
+            radius = float(scaled_radius * self.radius_scale)
+
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(ids)]
             if len(smiles) != len(ids):
@@ -133,6 +141,7 @@ class BaseGenerativeWorkflow:
 
         return self.interpolate_from_smiles(smiles,
                                             num_points=num_points,
+                                            radius=radius,
                                             force_unique=force_unique)
 
     def find_similars_smiles_from_id(self,
@@ -140,8 +149,14 @@ class BaseGenerativeWorkflow:
                                      id_type:str='chembleid',
                                      num_requested=10,
                                      force_unique=False,
-                                     radius=0.5):
+                                     scaled_radius:int=1):
         smiles = None
+
+        if not self.radius_scale:
+            raise Exception('Property `radius_scale` must be defined in model class.')
+        else:
+            radius = float(scaled_radius * self.radius_scale)
+
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(chemble_id)]
             if len(smiles) != len(chemble_id):
@@ -151,6 +166,7 @@ class BaseGenerativeWorkflow:
 
         return self.find_similars_smiles(smiles[0],
                                          num_requested=num_requested,
+                                         radius=radius,
                                          force_unique=force_unique)
 
 

@@ -260,7 +260,7 @@ grpc() {
 	else
 		dbSetup "${DATA_PATH}/db"
 		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CONT} python startdash.py grpc $@
+		${DOCKER_CMD} -p 50051:50051 -it ${CONT} python startdash.py grpc $@
 	fi
 	exit
 }

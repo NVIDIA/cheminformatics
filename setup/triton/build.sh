@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Copyright (c) 2020, NVIDIA CORPORATION. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -24,32 +26,9 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import time
-import sys
-
-import grpc
-from locust import task, User, constant
-
-sys.path.insert(0, "generated")
-import similaritysampler_pb2_grpc
-import similaritysampler_pb2
-
-from tests.utils import stopwatch
+docker build -f Dockerfile -t cheminformatic_triton ../..
 
 
-class GRPCLocust(User):
-    host = 'http://127.0.0.1'
-    wait_time = constant(.1)
-
-    @task
-    @stopwatch('GRPC_Sample')
-    def client_task(self):
-        with grpc.insecure_channel('127.0.0.1:50051') as channel:
-            stub = similaritysampler_pb2_grpc.SimilaritySamplerStub(channel)
-            spec = similaritysampler_pb2.SimilaritySpec(
-                model=similaritysampler_pb2.SimilarityModel.MolBART,
-                smiles='CN1C=NC2=C1C(=O)N(C(=O)N2C)C',
-                radius=0.0001,
-                numRequested=10)
-
-            response = stub.FindSimilars(spec)
+docker build -f Dockerfile -t cheminformatic_triton_sdk \
+    --build-arg BASE_IMAGE="nvcr.io/nvidia/tritonserver:21.03-py3-sdk" \
+    ../..

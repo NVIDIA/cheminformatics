@@ -23,6 +23,7 @@ import dask.array
 import dask
 import umap
 import pandas as pd
+import sklearn.cluster
 
 from . import BaseClusterWorkflow
 from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores
@@ -72,7 +73,7 @@ class CpuKmeansUmap(BaseClusterWorkflow):
         ids = df_molecular_embedding['id']
         df_molecular_embedding = df_molecular_embedding.persist()
         # self.n_molecules = df_molecular_embedding.compute().shape[0]
-        self.n_molecules = 10000
+        self.n_molecules = self.context.n_molecule
 
         for col in ['id', 'index', 'molregno']:
             if col in df_molecular_embedding.columns:
@@ -94,7 +95,9 @@ class CpuKmeansUmap(BaseClusterWorkflow):
 
         with MetricsLogger('kmeans', self.n_molecules,) as ml:
 
-            kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
+            # kmeans_float = dask_KMeans(n_clusters=self.n_clusters)
+            kmeans_float = sklearn.cluster.KMeans(n_clusters=self.n_clusters)
+
             kmeans_float.fit(df_embedding)
             kmeans_labels = kmeans_float.labels_
 
@@ -122,7 +125,8 @@ class CpuKmeansUmap(BaseClusterWorkflow):
 
         df_molecular_embedding['x'] = X_train[:, 0]
         df_molecular_embedding['y'] = X_train[:, 1]
-        df_molecular_embedding['cluster'] = kmeans_labels.compute()
+        # df_molecular_embedding['cluster'] = kmeans_labels.compute()
+        df_molecular_embedding['cluster'] = kmeans_labels
         df_molecular_embedding['id'] = ids
 
         self.df_embedding = df_molecular_embedding

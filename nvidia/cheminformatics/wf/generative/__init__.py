@@ -41,35 +41,36 @@ class BaseGenerativeWorkflow:
     def interpolate_from_smiles(self,
                                 smiles:List,
                                 num_points:int=10,
-                                radius=0.5,
+                                radius=None,
                                 force_unique=False):
         NotImplemented
 
     def find_similars_smiles_list(self,
                                   smiles:str,
                                   num_requested:int=10,
-                                  radius=0.5,
+                                  radius=None,
                                   force_unique=False):
         NotImplemented
 
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=0.5,
+                             radius=None,
                              force_unique=False):
         NotImplemented
 
     def addjitter(self,
                   embedding,
-                  radius,
+                  radius=None,
                   cnt=1):
+        radius = radius if radius else self.radius_scale
         return add_jitter(embedding, radius, cnt)
 
     def compute_unique_smiles(self,
                               interp_df,
                               embeddings,
                               embedding_funct,
-                              radius=0.5):
+                              radius=None):
         """
         Identify duplicate SMILES and distorts the embedding. The input df
         must have columns 'SMILES' and 'Generated' at 0th and 1st position.
@@ -79,6 +80,8 @@ class BaseGenerativeWorkflow:
         This function does not make any assumptions about order of embeddings.
         Instead it simply orders the df by SMILES to identify the duplicates.
         """
+
+        radius = radius if radius else self.radius_scale
 
         for i in range(5):
             smiles = interp_df['SMILES'].sort_values()

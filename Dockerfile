@@ -25,26 +25,9 @@ ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
 
-# TODO: Replace the following lines once the repo is available.
-RUN wget  --quiet -O /tmp/pysmilesutils-mirror.tgz \
-    http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
-    && tar -xf /tmp/pysmilesutils-mirror.tgz -C /opt \
-    && cd /opt/pysmilesutils-mirror; pip install .
-
-RUN wget  --quiet -O /tmp/molbart-mirror.tgz \
-    http://rilango-work.nvidia.com/molbart/molbart-mirror.tgz \
-    && tar -xf /tmp/molbart-mirror.tgz -C /opt \
-    && cd /opt/molbart-mirror; pip install -r requirements.txt; pip install .
-
-RUN mkdir -p /models/molbart \
-    && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
-    http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \
-    && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
-    http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
-
 RUN mkdir -p /opt/nvidia/ \
     && cd /opt/nvidia/ \
-    && git clone --single-branch --branch master https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
+    && git clone --single-branch --branch dev https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
     && rm -rf /opt/nvidia/cheminfomatics/.git
 
 ENV UCX_LOG_LEVEL error

@@ -702,8 +702,6 @@ class ChemVisualization(metaclass=Singleton):
                                 dcc.Dropdown(id='sl_generative_wf', multi=False,
                                              options=[{'label': 'CDDD Interpolation',
                                                        'value': 'nvidia.cheminformatics.wf.generative.Cddd'},
-                                                       {'label': 'MolBART',
-                                                       'value': 'nvidia.cheminformatics.wf.generative.MolBART'},
                                                      ],
                                              value=self.generative_wf_cls,
                                              clearable=False),

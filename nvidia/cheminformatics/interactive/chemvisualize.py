@@ -722,14 +722,14 @@ class ChemVisualization(metaclass=Singleton):
                             ),
 
                             html.Div(className='row', children=[
-                                dcc.Markdown("Number of molecules to generate", style={'marginLeft': 10, 'marginTop': 12}),
-                                dcc.Input(id='n2generate', value=10, style={'marginLeft': 85}),
+                                dcc.Markdown("Number of molecules to generate", style={'marginLeft': 10, 'marginTop': 12, 'width': '250px'}),
+                                dcc.Input(id='n2generate', value=10),
                             ], style={'marginLeft': 0}),
 
                             html.Div(className='row', children=[
-                                dcc.Markdown("Scaled sampling radius (int, start with 1)", style={'marginLeft': 10, 'marginTop': 12}),
-                                dcc.Input(id='scaled_radius', value=1, style={'marginLeft': 50}),
-                            ], style={'marginLeft': 0}),
+                                dcc.Markdown("Scaled sampling radius (int, start with 1)", style={'marginLeft': 10, 'marginTop': 12, 'width': '250px'}),
+                                dcc.Input(id='scaled_radius', value=1),
+                            ], style={'marginLeft': 0, 'marginTop': '6px'}),
 
                             dcc.Markdown(children="""**Please Select Two**""",
                                          id="mk_selection_msg",

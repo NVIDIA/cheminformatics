@@ -37,6 +37,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         self.bart_model = self.load_model(model_chk_path, self.tokenizer, max_seq_len)
 
         self.bart_model.to('cuda')
+        self.radius_scale = 0.0001
 
     def load_tokenizer(self, tokenizer_path):
         """Load pickled tokenizer
@@ -167,8 +168,9 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
     def find_similars_smiles_list(self,
                                   smiles:str,
                                   num_requested:int=10,
-                                  radius=0.0001,
+                                  radius=None,
                                   force_unique=False):
+        radius = radius if radius else self.radius_scale
         embedding, pad_mask = self.smiles2embedding(self.bart_model,
                                                     smiles,
                                                     self.tokenizer)
@@ -182,9 +184,9 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=0.0001,
+                             radius=None,
                              force_unique=False):
-
+        radius = radius if radius else self.radius_scale
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
@@ -207,8 +209,9 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
     def interpolate_from_smiles(self,
                                 smiles:List,
                                 num_points:int=10,
-                                radius=0.0001,
+                                radius=None,
                                 force_unique=False):
+        radius = radius if radius else self.radius_scale
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')

@@ -38,39 +38,41 @@ class BaseGenerativeWorkflow:
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
         self.dao = dao
+        self.radius_scale = None
 
     def interpolate_from_smiles(self,
                                 smiles:List,
                                 num_points:int=10,
-                                radius=0.5,
+                                radius=None,
                                 force_unique=False):
         NotImplemented
 
     def find_similars_smiles_list(self,
                                   smiles:str,
                                   num_requested:int=10,
-                                  radius=0.5,
+                                  radius=None,
                                   force_unique=False):
         NotImplemented
 
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=0.5,
+                             radius=None,
                              force_unique=False):
         NotImplemented
 
     def addjitter(self,
                   embedding,
-                  radius,
+                  radius=None,
                   cnt=1):
+        radius = radius if radius else self.radius_scale
         return add_jitter(embedding, radius, cnt)
 
     def compute_unique_smiles(self,
                               interp_df,
                               embeddings,
                               embedding_funct,
-                              radius=0.5):
+                              radius=None):
         """
         Identify duplicate SMILES and distorts the embedding. The input df
         must have columns 'SMILES' and 'Generated' at 0th and 1st position.
@@ -80,6 +82,8 @@ class BaseGenerativeWorkflow:
         This function does not make any assumptions about order of embeddings.
         Instead it simply orders the df by SMILES to identify the duplicates.
         """
+
+        radius = radius if radius else self.radius_scale
 
         for i in range(5):
             smiles = interp_df['SMILES'].sort_values()
@@ -124,8 +128,15 @@ class BaseGenerativeWorkflow:
                             ids:List,
                             id_type:str='chembleid',
                             num_points=10,
-                            force_unique=False):
+                            force_unique=False,
+                            scaled_radius:int=1):
         smiles = None
+
+        if not self.radius_scale:
+            raise Exception('Property `radius_scale` must be defined in model class.')
+        else:
+            radius = float(scaled_radius * self.radius_scale)
+
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(ids)]
             if len(smiles) != len(ids):
@@ -135,6 +146,7 @@ class BaseGenerativeWorkflow:
 
         return self.interpolate_from_smiles(smiles,
                                             num_points=num_points,
+                                            radius=radius,
                                             force_unique=force_unique)
 
     def find_similars_smiles_from_id(self,
@@ -142,8 +154,14 @@ class BaseGenerativeWorkflow:
                                      id_type:str='chembleid',
                                      num_requested=10,
                                      force_unique=False,
-                                     radius=0.5):
+                                     scaled_radius:int=1):
         smiles = None
+
+        if not self.radius_scale:
+            raise Exception('Property `radius_scale` must be defined in model class.')
+        else:
+            radius = float(scaled_radius * self.radius_scale)
+
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(chemble_id)]
             if len(smiles) != len(chemble_id):
@@ -153,6 +171,7 @@ class BaseGenerativeWorkflow:
 
         return self.find_similars_smiles(smiles[0],
                                          num_requested=num_requested,
+                                         radius=radius,
                                          force_unique=force_unique)
 
 

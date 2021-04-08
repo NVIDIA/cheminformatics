@@ -14,7 +14,7 @@ from nvidia.cheminformatics.wf.generative import BaseGenerativeWorkflow
 logger = logging.getLogger(__name__)
 
 
-class Cddd(BaseGenerativeWorkflow):
+class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
         super().__init__(dao)

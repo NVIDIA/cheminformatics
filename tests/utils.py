@@ -1,7 +1,11 @@
 import os
 import dask
+import time
+import inspect
 import tempfile
 import logging
+
+from locust import events
 
 from nvidia.cheminformatics.utils.dask import initialize_cluster
 from nvidia.cheminformatics.config import Context
@@ -48,3 +52,34 @@ def _create_context(use_gpu=True,
         context.batch_size = 10000
 
     return context
+
+
+def stopwatch(request_type):
+    def _stopwatch(func):
+
+        def wrapper(*args, **kwargs):
+            previous_frame = inspect.currentframe().f_back
+            _, _, task_name, _, _ = inspect.getframeinfo(previous_frame)
+
+            _start_time = time.time()
+            result = None
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                total = int((time.time() - _start_time) * 1000)
+                events.request_failure.fire(request_type=request_type,
+                                            name=task_name,
+                                            response_time=total,
+                                            response_length=0,
+                                            exception=e)
+            else:
+                total = int((time.time() - _start_time) * 1000)
+                events.request_success.fire(request_type=request_type,
+                                            name=task_name,
+                                            response_time=total,
+                                            response_length=0)
+            print(total, _start_time, time.time())
+            return result
+
+        return wrapper
+    return _stopwatch

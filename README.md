@@ -8,6 +8,7 @@ Here, we implement clustering on molecular similarity. We support multiple metho
 
  - Compute Morgan circular fingerprints, cluster using k-means, and perform dimensionality reduction using PCA and UMAP. Distributed GPU-accelerated algorithms with multi-GPU support are used in this method. This allows processing very large datasets.
  - Compute Morgan circular fingerprints, [Sparse Random Projection](https://docs.rapids.ai/api/cuml/stable/api.html?highlight=sparserandomprojection#cuml.random_projection.SparseRandomProjection) and cluster using k-means.
+ - Generate new molecules either by exploring the latent space between two molecules or sampling around a molecule
 
 ![screenshot](screenshot.png "Screenshot of cheminformatics dashboard")
 
@@ -108,7 +109,7 @@ The latest benchmarks reside in the [benchmarks](benchmarks) directory. The file
 
  - Cluster molecules from ChEMBL using the embedding generated from Morgan Fingerprints --> PCA --> UMAP
  - Ability to color the clustered molecules based on molecular properties
- - Ability to recluster on user-subsets of molecules or specific clusters
+ - Ability to recluster on user selected subsets of molecules or specific clusters
  - Designate and track molecules of interest during the analysis
  - Generate new molecules by linearly interpolating the latent space between two selected molecules or sampling arround a selected molecule
  - Export generated molecules in SDF format

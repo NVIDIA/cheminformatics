@@ -177,7 +177,10 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
 
         xticklabels = [f'{x[1]} CPU cores' if x[0] == 'CPU' else f'{x[1]} GPU(s)' for x in dat.index.to_list()]
         ax.set_xticklabels(xticklabels, rotation=25)
-        ax.set(title=f'{n_molecules:,} Molecules', xlabel='')
+
+        if n_molecules == -1:
+            n_molecules = 'ALL'
+        ax.set(title=f'{n_molecules:} Molecules', xlabel='')
         if ax.is_first_col():
             ax.set(ylabel='Compute Time (s)\nfor RAPIDS / Sklearn Workflow')
 

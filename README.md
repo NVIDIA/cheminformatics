@@ -42,7 +42,7 @@ Build your container:
 ./launch.sh build
 ```
 
-Download the ChEMBL database:
+Download the ChEMBL database (version 27):
 ```
 ./launch.sh dbSetup
 ```
@@ -103,7 +103,17 @@ Conda environment support is available for user wanting to use the tool outside 
 
 ### Acceleration
 
-The latest benchmarks reside in the [benchmarks](benchmarks) directory. The files are available in [markdown](benchmarks/benchmark.md) and [Excel](benchmarks/benchmark.xlsx). A [plot](benchmarks/benchmark.png) is also available.
+The latest benchmarks reside in the [benchmarks](benchmarks) directory.
+
+Benchmark tests run on A100:
+  - [markdown](benchmarks/A100/benchmark.md)
+  - [Excel](benchmarks/A100/benchmark.xlsx)
+  - [plot](benchmarks/A100/benchmark.png)
+
+Benchmark tests run on V100:
+  - [markdown](benchmarks/V100/benchmark.md)
+  - [Excel](benchmarks/V100/benchmark.xlsx)
+  - [plot](benchmarks/V100/benchmark.png)
 
 ### Features
 

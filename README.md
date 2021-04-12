@@ -9,7 +9,7 @@ Here, we implement clustering on molecular similarity. We support multiple metho
 
 ![screenshot](screenshot.png "Screenshot of cheminformatics dashboard")
 
-### Preparing your environment (optional)
+### Preparing the Environment (optional)
 A launch script, `launch.sh`, is provided to perform all tasks.
 
 #### Customization
@@ -72,9 +72,13 @@ Navigate a browser to:
 https://0.0.0.0:5000
 ```
 
-### Advance setup
+### Tutorial
 
-#### Caching fingerprints
+See the [tutorial](tutorial/Tutorial.md) for an example walkthrough.
+
+### Advanced Setup
+
+#### Caching Fingerprints
 Users can generate Morgan Fingerprints and store it in HDF5 files for later use. Please use the following command to generate fingerprint cache.
 ```
 ./launch.sh cache -c /data/fp
@@ -88,7 +92,8 @@ Once generated, the cached fingerprints can be used for analysis using `-c` opti
 ```
 
 ### Conda
-Conda env. support is available for user wanting to use the tool outside of containers. Please find the setup file in `setup` directory.
+
+Conda environment support is available for user wanting to use the tool outside of containers. Please find the setup file in `setup` directory.
 
 ### Acceleration
 

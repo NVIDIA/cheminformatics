@@ -651,7 +651,7 @@ class ChemVisualization(metaclass=Singleton):
                     ], style={'marginLeft': 0, 'marginBottom': 18,}),
 
                     dcc.Tabs([
-                        dcc.Tab(label='Cluster', children=[
+                        dcc.Tab(label='Cluster Molecules', children=[
                             dcc.Markdown("""**Select Workflow**""", style={'marginTop': 12}),
 
                             html.Div(className='row', children=[
@@ -695,14 +695,14 @@ class ChemVisualization(metaclass=Singleton):
                             dbc.Button('Reload', id='bt_reset', n_clicks=0, style={'marginLeft': 0, 'marginTop': 18, }),
                         ]),
 
-                        dcc.Tab(label='Interpolate', children=[
+                        dcc.Tab(label='Generate Molecules', children=[
                             dcc.Markdown("""**Select Generative Model**""", style={'marginTop': 12}),
 
                             html.Div(children=[
                                 dcc.Dropdown(id='sl_generative_wf', multi=False,
-                                             options=[{'label': 'CDDD Interpolation',
+                                             options=[{'label': 'CDDD Model',
                                                        'value': 'nvidia.cheminformatics.wf.generative.Cddd'},
-                                                       {'label': 'MolBART',
+                                                       {'label': 'MolBART Model',
                                                        'value': 'nvidia.cheminformatics.wf.generative.MolBART'},
                                                      ],
                                              value=self.generative_wf_cls,
@@ -712,8 +712,8 @@ class ChemVisualization(metaclass=Singleton):
                             dcc.RadioItems(
                                 id='rd_generation_type',
                                 options=[
-                                    {'label': 'Interpolate', 'value': 'INTERPOLATE'},
-                                    {'label': 'Sample (from neighborhood)', 'value': 'SAMPLE'},
+                                    {'label': 'Interpolate between two molecules', 'value': 'INTERPOLATE'},
+                                    {'label': 'Sample around one molecule', 'value': 'SAMPLE'},
                                 ],
                                 value='INTERPOLATE',
                                 style={'marginTop': 18},

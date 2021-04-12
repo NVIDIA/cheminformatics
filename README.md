@@ -12,8 +12,7 @@ Here, we implement clustering on molecular similarity. We support multiple metho
 
 ![screenshot](screenshot.png "Screenshot of cheminformatics dashboard")
 
-### Preparing Your Environment (optional)
-
+### Preparing the Environment (optional)
 A launch script, `launch.sh`, is provided to perform all tasks.
 
 #### Customization
@@ -81,10 +80,13 @@ Navigate a browser to:
 https://0.0.0.0:5000
 ```
 
+### Tutorial
+
+See the [tutorial](tutorial/Tutorial.md) for an example walkthrough.
+
 ### Advanced Setup
 
 #### Caching Fingerprints
-
 Users can generate Morgan Fingerprints and store it in HDF5 files for later use. Please use the following command to generate fingerprint cache.
 ```
 ./launch.sh cache -c /data/fp

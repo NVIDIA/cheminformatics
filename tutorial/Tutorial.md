@@ -25,10 +25,11 @@ The Dash UI contains a subset of the compounds from ChEMBL processed according t
 First, the visualization tools will be used to interact with and select the compounds plotted in the graph.
 
 1. In the Plotly tools at the top of the window, choose either the Lasso Select or the Box Select tool.
-2. Select a subset of compounds in the plot. The selected compounds will appear in the paginated table below. If desired, compounds of interest could be selected for tracking throughout the rest of the analysis (see section "Following Compounds of Interest" below) by pressing the "XXX" button in the table. 
-3. Ensure the "Cluster Molecules" tab is selected in the panel on the right. Press "Recluster Selection" and the UI will recluster only the selected compounds and update the plot.
-4. Molecular properties of interest can be added to the table using the drop-down menu "XXX".
-5. By default, the plotted compounds are colored by cluster ID. However, they can also be colored by molecular property. The property can be selected in the drop-down menu labeled "Select molecular property for color gradient".  
+2. Select a subset of compounds in the plot. 
+3. The selected compounds will appear in the paginated table below. If desired, compounds of interest could be selected for tracking throughout the rest of the analysis (see section "Following Compounds of Interest" below) by pressing the "Add as Mol" button in the table. 
+4. Ensure the "Cluster Molecules" tab is selected in the panel on the right. Press "Recluster Selection" and the UI will recluster only the selected compounds and update the plot.
+5. Molecular properties of interest can be added to the table using the drop-down menu "Select Molecular Properties".
+6. By default, the plotted compounds are colored by cluster ID. However, they can also be colored by molecular property. The property can be selected in the drop-down menu labeled "Select molecular property for color gradient".  
 
 ![Compound Selection and Reclustering](assets/compound_selection_and_reclustering.png)
 
@@ -40,7 +41,9 @@ Compounds of interest can be tracked throughout the analysis using their ChEMBL 
 
 1. Add the following list of comma-separated ChEMBL IDs, based on hits identified in the anti-SARS-CoV-2 virtual screen, to the box labeled "Molecule(s) of Interest" and press "Highlight": 
 > CHEMBL1524273,CHEMBL2105398,CHEMBL1191,CHEMBL1355299
-2. The compounds will be added to the plot (if necessary) and represented with large diamonds. They will also appear in the table below -- these compounds of interest will be used in the next section.
+2. The compounds will be added to the plot (if necessary) and represented with large diamonds. 
+3. They will also appear in the table below -- these compounds of interest will be used in the next section. 
+4. For the compounds with ChEMBL IDs of `CHEMBL1191` and `CHEMBL1524273`, select "Add for Interpolation" from the table.
 
 ![Following Compounds of Interest](assets/following_compounds_of_interest.png)
 
@@ -48,10 +51,12 @@ Compounds of interest can be tracked throughout the analysis using their ChEMBL 
 
 The generative module can be used to sample novel molecules derived from the generative model's latent space that are either in the region surrounding one molecule of interest or located between two selected molecules. The second option will be explored below.
 
-1. Ensure the list of ChEMBL IDs from the "Following Compounds of Interest" section are still present in the table below. For two of the compounds, select "XXX".
-2. Choose the "Generate Molecules" tab in the panel to the right and select the "Interpolate between two molecules" radio button. Choose the tickbox next to two of the ChEMBL IDs.
-3. Set the number of molecules to generate. Press "XXX" and wait for the molecule generation to complete. The model weights model may need time to download the first time this function is executed.
-4. Generated molecules will appear in the table below with the original (selected) molecules at the top and bottom. The molecules can be exported in an SDF file by pressing the "XXX" button above the table.
+1. Choose the "Generate Molecules" tab in the panel on the right.
+2. Ensure "CDDD Model" is shown in the section "Select Generative Model" and then select the "Interpolate between two molecules" radio button. 
+3. The ChEMBL IDs `CHEMBL1191` and `CHEMBL1524273` should be in the panel below the text "Please Select Two Molecules." Choose the tickboxes next to both of these two ChEMBL IDs.
+3. Set the number of molecules to generate to 5. 
+4. Press "Generate" and wait for the molecule generation to complete. The model weights model may need time to download the first time this function is executed.
+5. Generated molecules will appear in the table below with the original (selected) molecules at the top and bottom. The molecules can be exported to an SDF file by pressing the "Export to SDF" button above the table.
 
 ![Generating Novel Compounds](assets/generating_novel_compounds.png)
 

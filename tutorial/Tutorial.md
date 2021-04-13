@@ -60,4 +60,4 @@ The generative module can be used to sample novel molecules derived from the gen
 
 ![Generating Novel Compounds](assets/generating_novel_compounds.png)
 
-As an alternative to the above workflow, molecules can be sampled in the vicinity of a single molecule by choosing the "XXX" radio button in step 2.
+As an alternative to the above workflow, molecules can be sampled in the vicinity of a single molecule by choosing the "Sample around molecule" radio button in step 2.

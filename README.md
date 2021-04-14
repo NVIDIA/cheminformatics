@@ -105,17 +105,17 @@ Conda environment support is available for user wanting to use the tool outside 
 
 ### Acceleration
 
-The latest benchmarks reside in the [benchmarks](benchmarks) directory.
+The latest benchmarks reside in the [benchmark](benchmark) directory.
 
 Benchmark tests run on A100:
-  - [markdown](benchmarks/A100/benchmark.md)
-  - [Excel](benchmarks/A100/benchmark.xlsx)
-  - [plot](benchmarks/A100/benchmark.png)
+  - [markdown](benchmark/A100/benchmark.md)
+  - [Excel](benchmark/A100/benchmark.xlsx)
+  - [plot](benchmark/A100/benchmark.png)
 
 Benchmark tests run on V100:
-  - [markdown](benchmarks/V100/benchmark.md)
-  - [Excel](benchmarks/V100/benchmark.xlsx)
-  - [plot](benchmarks/V100/benchmark.png)
+  - [markdown](benchmark/V100/benchmark.md)
+  - [Excel](benchmark/V100/benchmark.xlsx)
+  - [plot](benchmark/V100/benchmark.png)
 
 ### Features
 

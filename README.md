@@ -24,7 +24,7 @@ To generate a template for `.cheminf_local_environment`, just run `./launch.sh` 
 If `.cheminf_local_environment` does not exist, then a template will be written for you.
 
 ```
-CONT=nvcr.io/nvidia/clara/cheminformatics_demo:200929-0.0.1
+CONT=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1
 JUPYTER_PORT=8888
 PLOTLY_PORT=5000
 DASK_PORT=9001

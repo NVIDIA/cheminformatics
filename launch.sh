@@ -105,7 +105,7 @@ fi
 #
 ###############################################################################
 
-CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:200929-0.0.1}
+CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
 JUPYTER_PORT=${JUPYTER_PORT:-9000}
 PLOTLY_PORT=${PLOTLY_PORT:-5000}
 DASK_PORT=${DASK_PORT:-9001}

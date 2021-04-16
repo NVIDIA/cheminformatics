@@ -670,10 +670,9 @@ class ChemVisualization(metaclass=Singleton):
                                         className='three columns'),
                             ], style={'marginLeft': 0, 'marginTop': 6, }),
 
+                            dcc.Markdown("""**Cluster Selection**""", style={'marginTop': 18,}),
                             dcc.Markdown("Set number of clusters", style={'marginTop': 18,}),
                             dcc.Input(id='sl_nclusters', value=self.n_clusters),
-
-                            dcc.Markdown("""**Cluster Selection**""", style={'marginTop': 18,}),
                             dcc.Markdown("Click a point to select a cluster."),
 
                             html.Div(className='row', children=[

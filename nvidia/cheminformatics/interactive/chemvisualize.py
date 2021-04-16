@@ -652,7 +652,7 @@ class ChemVisualization(metaclass=Singleton):
 
                     dcc.Tabs([
                         dcc.Tab(label='Cluster Molecules', children=[
-                            dcc.Markdown("""**Select Workflow**""", style={'marginTop': 12}),
+                            dcc.Markdown("""**Select Workflow**""", style={'marginTop': 18,}),
 
                             html.Div(className='row', children=[
                                 html.Div(children=[
@@ -671,9 +671,9 @@ class ChemVisualization(metaclass=Singleton):
                             ], style={'marginLeft': 0, 'marginTop': 6, }),
 
                             dcc.Markdown("""**Cluster Selection**""", style={'marginTop': 18,}),
-                            dcc.Markdown("Set number of clusters", style={'marginTop': 18,}),
+                            dcc.Markdown("Set number of clusters", style={'marginTop': 12,}),
                             dcc.Input(id='sl_nclusters', value=self.n_clusters),
-                            dcc.Markdown("Click a point to select a cluster."),
+                            dcc.Markdown("Click a point to select a cluster.", style={'marginTop': 12,}),
 
                             html.Div(className='row', children=[
                                 dcc.Input(id='selected_clusters', type='text', className='nine columns'),
@@ -682,12 +682,10 @@ class ChemVisualization(metaclass=Singleton):
                                         className='three columns'),
                             ], style={'marginLeft': 0}),
 
-                            dcc.Markdown("""
-                                **Selection Points**
-
-                                Choose the lasso or rectangle tool in the graph's menu
+                            dcc.Markdown("""**Selection Points**""", style={'marginTop': 18,}),
+                            dcc.Markdown("""Choose the lasso or rectangle tool in the graph's menu
                                 bar and then select points in the graph.
-                                """, style={'marginTop': 18}),
+                                """, style={'marginTop': 12,}),
                             dbc.Button('Recluster Selection', id='bt_recluster_points', n_clicks=0),
                             html.Div(children=[html.Div(id='selected_point_cnt'), ]),
 
@@ -695,7 +693,7 @@ class ChemVisualization(metaclass=Singleton):
                         ]),
 
                         dcc.Tab(label='Generate Molecules', children=[
-                            dcc.Markdown("""**Select Generative Model**""", style={'marginTop': 12}),
+                            dcc.Markdown("""**Select Generative Model**""", style={'marginTop': 18,}),
 
                             html.Div(children=[
                                 dcc.Dropdown(id='sl_generative_wf', multi=False,

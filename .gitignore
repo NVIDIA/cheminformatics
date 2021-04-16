@@ -11,8 +11,20 @@
 .cupy
 .nv
 .cudf/
+.keras/
+.vscode/
+cddd/
+.viminfo
+.conda/
+.gitconfig
+.gnupg/
+.pip/
+.ssh/
+.vscode-server/
+.wget-hsts
 
 __pycache__
 dask-worker-space
-./data
 .npm
+.cache_dir
+benchmark.csv

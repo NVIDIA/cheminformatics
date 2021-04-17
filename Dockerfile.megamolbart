@@ -1,0 +1,56 @@
+FROM nvcr.io/nvidia/pytorch:20.11-py3
+
+ENV UCX_LOG_LEVEL error
+ENV PATH /opt/conda/bin:$PATH
+ENV CUDA_HOME /usr/local/cuda
+SHELL ["/bin/bash", "-c"]
+RUN echo "source activate base" > /etc/bash.bashrc
+
+RUN apt update && DEBIAN_FRONTEND=noninteractive \
+    && apt-get install -y wget git unzip tmux vim libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+## Environment setup -- original installation
+# RUN conda install -n base -c rdkit rdkit pandas==1.1.3 matplotlib numpy \
+#     && conda clean -ay
+# RUN conda run -n base pip install pytorch_lightning==1.1.0 pytest pytest-order pybind11==2.6.2 six==1.15.0 regex deepspeed==0.3.10
+## Environment setup
+COPY setup/megamolbart.yml /tmp/.
+RUN conda env update --name base -f /tmp/megamolbart.yml
+
+## Apex
+RUN cd /tmp && git clone https://github.com/NVIDIA/apex 
+RUN cd /tmp/apex/ \
+    && /opt/conda/bin/python3 -m pip install -v \
+        --disable-pip-version-check --no-cache-dir \
+        --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+
+## PySMILES
+RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
+    http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
+    && tar -xf /tmp/pysmilesutils-mirror.tgz -C /opt \
+    && cd /opt/pysmilesutils-mirror; pip install .
+
+## Megatron & MegaMolBART
+RUN wget --quiet -O /tmp/megatron_molbart.zip \
+    http://rilango-work.nvidia.com/megatron_molbart/MolBART-megatron-molbart-with-zinc.zip \
+    && unzip /tmp/megatron_molbart.zip -d /opt \
+    && mv /opt/MolBART-megatron-molbart-with-zinc /opt/MolBART \
+    && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
+    && cd /opt/MolBART; pip install .
+ENV PYTHONPATH = /opt/MolBART/megatron_molbart:/opt/MolBART
+
+## Models and Weights
+RUN mkdir -p /models/molbart \
+    && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
+    http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \
+    && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
+    http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt \
+    && wget --quiet -O /models/molbart/bart_vocab.txt \
+    http://rilango-work.nvidia.com/megatron_molbart/bart_vocab.txt
+
+## NVIDIA code
+RUN mkdir -p /opt/nvidia/ \
+    && cd /opt/nvidia/ \
+    && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
+    && rm -rf /opt/nvidia/cheminfomatics/.git

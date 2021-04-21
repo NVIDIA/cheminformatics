@@ -236,7 +236,7 @@ dash() {
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
 		cd /opt/nvidia/cheminfomatics
-    python3 startdash.py analyze $@
+                python3 startdash.py analyze $@
 	else
 		dbSetup "${DATA_PATH}/db"
 		# run a container and start dash inside container.

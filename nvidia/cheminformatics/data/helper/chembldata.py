@@ -225,8 +225,10 @@ class ChEmblData(object, metaclass=Singleton):
                     df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
 
         # Conversion to fingerprints or embeddings
+        transformed_smiles = df['transformed_smiles']
         transformation = self.fp_type(**transformation_kwargs)
-        return_df = df.apply(transformation.transform, result_type='expand', axis=1)
+        cache_data = transformation.transform(df)        
+        return_df = pandas.DataFrame(cache_data)
 
         return_df = pandas.DataFrame(
             return_df,

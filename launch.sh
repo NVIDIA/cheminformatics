@@ -234,11 +234,11 @@ dbSetup() {
 dash() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
+		dbSetup '/data'
 		cd /opt/nvidia/cheminfomatics/
         python3 startdash.py analyze $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py analyze $@
 	fi
@@ -249,10 +249,10 @@ dash() {
 cache() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
+		dbSetup '/data'
 	    python3 startdash.py cache $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py cache $@
 	fi
@@ -263,10 +263,10 @@ cache() {
 service() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
+		dbSetup '/data'
 	    python3 startdash.py service $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py service $@
 	fi
@@ -277,10 +277,10 @@ service() {
 grpc() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
+		dbSetup '/data'
 	    python3 startdash.py grpc $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py grpc $@
 	fi
@@ -289,7 +289,7 @@ grpc() {
 
 
 test() {
-	dbSetup "${DATA_PATH}/db"
+	dbSetup "${DATA_PATH}"
 	# run a container and start dash inside container.
 	${DOCKER_CMD} -it ${CONT} python startdash.py analyze -b --n_mol 100000
 	exit

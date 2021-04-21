@@ -29,7 +29,7 @@ RUN echo "source activate cuchem" > /etc/bash.bashrc
 
 RUN mkdir -p /opt/nvidia/ \
     && cd /opt/nvidia/ \
-    && git clone --single-branch --branch dev https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
+    && git clone --single-branch --branch master https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
     && rm -rf /opt/nvidia/cheminfomatics/.git
 
 ENV UCX_LOG_LEVEL error

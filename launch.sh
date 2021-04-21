@@ -235,6 +235,7 @@ dash() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
 		dbSetup '/data/db'
+		cd /opt/nvidia/cheminfomatics/
         python3 startdash.py analyze $@
 	else
 		dbSetup "${DATA_PATH}/db"

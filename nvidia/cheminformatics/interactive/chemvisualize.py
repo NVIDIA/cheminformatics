@@ -699,6 +699,8 @@ class ChemVisualization(metaclass=Singleton):
                                 dcc.Dropdown(id='sl_generative_wf', multi=False,
                                              options=[{'label': 'CDDD Model',
                                                        'value': 'nvidia.cheminformatics.wf.generative.Cddd'},
+                                                      {'label': 'MolBART Model',
+                                                       'value': 'nvidia.cheminformatics.wf.generative.MolBART'},
                                                      ],
                                              value=self.generative_wf_cls,
                                              clearable=False),
@@ -789,12 +791,22 @@ class ChemVisualization(metaclass=Singleton):
                         dbc.Button(">", id="bt_page_next",
                                    style={"height": "25px"})
                     ],
-                        className='three columns',
-                        style={'verticalAlign': 'text-bottom', 'text-align': 'right'}
-                    ),
-                ]),
+                        className='three columns',import logging
 
-                html.Div(children=[
+from nvidia.cheminformatics.data import GenerativeWfDao
+from nvidia.cheminformatics.data.generative_wf import ChemblGenerativeWfDao
+from nvidia.cheminformatics.utils.singleton import Singleton
+from nvidia.cheminformatics.wf.generative import BaseGenerativeWorkflow
+
+
+logger = logging.getLogger(__name__)
+
+
+class MolBART(BaseGenerativeWorkflow):
+
+    def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
+        pass
+
                     html.Div(id='tb_selected_molecules', children=[],
                              style={'verticalAlign': 'text-top'}
                              ),

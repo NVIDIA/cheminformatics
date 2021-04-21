@@ -226,6 +226,7 @@ dbSetup() {
 			fi
 		else
 			echo "Please clean ${DATA_DIR} directory and retry."
+			exit 1
 		fi
 	fi
 }

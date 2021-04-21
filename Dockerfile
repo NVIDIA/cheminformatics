@@ -27,6 +27,7 @@ ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
 
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 RUN mkdir -p /opt/nvidia/ \
     && cd /opt/nvidia/ \
     && git clone --single-branch --branch master https://github.com/NVIDIA/cheminformatics.git cheminfomatics \

@@ -72,6 +72,7 @@ class CpuKmeansUmap(BaseClusterWorkflow):
 
         ids = df_molecular_embedding['id']
         df_molecular_embedding = df_molecular_embedding.persist()
+
         self.n_molecules = df_molecular_embedding.compute().shape[0]
         # self.n_molecules = self.context.n_molecule
 

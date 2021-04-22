@@ -3,6 +3,7 @@ from typing import List
 
 from rdkit.Chem import Draw, PandasTools
 import numpy as np
+import pandas as pd
 import torch
 from functools import singledispatch
 

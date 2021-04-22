@@ -24,32 +24,32 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import time
-import sys
+import numpy as np
 
-import grpc
+from tritonclient.utils import *
+import tritonclient.http as httpclient
+
 from locust import task, User, constant
-
-sys.path.insert(0, "generated")
-import similaritysampler_pb2_grpc
-import similaritysampler_pb2
-
 from tests.utils import stopwatch
 
 
-class GRPCLocust(User):
-    host = 'http://127.0.0.1'
-    wait_time = constant(.1)
+class TirtonLocust(User):
+    host = 'http://127.0.0.1:8000'
+    wait_time = constant(0.1)
+    model_name = "molbart"
 
     @task
-    @stopwatch('GRPC_Sample')
+    @stopwatch('Triton_Sample')
     def client_task(self):
-        with grpc.insecure_channel('127.0.0.1:50051') as channel:
-            stub = similaritysampler_pb2_grpc.SimilaritySamplerStub(channel)
-            spec = similaritysampler_pb2.SimilaritySpec(
-                model=similaritysampler_pb2.SimilarityModel.MolBART,
-                smiles='CN1C=NC2=C1C(=O)N(C(=O)N2C)C',
-                radius=0.0001,
-                numRequested=10)
+        with httpclient.InferenceServerClient('localhost:8000') as client:
+            input0_data = np.array(['CN1C=NC2=C1C(=O)N(C(=O)N2C)C']).astype(np.object)
+            inputs = [httpclient.InferInput("INPUT0", input0_data.shape,
+                                            np_to_triton_dtype(input0_data.dtype)),]
 
-            response = stub.FindSimilars(spec)
+            inputs[0].set_data_from_numpy(input0_data)
+            outputs = [httpclient.InferRequestedOutput("OUTPUT0"),]
+            response = client.infer(TirtonLocust.model_name,
+                                        inputs,
+                                        request_id=str(1),
+                                        outputs=outputs)
+            result = response.get_response()

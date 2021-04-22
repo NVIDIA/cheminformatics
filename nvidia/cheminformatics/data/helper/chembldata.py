@@ -253,6 +253,8 @@ class ChEmblData(object, metaclass=Singleton):
         if not num_recs or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
+        logger.info(num_recs)
+        logger.info(batch_size)
         meta_df = self._meta_df(**transformation_kwargs)
 
         dls = []

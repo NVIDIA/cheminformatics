@@ -41,14 +41,14 @@ class CpuKmeansUmap(BaseClusterWorkflow):
     def __init__(self,
                  n_molecules=None,
                  dao: ClusterWfDAO = ChemblClusterWfDao(),
-                 pca_comps=64,
+                 n_pca=64,
                  n_clusters=7,
                  seed=0):
         super(CpuKmeansUmap, self).__init__()
 
         self.dao = dao
         self.n_molecules = n_molecules
-        self.n_pca = pca_comps
+        self.n_pca = n_pca
         self.n_clusters = n_clusters
 
         self.seed = seed
@@ -72,8 +72,9 @@ class CpuKmeansUmap(BaseClusterWorkflow):
 
         ids = df_molecular_embedding['id']
         df_molecular_embedding = df_molecular_embedding.persist()
-        # self.n_molecules = df_molecular_embedding.compute().shape[0]
-        self.n_molecules = self.context.n_molecule
+
+        self.n_molecules = df_molecular_embedding.compute().shape[0]
+        # self.n_molecules = self.context.n_molecule
 
         for col in ['id', 'index', 'molregno']:
             if col in df_molecular_embedding.columns:

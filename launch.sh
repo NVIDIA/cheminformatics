@@ -105,6 +105,7 @@ fi
 #
 ###############################################################################
 
+CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
 CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:200929-0.0.1}
 MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:200929-0.0.1}
 JUPYTER_PORT=${JUPYTER_PORT:-9000}
@@ -201,7 +202,7 @@ root() {
 
 
 dbSetup() {
-	local DATA_DIR=$DATA_MOUNT_PATH
+	local DATA_DIR=$1
 
 	if [[ ! -e "${DATA_DIR}/db/chembl_27.db" ]]; then
 		echo "Downloading chembl db to ${DATA_DIR}..."
@@ -210,11 +211,33 @@ dbSetup() {
 			wget -q --show-progress \
 				-O ${DATA_DIR}/chembl_27_sqlite.tar.gz \
 				ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
+			return_code=$?
+			if [[ $return_code -ne 0 ]]; then
+				echo 'ChEMBL database download failed. Please check network settings.'
+				rm -rf ${DATA_DIR}/chembl_27_sqlite.tar.gz
+				exit $return_code
+			fi
 		fi
+
+		wget -q --show-progress \
+			-O ${DATA_DIR}/checksums.txt \
+			ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/checksums.txt
 		echo "Unzipping chembl db to ${DATA_DIR}..."
-		tar -C ${DATA_DIR}/db \
-			--strip-components=2 \
-			-xf ${DATA_DIR}/chembl_27_sqlite.tar.gz chembl_27/chembl_27_sqlite/chembl_27.db
+		if cd ${DATA_DIR}; sha256sum --check --ignore-missing --status ${DATA_DIR}/checksums.txt
+		then
+			tar -C ${DATA_DIR}/db \
+				--strip-components=2 \
+				-xf ${DATA_DIR}/chembl_27_sqlite.tar.gz chembl_27/chembl_27_sqlite/chembl_27.db
+			return_code=$?
+			if [[ $return_code -ne 0 ]]; then
+				echo 'ChEMBL database extraction faile. Please cleanup ${DATA_DIR} directory and retry.'
+				rm -rf ${DATA_DIR}/chembl_27_sqlite.tar.gz
+				exit $return_code
+			fi
+		else
+			echo "Please clean ${DATA_DIR} directory and retry."
+			exit 1
+		fi
 	fi
 }
 
@@ -222,10 +245,10 @@ dbSetup() {
 dash() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
-        python3 startdash.py analyze $@
+		dbSetup '/data'
+		cd /opt/nvidia/cheminfomatics; python3 startdash.py analyze $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py analyze $@
 	fi
@@ -236,10 +259,10 @@ dash() {
 cache() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
+		dbSetup '/data'
 	    python3 startdash.py cache $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py cache $@
 	fi
@@ -250,10 +273,10 @@ cache() {
 service() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
+		dbSetup '/data'
 	    python3 startdash.py service $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -it ${CONT} python startdash.py service $@
 	fi
@@ -264,10 +287,10 @@ service() {
 grpc() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data/db'
+		dbSetup '/data'
 	    python3 startdash.py grpc $@
 	else
-		dbSetup "${DATA_PATH}/db"
+		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
 		${DOCKER_CMD} -p 50051:50051 -it ${CONT} python startdash.py grpc $@
 	fi
@@ -276,7 +299,7 @@ grpc() {
 
 
 test() {
-	dbSetup "${DATA_PATH}/db"
+	dbSetup "${DATA_PATH}"
 	# run a container and start dash inside container.
 	${DOCKER_CMD} -it ${CONT} python startdash.py analyze -b --n_mol 100000
 	exit

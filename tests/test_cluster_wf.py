@@ -16,11 +16,12 @@ def test_cpukmeansumap():
     """
     Verify fetching data from chemblDB when the input is a pandas df.
     """
+    context = _create_context()
     n_molecules, dao, mol_df = _fetch_chembl_test_dataset(n_molecules=10000)
 
-    context = _create_context()
+    logger.info(context.batch_size)
     wf = CpuKmeansUmap(n_molecules=n_molecules,
-                       dao=dao, pca_comps=64)
+                       dao=dao, n_pca=64)
     embedding = wf.cluster(df_molecular_embedding=mol_df)
     logger.info(embedding.head())
 

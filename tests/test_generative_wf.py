@@ -47,7 +47,6 @@ def test_cddd_similar_smiles():
 
     generated_smiles = wf.find_similars_smiles_from_id(['CHEMBL6273'],
                                                         num_requested=num_to_generate,
-                                                        radius=0.75,
                                                         force_unique=True)
     logger.info(generated_smiles)
 
@@ -67,7 +66,6 @@ def test_molbart_similar_smiles():
 
     generated_smiles = wf.find_similars_smiles_from_id(['CHEMBL6273'],
                                                        num_requested=num_to_generate,
-                                                       radius=0.0001,
                                                        force_unique=True)
 
     logger.info('# of generated SMILES %s', len(generated_smiles))

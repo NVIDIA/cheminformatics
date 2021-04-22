@@ -225,8 +225,10 @@ class ChEmblData(object, metaclass=Singleton):
                     df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
 
         # Conversion to fingerprints or embeddings
+        transformed_smiles = df['transformed_smiles']
         transformation = self.fp_type(**transformation_kwargs)
-        return_df = df.apply(transformation.transform, result_type='expand', axis=1)
+        cache_data = transformation.transform(df)        
+        return_df = pandas.DataFrame(cache_data)
 
         return_df = pandas.DataFrame(
             return_df,
@@ -251,6 +253,8 @@ class ChEmblData(object, metaclass=Singleton):
         if not num_recs or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
+        logger.info(num_recs)
+        logger.info(batch_size)
         meta_df = self._meta_df(**transformation_kwargs)
 
         dls = []

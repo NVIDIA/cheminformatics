@@ -106,6 +106,8 @@ fi
 ###############################################################################
 
 CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
+CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:200929-0.0.1}
+MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:200929-0.0.1}
 JUPYTER_PORT=${JUPYTER_PORT:-9000}
 PLOTLY_PORT=${PLOTLY_PORT:-5000}
 DASK_PORT=${DASK_PORT:-9001}
@@ -121,6 +123,7 @@ DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
 
 if [ $write_env -eq 1 ]; then
 	echo CONT=${CONT} >> $LOCAL_ENV
+    echo MEGAMOLBART_CONT=${MEGAMOLBART_CONT} >> $LOCAL_ENV
 	echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
 	echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
 	echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
@@ -162,6 +165,7 @@ DOCKER_CMD="docker run \
 
 build() {
 	docker build -t ${CONT} .
+    docker build -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
 	exit
 }
 
@@ -181,6 +185,12 @@ pull() {
 
 bash() {
 	${DOCKER_CMD} -it $@ ${CONT} bash
+	exit
+}
+
+
+megamolbart() {
+	${DOCKER_CMD} -it $@ ${MEGAMOLBART_CONT} bash
 	exit
 }
 
@@ -282,7 +292,7 @@ grpc() {
 	else
 		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CONT} python startdash.py grpc $@
+		${DOCKER_CMD} -p 50051:50051 -it ${CONT} python startdash.py grpc $@
 	fi
 	exit
 }
@@ -310,6 +320,8 @@ case $1 in
 	pull)
 		;&
 	bash)
+		;&
+	megamolbart)
 		;&
 	root)
 		;&

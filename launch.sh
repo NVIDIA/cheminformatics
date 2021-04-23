@@ -164,6 +164,10 @@ DOCKER_CMD="docker run \
 
 build() {
 	docker build -t ${CONT} .
+	exit
+}
+
+build_megamolbart() {
     docker build -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
 	exit
 }
@@ -189,7 +193,7 @@ bash() {
 
 
 megamolbart() {
-	${DOCKER_CMD} -it $@ ${MEGAMOLBART_CONT} bash
+	${DOCKER_CMD} -it $@ ${MEGAMOLBART_CONT} python test_megamolbart.py
 	exit
 }
 
@@ -291,6 +295,8 @@ jupyter() {
 
 case $1 in
 	build)
+		;&
+    build_megamolbart)
 		;&
 	push)
 		;&

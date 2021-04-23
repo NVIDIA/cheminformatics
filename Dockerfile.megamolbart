@@ -26,28 +26,31 @@ RUN cd /tmp/apex/ \
         --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
 ## PySMILES
-RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
-    http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
-    && tar -xf /tmp/pysmilesutils-mirror.tgz -C /opt \
+# RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
+#     http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
+COPY pysmilesutils-mirror.tgz /tmp/.
+RUN tar -xzf /tmp/pysmilesutils-mirror.tgz -C /opt \
     && cd /opt/pysmilesutils-mirror; pip install .
 
-## Megatron & MegaMolBART
-RUN wget --quiet -O /tmp/megatron_molbart.zip \
-    http://rilango-work.nvidia.com/megatron_molbart/MolBART-megatron-molbart-with-zinc.zip \
-    && unzip /tmp/megatron_molbart.zip -d /opt \
-    && mv /opt/MolBART-megatron-molbart-with-zinc /opt/MolBART \
+## MegaMolBART code and weights
+# RUN wget --quiet -O /tmp/megatron_molbart.zip \
+#     http://rilango-work.nvidia.com/megatron_molbart/MolBART-megatron-molbart-with-zinc.zip \
+COPY MolBART-megatron-molbart-with-zinc.zip /tmp/megatron_molbart.zip
+COPY global_step677000-20210423T224437Z-001.zip /tmp/.
+RUN unzip /tmp/megatron_molbart.zip -d /opt \
     && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
     && cd /opt/MolBART; pip install .
+RUN mkdir -p /models/megamolbart \
+    && cp /opt/MolBART/bart_vocab.txt /models/megamolbart/bart_vocab.txt \
+    && unzip /tmp/global_step677000-20210423T224437Z-001.zip -d /models/megamolbart 
 ENV PYTHONPATH = /opt/MolBART/megatron_molbart:/opt/MolBART
 
-## Models and Weights
-RUN mkdir -p /models/molbart \
-    && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
-    http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \
-    && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
-    http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt \
-    && wget --quiet -O /models/molbart/bart_vocab.txt \
-    http://rilango-work.nvidia.com/megatron_molbart/bart_vocab.txt
+# ## MolBART Models and Weights -- TODO: remove these
+# RUN mkdir -p /models/molbart \
+#     && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
+#     http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \
+#     && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
+#     http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
 
 ## NVIDIA code
 RUN mkdir -p /opt/nvidia/ \

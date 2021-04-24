@@ -46,10 +46,14 @@ class MorganFingerprint(BaseTransformation):
         self.func = AllChem.GetMorganFingerprintAsBitVect
 
     def transform(self, data):
-        smile = data['transformed_smiles']
-        m = Chem.MolFromSmiles(smile)
-        fp = self.func(m, **self.kwargs)
-        return list(fp.ToBitString())
+        data = data['transformed_smiles']
+        fp_array = []
+        for mol in data:
+            m = Chem.MolFromSmiles(mol)
+            fp = self.func(m, **self.kwargs)
+            fp_array.append(list(fp.ToBitString()))
+        fp_array = np.asarray(fp_array)
+        return fp_array
 
     def __len__(self):
         return self.kwargs['nBits']
@@ -64,10 +68,8 @@ class Embeddings(BaseTransformation):
         self.func = InferenceModel(model_dir, use_gpu=use_gpu, cpu_threads=cpu_threads)
 
     def transform(self, data):
-        smile = data['transformed_smiles']
-        if isinstance(smile, str):
-            smile = [smile]
-        return self.func.seq_to_emb(smile).squeeze()
+        data = data['transformed_smiles']
+        return self.func.seq_to_emb(data).squeeze()
 
     def inverse_transform(self, embeddings):
         "Embedding array -- individual compound embeddings are in rows"

@@ -26,15 +26,12 @@ RUN cd /tmp/apex/ \
         --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
 ## PySMILES
-# COPY pysmilesutils-mirror.tgz /tmp/.
 RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
     http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
     && tar xzf /tmp/pysmilesutils-mirror.tgz -C /opt \
     && cd /opt/pysmilesutils-mirror; pip install .
 
 ## MegaMolBART code and weights
-# COPY MolBART-megatron-molbart-with-zinc.zip /tmp/megatron_molbart.zip
-# COPY global_step677000-20210423T224437Z-001.zip /tmp/.
 RUN wget --quiet -O /tmp/megatron_molbart.zip \
     http://rilango-work.nvidia.com/megatron_molbart/MolBART-megatron-molbart-with-zinc.zip \
     && wget --quiet -O /tmp/global_step677000-20210423T224437Z-001.zip \

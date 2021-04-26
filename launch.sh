@@ -164,13 +164,12 @@ DOCKER_CMD="docker run \
 	-w /workspace"
 
 build() {
-	docker build -t ${CONT} .
-    docker build -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
+	docker build -t ${CONT} --network host .
 	exit
 }
 
 build_megamolbart() {
-    docker build -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
+    docker build -t ${MEGAMOLBART_CONT} --network host -f Dockerfile.megamolbart .
 	exit
 }
 

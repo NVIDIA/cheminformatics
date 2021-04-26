@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from rdkit.Chem import Draw, PandasTools
+from rdkit.Chem import Draw, PandasTools, CanonSmiles
 import numpy as np
 import pandas as pd
 import torch
@@ -84,6 +84,11 @@ class BaseGenerativeWorkflow:
         """
 
         radius = radius if radius else self.radius_scale
+
+        for index, row in interp_df.iterrows():
+            smile_string = row['SMILES']
+            canonical_smile = CanonSmiles(smile_string)
+            row['SMILES'] = canonical_smile
 
         for i in range(5):
             smiles = interp_df['SMILES'].sort_values()

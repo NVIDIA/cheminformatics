@@ -39,8 +39,6 @@ launch.sh [command]
 	pull
 	push
 	root
-	dbSetup
-	dash
 	jupyter
 
 
@@ -59,9 +57,12 @@ More Information
 Note: This script looks for a file called $LOCAL_ENV in the
 current directory. This file should define the following environment
 variables:
-	CONT
+	CUCHEM_CONT
 		container image, prepended with registry. e.g.,
-		cheminformatics:latest
+		cheminformatics_demo:latest
+	MEGAMOLBART_CONT
+		container image, prepended with registry. e.g.,
+		cheminformatics_megamolbart:latest
 	DATA_PATH
 		path to data directory. e.g.,
 		/scratch/data/cheminformatics
@@ -105,9 +106,8 @@ fi
 #
 ###############################################################################
 
-CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
-CONT=${CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:200929-0.0.1}
-MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:200929-0.0.1}
+CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
+MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
 JUPYTER_PORT=${JUPYTER_PORT:-9000}
 PLOTLY_PORT=${PLOTLY_PORT:-5000}
 DASK_PORT=${DASK_PORT:-9001}
@@ -122,7 +122,7 @@ DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
 ###############################################################################
 
 if [ $write_env -eq 1 ]; then
-	echo CONT=${CONT} >> $LOCAL_ENV
+	echo CUCHEM_CONT=${CUCHEM_CONT} >> $LOCAL_ENV
     echo MEGAMOLBART_CONT=${MEGAMOLBART_CONT} >> $LOCAL_ENV
 	echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
 	echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
@@ -163,45 +163,47 @@ DOCKER_CMD="docker run \
 	-e TF_CPP_MIN_LOG_LEVEL=3 \
 	-w /workspace"
 
+
 build() {
-	docker build -t ${CONT} .
-    docker build -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
+	set -e
+
+	echo "Building ${CUCHEM_CONT}..."
+	docker build --network host -t ${CUCHEM_CONT} -f Dockerfile.cuchem .
+
+	echo "Building ${MEGAMOLBART_CONT}..."
+    docker build --network host -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
+
+	set +e
 	exit
 }
 
-build_megamolbart() {
-    docker build -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
-	exit
-}
 
 push() {
+	# TODO: Add code to push all containers.
 	docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-	docker push ${CONT}
+	docker push ${CUCHEM_CONT}
+    docker push ${MEGAMOLBART_CONT}
 	exit
 }
 
 
 pull() {
 	docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-	docker pull ${CONT}
+	docker pull ${CUCHEM_CONT}
+    docker pull ${MEGAMOLBART_CONT}
 	exit
 }
 
 
-bash() {
-	${DOCKER_CMD} -it $@ ${CONT} bash
-	exit
-}
-
-
-megamolbart() {
-	${DOCKER_CMD} -it $@ ${MEGAMOLBART_CONT} python test_megamolbart.py
+dev() {
+	set -x
+	${DOCKER_CMD} -it $@ ${CUCHEM_CONT} bash
 	exit
 }
 
 
 root() {
-	${DOCKER_CMD} -it --user root ${CONT} bash
+	${DOCKER_CMD} -it --user root ${CUCHEM_CONT} bash
 	exit
 }
 
@@ -248,14 +250,17 @@ dbSetup() {
 
 
 dash() {
-	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
+	if [[ -e "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data'
-		cd /opt/nvidia/cheminfomatics; python3 startdash.py analyze $@
+		dbSetup "${DATA_MOUNT_PATH}"
+		if [[ ! -e "/workspace/cuchem/startdash.py" ]]; then
+			cd /opt/nvidia/cheminfomatics/cuchem/; python3 startdash.py analyze $@
+		else
+			cd /workspace/cuchem/; python3 startdash.py analyze $@
+		fi
 	else
-		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CONT} python startdash.py analyze $@
+		docker-compose -f setup/docker_compose.yml --project-directory . up
 	fi
 	exit
 }
@@ -264,40 +269,12 @@ dash() {
 cache() {
 	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
 		# Executed within container or a managed env.
-		dbSetup '/data'
+		dbSetup "${DATA_MOUNT_PATH}"
 	    python3 startdash.py cache $@
 	else
 		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CONT} python startdash.py cache $@
-	fi
-	exit
-}
-
-
-service() {
-	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
-		# Executed within container or a managed env.
-		dbSetup '/data'
-	    python3 startdash.py service $@
-	else
-		dbSetup "${DATA_PATH}"
-		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CONT} python startdash.py service $@
-	fi
-	exit
-}
-
-
-grpc() {
-	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
-		# Executed within container or a managed env.
-		dbSetup '/data'
-	    python3 startdash.py grpc $@
-	else
-		dbSetup "${DATA_PATH}"
-		# run a container and start dash inside container.
-		${DOCKER_CMD} -p 50051:50051 -it ${CONT} python startdash.py grpc $@
+		${DOCKER_CMD} -it ${CUCHEM_CONT} python startdash.py cache $@
 	fi
 	exit
 }
@@ -306,13 +283,13 @@ grpc() {
 test() {
 	dbSetup "${DATA_PATH}"
 	# run a container and start dash inside container.
-	${DOCKER_CMD} -it ${CONT} python startdash.py analyze -b --n_mol 100000
+	${DOCKER_CMD} -it ${CUCHEM_CONT} python startdash.py analyze -b --n_mol 100000
 	exit
 }
 
 
 jupyter() {
-	${DOCKER_CMD} -it ${CONT} jupyter-lab --no-browser --port=8888 --ip=0.0.0.0 --notebook-dir=/workspace --NotebookApp.password=\"\" --NotebookApp.token=\"\" --NotebookApp.password_required=False
+	${DOCKER_CMD} -it ${CUCHEM_CONT} jupyter-lab --no-browser --port=8888 --ip=0.0.0.0 --notebook-dir=/workspace --NotebookApp.password=\"\" --NotebookApp.token=\"\" --NotebookApp.password_required=False
 	exit
 }
 
@@ -326,7 +303,7 @@ case $1 in
 		;&
 	pull)
 		;&
-	bash)
+	dev)
 		;&
 	megamolbart)
 		;&

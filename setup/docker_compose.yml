@@ -1,0 +1,50 @@
+version: "3.9"
+
+networks:
+  cuchemNet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.167.100.0/16
+
+services:
+  cuchemUI:
+    image: nvcr.io/nvstaging/clara/cheminformatics_demo:0.0.1
+    hostname: cuchemUI
+    networks:
+      cuchemNet:
+        ipv4_address: 192.167.100.1
+    ports:
+      - "5000:5000"
+      - "8787:8787"
+    volumes:
+      - './:/workspace'
+      - '/home/rilango/Projects/testData/chemInformatics/:/data'
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+    working_dir: /workspace
+    command: ./launch.sh dash
+    extra_hosts:
+      - "megamolbart:192.167.100.2"
+
+  megamolbart:
+    image: nvcr.io/nvstaging/clara/cheminformatics_megamolbart:0.0.1
+    hostname: 'megamolbart'
+    networks:
+      cuchemNet:
+        ipv4_address: 192.167.100.2
+    volumes:
+        - './:/workspace'
+        - '/home/rilango/Projects/testData/chemInformatics/:/data'
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]

@@ -43,6 +43,7 @@ dependencies:
     - fsspec==2021.4.0
     - google-auth==1.29.0
     - google-auth-oauthlib==0.4.4
+    - mpi4py==3.0.3
     - ninja==1.10.0.post2
     - oauthlib==3.1.0
     - pyasn1==0.4.8

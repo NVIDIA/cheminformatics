@@ -2,6 +2,7 @@
 
 import logging
 from typing import List
+import os
 
 from rdkit import Chem
 from rdkit.Chem import PandasTools
@@ -29,7 +30,9 @@ logger = logging.getLogger(__name__)
 # TODO add to model specific utility code
 REGEX = "\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\(|\)|\.|=|#|-|\+|\\\\|\/|:|~|@|\?|>|\*|\$|\%[0-9]{2}|[0-9]"
 DEFAULT_CHEM_TOKEN_START = 272
-
+DEFAULT_MAX_SEQ_LEN = 512
+DEFAULT_VOCAB_PATH = '/models/megamolbart/bart_vocab.txt'
+CHECKPOINTS_DIR = '/models/megamolbart/checkpoints'
 
 @singledispatch
 def add_jitter(embedding, radius, cnt):
@@ -202,21 +205,21 @@ class MegaMolBART(BaseGenerativeWorkflow):
                 'num_layers': 4,
                 'hidden_size': 256,
                 'num_attention_heads': 8,
-                'max_position_embeddings': 512,
+                'max_position_embeddings': DEFAULT_MAX_SEQ_LEN,
                 'tokenizer_type': 'GPT2BPETokenizer',
-                'vocab_file': '/models/megamolbart/bart_vocab.txt',
-                'load': '/models/megamolbart/global_step677000' # this is the checkpoint path
+                'vocab_file': DEFAULT_VOCAB_PATH,
+                'load': CHECKPOINTS_DIR # this is the checkpoint path
             }
 
         self.device = 'cuda' # Megatron arg loading seems to only work with GPU
-        max_seq_len = 512
+        max_seq_len = DEFAULT_MAX_SEQ_LEN
         self.radius_scale = 0.0001 # TODO adjust this once model is trained
 
         torch.set_grad_enabled(False) # Testing this instead of `with torch.no_grad():` context since it doesn't exit
         initialize_megatron(args_defaults=args)
         args = get_args()
         self.tokenizer = self.load_tokenizer(args.vocab_file)
-        self.model = self.load_model(args.load, self.tokenizer, max_seq_len, args)
+        self.model = self.load_model(self.tokenizer, DEFAULT_MAX_SEQ_LEN, args)
 
     def load_tokenizer(self, tokenizer_vocab_path):
         """Load tokenizer from vocab file
@@ -236,11 +239,10 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         return tokenizer
 
-    def load_model(self, model_checkpoint_path, tokenizer, max_seq_len, args):
+    def load_model(self, tokenizer, max_seq_len, args):
         """Load saved model checkpoint
 
         Params:
-            model_checkpoint_path: str, path to saved model checkpoint
             tokenizer: MolEncTokeniser tokenizer object
             max_seq_len: int, maximum sequence length
             args: Megatron initialized arguments
@@ -263,9 +265,10 @@ class MegaMolBART(BaseGenerativeWorkflow):
                             max_seq_len,
                             dropout=0.1,
                             )
-        model = model.cuda()
         load_checkpoint(model, None, None)
-        return model.eval()
+        model = model.cuda()
+        model.eval()
+        return model
 
     def smiles2embedding(self, model, smiles, tokenizer, pad_length=None):
         """Calculate embedding and padding mask for smiles with optional extra padding

@@ -28,20 +28,21 @@ RUN cd /tmp/apex/ \
 ## PySMILES
 RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
     http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
-    && tar -xzf /tmp/pysmilesutils-mirror.tgz -C /opt \
+    && tar xzf /tmp/pysmilesutils-mirror.tgz -C /opt \
     && cd /opt/pysmilesutils-mirror; pip install .
 
 ## MegaMolBART code and weights
 RUN wget --quiet -O /tmp/megatron_molbart.zip \
-        http://rilango-work.nvidia.com/megatron_molbart/MolBART-megatron-molbart-with-zinc.zip \
-    && wget --quiet -O /tmp/global_step677000-20210423T224437Z-001.zip \
-        http://rilango-work.nvidia.com/megatron_molbart/global_step677000-20210423T224437Z-001.zip \
+    http://rilango-work.nvidia.com/megatron_molbart/MolBART-megatron-molbart-with-zinc.zip \
     && unzip /tmp/megatron_molbart.zip -d /opt \
     && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
-    && cd /opt/MolBART; pip install . \
-    && mkdir -p /models/megamolbart \
+    && cd /opt/MolBART; pip install .
+
+RUN mkdir -p /models/megamolbart \
+    && wget --quiet -O /tmp/megamolbart_checkpoints_20210427.tgz \
+    http://rilango-work.nvidia.com/megatron_molbart/megamolbart_checkpoints_20210427.tgz \
     && cp /opt/MolBART/bart_vocab.txt /models/megamolbart/bart_vocab.txt \
-    && unzip /tmp/global_step677000-20210423T224437Z-001.zip -d /models/megamolbart
+    && tar xzf /tmp/megamolbart_checkpoints_20210427.tgz -C /models/megamolbart
 ENV PYTHONPATH = /opt/MolBART/megatron_molbart:/opt/MolBART
 
 # ## MolBART Models and Weights -- TODO: remove these

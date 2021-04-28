@@ -15,11 +15,19 @@ from rdkit import Chem
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
 from cuchemcommon.utils.singleton import Singleton
-from cuchemcommon.workflow import BaseGenerativeWorkflow
+from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 
 from nvidia.cheminformatics.fingerprint import MorganFingerprint
 
 logger = logging.getLogger(__name__)
+
+
+@add_jitter.register(torch.Tensor)
+def _(embedding, radius, cnt):
+    permuted_emb = embedding.permute(1, 0, 2)
+    noise = torch.normal(0,  radius, (cnt,) + permuted_emb.shape[1:]).to(embedding.device)
+
+    return noise + permuted_emb
 
 
 class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):

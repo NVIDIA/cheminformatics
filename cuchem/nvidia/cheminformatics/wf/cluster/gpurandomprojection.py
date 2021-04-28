@@ -16,8 +16,6 @@
 
 import logging
 from functools import singledispatch
-from cuchemcommon.utils.singleton import Singleton
-from cuchemcommon.workflow.cluster import BaseClusterWorkflow
 from typing import List
 
 import cupy
@@ -32,8 +30,11 @@ from cuchemcommon.utils.logger import MetricsLogger
 from cuchemcommon.data import ClusterWfDAO
 from cuchemcommon.data.cluster_wf import ChemblClusterWfDao
 from cuchemcommon.context import Context
+from cuchemcommon.utils.singleton import Singleton
+
 from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores
 from nvidia.cheminformatics.fingerprint import MorganFingerprint
+from nvidia.cheminformatics.wf.cluster import BaseClusterWorkflow
 
 
 logger = logging.getLogger(__name__)

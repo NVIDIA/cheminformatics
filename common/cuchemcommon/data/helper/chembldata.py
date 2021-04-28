@@ -3,7 +3,6 @@ import sys
 import warnings
 warnings.filterwarnings("ignore", message=r"deprecated", category=FutureWarning)
 
-import cudf
 import pandas
 import sqlite3
 import logging
@@ -13,10 +12,10 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from cuchemcommon.utils.singleton import Singleton
-from cuchemcommon.smiles import RemoveSalt, PreprocessSmiles
+# from cuchemcommon.smiles import RemoveSalt, PreprocessSmiles
 from cuchemcommon.context import Context
 
-SMILES_TRANSFORMS = [RemoveSalt(), PreprocessSmiles()]
+# SMILES_TRANSFORMS = [RemoveSalt(), PreprocessSmiles()]
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -177,7 +176,7 @@ class ChEmblData(object, metaclass=Singleton):
     def _fetch_mol_embedding(self,
                              start=0,
                              batch_size=BATCH_SIZE,
-                             smiles_transforms=SMILES_TRANSFORMS,
+                            #  smiles_transforms=SMILES_TRANSFORMS,
                              molregnos=None,
                              **transformation_kwargs):
         """
@@ -215,15 +214,17 @@ class ChEmblData(object, metaclass=Singleton):
                             sqlite3.connect(self.chembl_db, uri=True))
 
         # Smiles -> Smiles transformation and filtering
+        # TODO: Discuss internally to find use or refactor this code to remove
+        # model specific filtering
         df['transformed_smiles'] = df['canonical_smiles']
-        if smiles_transforms is not None:
-            if len(smiles_transforms) > 0:
-                for xf in smiles_transforms:
-                    df['transformed_smiles'] = df['transformed_smiles'].map(xf.transform)
-                    df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
+        # if smiles_transforms is not None:
+        #     if len(smiles_transforms) > 0:
+        #         for xf in smiles_transforms:
+        #             df['transformed_smiles'] = df['transformed_smiles'].map(xf.transform)
+        #             df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
 
         # Conversion to fingerprints or embeddings
-        transformed_smiles = df['transformed_smiles']
+        # transformed_smiles = df['transformed_smiles']
         transformation = self.fp_type(**transformation_kwargs)
         cache_data = transformation.transform(df)
         return_df = pandas.DataFrame(cache_data)

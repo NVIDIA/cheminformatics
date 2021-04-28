@@ -21,7 +21,7 @@ from megatron import get_args
 from molbart.decoder import DecodeSampler
 from molbart.tokeniser import MolEncTokeniser
 
-from cuchemcommon.workflow import BaseGenerativeWorkflow
+from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 
 logger = logging.getLogger(__name__)
 

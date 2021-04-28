@@ -21,7 +21,7 @@ def test_dataframe():
     mol_df = dao.fetch_molecular_embedding(n_molecules=100)
     assert isinstance(mol_df, dask.dataframe.core.DataFrame),\
         'Incorrect data structure from DAO'
-    fp_size = TransformationDefaults['MorganFingerprint'].value['nBits']
+    fp_size = MorganFingerprint.DEFAULTS.value['nBits']
 
     # Fingerprint size + Important Columns + ID + (smile + tranformed smile)
     df_size = fp_size + len(IMP_PROPS) + 3

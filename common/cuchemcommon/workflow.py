@@ -7,9 +7,9 @@ import pandas as pd
 # import torch
 from functools import singledispatch
 
-from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
 from cuchemcommon.data import GenerativeWfDao
-from nvidia.cheminformatics.fingerprint import MorganFingerprint
+from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
+from cuchemcommon.fingerprint import MorganFingerprint
 
 logger = logging.getLogger(__name__)
 

@@ -283,7 +283,7 @@ cache() {
 test() {
 	dbSetup "${DATA_PATH}"
 	# run a container and start dash inside container.
-	${DOCKER_CMD} -it ${CUCHEM_CONT} python startdash.py analyze -b --n_mol 100000
+	${DOCKER_CMD} -it ${CUCHEM_CONT} cd /workspace/cuchem/; pytest tests
 	exit
 }
 
@@ -311,13 +311,9 @@ case $1 in
 		;&
 	dbSetup)
 		;&
+	test)
+		;&
 	dash)
-		$@
-		;;
-	service)
-		$@
-		;;
-	grpc)
 		$@
 		;;
 	cache)

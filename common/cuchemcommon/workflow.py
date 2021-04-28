@@ -26,14 +26,6 @@ def _(embedding, radius, cnt):
     return noise + embedding
 
 
-# @add_jitter.register(torch.Tensor)
-# def _(embedding, radius, cnt):
-#     permuted_emb = embedding.permute(1, 0, 2)
-#     noise = torch.normal(0,  radius, (cnt,) + permuted_emb.shape[1:]).to(embedding.device)
-
-#     return noise + permuted_emb
-
-
 class BaseGenerativeWorkflow:
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(MorganFingerprint)) -> None:

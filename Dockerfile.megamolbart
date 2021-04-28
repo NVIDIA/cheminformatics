@@ -43,7 +43,7 @@ RUN mkdir -p /models/megamolbart \
     http://rilango-work.nvidia.com/megatron_molbart/megamolbart_checkpoints_20210427.tgz \
     && cp /opt/MolBART/bart_vocab.txt /models/megamolbart/bart_vocab.txt \
     && tar xzf /tmp/megamolbart_checkpoints_20210427.tgz -C /models/megamolbart
-ENV PYTHONPATH = /opt/MolBART/megatron_molbart:/opt/MolBART
+ENV PYTHONPATH /opt/MolBART/megatron_molbart:/opt/MolBART
 
 # ## MolBART Models and Weights -- TODO: remove these
 # RUN mkdir -p /models/molbart \
@@ -52,8 +52,16 @@ ENV PYTHONPATH = /opt/MolBART/megatron_molbart:/opt/MolBART
 #     && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
 #     http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
 
-## NVIDIA code
-RUN mkdir -p /opt/nvidia/ \
-    && cd /opt/nvidia/ \
-    && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
-    && rm -rf /opt/nvidia/cheminfomatics/.git
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+
+# Copy and add generated code to PYTHONPATH
+# Any line that needs to be executed without refering to cache should be below
+# this line.
+COPY common/ /tmp/common
+RUN cd /tmp/common; pip install .
+
+RUN mkdir -p /opt/nvidia/cuchem/grpc
+COPY common/generated /opt/nvidia/cuchem/grpc
+ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
+
+CMD python3 megamolbart/launch.py

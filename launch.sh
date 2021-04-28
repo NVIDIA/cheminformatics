@@ -196,8 +196,17 @@ pull() {
 
 
 dev() {
+
 	set -x
-	${DOCKER_CMD} -it $@ ${CUCHEM_CONT} bash
+	local CONTAINER_OPTION=$1
+	local CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
+
+	if [[ "${CONTAINER_OPTION}"=="1" ]]; then
+		CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
+	fi
+
+	set -x
+	${DOCKER_CMD} -it ${CONT} bash
 	exit
 }
 
@@ -283,7 +292,7 @@ cache() {
 test() {
 	dbSetup "${DATA_PATH}"
 	# run a container and start dash inside container.
-	${DOCKER_CMD} -it ${CUCHEM_CONT} cd /workspace/cuchem/; pytest tests
+	${DOCKER_CMD} -w /workspace/cuchem -it ${CUCHEM_CONT}  pytest tests
 	exit
 }
 
@@ -297,16 +306,13 @@ jupyter() {
 case $1 in
 	build)
 		;&
-    build_megamolbart)
-		;&
 	push)
 		;&
 	pull)
 		;&
 	dev)
-		;&
-	megamolbart)
-		;&
+		$@
+		;;
 	root)
 		;&
 	dbSetup)

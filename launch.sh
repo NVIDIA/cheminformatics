@@ -269,7 +269,10 @@ dash() {
 		fi
 	else
 		# run a container and start dash inside container.
-		docker-compose -f setup/docker_compose.yml --project-directory . up
+		docker-compose --env-file .cheminf_local_environment  \
+			-f setup/docker_compose.yml \
+			--project-directory . \
+			up
 	fi
 	exit
 }

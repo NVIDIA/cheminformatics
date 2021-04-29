@@ -15,11 +15,11 @@ RUN apt update && DEBIAN_FRONTEND=noninteractive \
 #     && conda clean -ay
 # RUN conda run -n base pip install pytorch_lightning==1.1.0 pytest pytest-order pybind11==2.6.2 six==1.15.0 regex deepspeed==0.3.10
 ## Environment setup
-COPY setup/megamolbart.yml /tmp/.
-RUN conda env update --name base -f /tmp/megamolbart.yml
+COPY megamolbart/conda/env.yml /tmp/.
+RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
 
 ## Apex
-RUN cd /tmp && git clone https://github.com/NVIDIA/apex 
+RUN cd /tmp && git clone https://github.com/NVIDIA/apex
 RUN cd /tmp/apex/ \
     && /opt/conda/bin/python3 -m pip install -v \
         --disable-pip-version-check --no-cache-dir \
@@ -37,12 +37,13 @@ RUN wget --quiet -O /tmp/megatron_molbart.zip \
     && unzip /tmp/megatron_molbart.zip -d /opt \
     && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
     && cd /opt/MolBART; pip install .
+
 RUN mkdir -p /models/megamolbart \
     && wget --quiet -O /tmp/megamolbart_checkpoints_20210427.tgz \
     http://rilango-work.nvidia.com/megatron_molbart/megamolbart_checkpoints_20210427.tgz \
     && cp /opt/MolBART/bart_vocab.txt /models/megamolbart/bart_vocab.txt \
-    && tar xzf /tmp/megamolbart_checkpoints_20210427.tgz -C /models/megamolbart 
-ENV PYTHONPATH = /opt/MolBART/megatron_molbart:/opt/MolBART
+    && tar xzf /tmp/megamolbart_checkpoints_20210427.tgz -C /models/megamolbart
+ENV PYTHONPATH /opt/MolBART/megatron_molbart:/opt/MolBART
 
 # ## MolBART Models and Weights -- TODO: remove these
 # RUN mkdir -p /models/molbart \
@@ -51,8 +52,16 @@ ENV PYTHONPATH = /opt/MolBART/megatron_molbart:/opt/MolBART
 #     && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
 #     http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
 
-## NVIDIA code
-RUN mkdir -p /opt/nvidia/ \
-    && cd /opt/nvidia/ \
-    && git clone https://github.com/NVIDIA/cheminformatics.git cheminfomatics \
-    && rm -rf /opt/nvidia/cheminfomatics/.git
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+
+# Copy and add generated code to PYTHONPATH
+# Any line that needs to be executed without refering to cache should be below
+# this line.
+COPY common/ /tmp/common
+RUN cd /tmp/common; pip install .
+
+RUN mkdir -p /opt/nvidia/cuchem/grpc
+COPY common/generated /opt/nvidia/cuchem/grpc
+ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
+
+CMD python3 megamolbart/launch.py

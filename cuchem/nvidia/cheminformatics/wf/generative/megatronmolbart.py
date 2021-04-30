@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from typing import List
 
+import grpc
 import torch
 import torch.nn
 import pickle
@@ -30,21 +31,21 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         super().__init__(dao)
 
         channel = grpc.insecure_channel('192.167.100.2')
-        stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
+        self.stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
 
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
                              radius=None,
                              force_unique=False):
-        
+
         spec = generativesampler_pb2.GenerativeSpec(
             model=generativesampler_pb2.GenerativeSampler.MegaMolBART,
             smiles=smiles,
             radius=radius,
             numRequested=num_requested)
 
-        result = stub.FindSimilars(spec)
+        result = self.stub.FindSimilars(spec)
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})
@@ -57,14 +58,14 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                                 num_points:int=10,
                                 radius=None,
                                 force_unique=False):
-        
+
         spec = generativesampler_pb2.GenerativeSpec(
             model=generativesampler_pb2.GenerativeSampler.MegaMolBART,
             smiles=smiles,
             radius=radius,
             numPoints=num_points)
 
-        result = stub.Interpolate(spec)
+        result = self.stub.Interpolate(spec)
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})

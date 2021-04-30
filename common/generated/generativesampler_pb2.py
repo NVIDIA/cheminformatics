@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x17generativesampler.proto\x12\x1bnvidia.cheminformatics.grpc\"\xa9\x01\n\x0eGenerativeSpec\x12;\n\x05model\x18\x01 \x01(\x0e\x32,.nvidia.cheminformatics.grpc.GenerativeModel\x12\x0e\n\x06smiles\x18\x02 \x03(\t\x12\x13\n\x06radius\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x19\n\x0cnumRequested\x18\x04 \x01(\x05H\x01\x88\x01\x01\x42\t\n\x07_radiusB\x0f\n\r_numRequested\"%\n\nSmilesList\x12\x17\n\x0fgeneratedSmiles\x18\x01 \x03(\t*(\n\x0fGenerativeModel\x12\x08\n\x04\x43\x44\x44\x44\x10\x00\x12\x0b\n\x07MolBART\x10\x01\x32\xe2\x01\n\x11GenerativeSampler\x12\x66\n\x0c\x46indSimilars\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x65\n\x0bInterpolate\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\x17generativesampler.proto\x12\x1bnvidia.cheminformatics.grpc\"\xa9\x01\n\x0eGenerativeSpec\x12;\n\x05model\x18\x01 \x01(\x0e\x32,.nvidia.cheminformatics.grpc.GenerativeModel\x12\x0e\n\x06smiles\x18\x02 \x03(\t\x12\x13\n\x06radius\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x19\n\x0cnumRequested\x18\x04 \x01(\x05H\x01\x88\x01\x01\x42\t\n\x07_radiusB\x0f\n\r_numRequested\"%\n\nSmilesList\x12\x17\n\x0fgeneratedSmiles\x18\x01 \x03(\t*9\n\x0fGenerativeModel\x12\x08\n\x04\x43\x44\x44\x44\x10\x00\x12\x0b\n\x07MolBART\x10\x01\x12\x0f\n\x0bMegaMolBART\x10\x02\x32\xe2\x01\n\x11GenerativeSampler\x12\x66\n\x0c\x46indSimilars\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x65\n\x0bInterpolate\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x62\x06proto3'
 )
 
 _GENERATIVEMODEL = _descriptor.EnumDescriptor(
@@ -40,17 +40,23 @@ _GENERATIVEMODEL = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
+    _descriptor.EnumValueDescriptor(
+      name='MegaMolBART', index=2, number=2,
+      serialized_options=None,
+      type=None,
+      create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
   serialized_start=267,
-  serialized_end=307,
+  serialized_end=324,
 )
 _sym_db.RegisterEnumDescriptor(_GENERATIVEMODEL)
 
 GenerativeModel = enum_type_wrapper.EnumTypeWrapper(_GENERATIVEMODEL)
 CDDD = 0
 MolBART = 1
+MegaMolBART = 2
 
 
 
@@ -183,8 +189,8 @@ _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=310,
-  serialized_end=536,
+  serialized_start=327,
+  serialized_end=553,
   methods=[
   _descriptor.MethodDescriptor(
     name='FindSimilars',

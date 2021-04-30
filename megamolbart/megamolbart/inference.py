@@ -17,6 +17,7 @@ from megatron.checkpointing import load_checkpoint
 from megatron.initialize import initialize_megatron
 from megatron import get_args
 # from megatron.training import get_model
+from  megatron_molbart.megatron_bart import MegatronBART
 
 from molbart.decoder import DecodeSampler
 from molbart.tokeniser import MolEncTokeniser

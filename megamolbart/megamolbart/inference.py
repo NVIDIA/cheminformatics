@@ -45,7 +45,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
     def __init__(self) -> None:
         super().__init__()
 
-        args = {
+        model_args = {
                 'num_layers': 4,
                 'hidden_size': 256,
                 'num_attention_heads': 8,
@@ -60,10 +60,11 @@ class MegaMolBART(BaseGenerativeWorkflow):
         self.radius_scale = 0.0001 # TODO adjust this once model is trained
 
         torch.set_grad_enabled(False) # Testing this instead of `with torch.no_grad():` context since it doesn't exit
-        initialize_megatron(args_defaults=args)
-        args = get_args()
-        self.tokenizer = self.load_tokenizer(args.vocab_file)
-        self.model = self.load_model(self.tokenizer, DEFAULT_MAX_SEQ_LEN, args)
+        # initialize_megatron(args_defaults=model_args)
+        initialize_megatron()
+        model_args = get_args()
+        self.tokenizer = self.load_tokenizer(model_args.vocab_file)
+        self.model = self.load_model(self.tokenizer, DEFAULT_MAX_SEQ_LEN, model_args)
 
     def load_tokenizer(self, tokenizer_vocab_path):
         """Load tokenizer from vocab file
@@ -205,6 +206,8 @@ class MegaMolBART(BaseGenerativeWorkflow):
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda() # dims: batch, tokens, embedding
         combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
 
+
+
         return self.inverse_transform(interpolated_emb, self.model, k=k, mem_pad_mask=combined_mask, sanitize=True), combined_mask
 
 
@@ -249,7 +252,10 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                                    neighboring_embeddings,
                                                    inv_transform_funct,
                                                    radius=radius)
-        return generated_df
+
+        smile_list = list(result_df['SMILES'])
+
+        return generated_df, smile_list
 
     def interpolate_from_smiles(self,
                                 smiles:List,
@@ -291,5 +297,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
             result_df.append(interp_df)
 
-        return pd.concat(result_df)
+        smile_list = list(result_df['SMILES'])
+
+        return pd.concat(result_df), smile_list
 

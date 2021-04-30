@@ -6,9 +6,8 @@ import torch
 from rdkit import Chem
 
 import sys
-sys.path.insert(0, "/workspace/megamolbart_generative")
-from megamolbart_generative import MegaMolBART, clean_smiles_list
-
+sys.path.insert(0, "/workspace/megamolbart")
+from megamolbart.inference import MegaMolBART, clean_smiles_list
 
 
 if __name__ == '__main__':
@@ -17,7 +16,7 @@ if __name__ == '__main__':
     num_samples = 3
     radius_list = [0.001]
 
-    data = pd.read_csv('/workspace/tests/data/benchmark_approved_drugs.csv')
+    data = pd.read_csv('/workspace/cuchem/tests/data/benchmark_approved_drugs.csv')
     if num_molecules > 0:
         data = data.sample(n=num_molecules, replace=False)
 
@@ -33,7 +32,7 @@ if __name__ == '__main__':
                 smiles_df = pd.DataFrame({'OUTPUT': clean_smiles_list(smiles_df['SMILES'].tolist())})
                 smiles_df['INPUT'] = smiles
                 smiles_df['RADIUS'] = simulated_radius
-                simgle_smiles_results.append(smiles_df)
+                single_smiles_results.append(smiles_df)
     
     single_smiles_results = pd.concat(single_smiles_results, axis=0).reset_index(drop=True).dropna()[['RADIUS', 'INPUT', 'OUTPUT']]
     

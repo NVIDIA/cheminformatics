@@ -63,7 +63,7 @@ class Launcher(object):
             logger.setLevel(logging.DEBUG)
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        generativesampler_pb2_grpc.add_SimilaritySamplerServicer_to_server(GenerativeSampler(), server)
+        generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(GenerativeSampler(), server)
         server.add_insecure_port(f'[::]:{args.port}')
         server.start()
         server.wait_for_termination()

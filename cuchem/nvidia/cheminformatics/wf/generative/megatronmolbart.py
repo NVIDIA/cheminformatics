@@ -30,7 +30,9 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(MorganFingerprint)) -> None:
         super().__init__(dao)
 
-        channel = grpc.insecure_channel('192.167.100.2')
+        self.radius_scale = 0.0001
+
+        channel = grpc.insecure_channel('192.167.100.2:50051')
         self.stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
 
     def find_similars_smiles(self,
@@ -40,12 +42,13 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                              force_unique=False):
 
         spec = generativesampler_pb2.GenerativeSpec(
-            model=generativesampler_pb2.GenerativeSampler.MegaMolBART,
+            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
             smiles=smiles,
-            radius=radius,
+            radius=self.radius_scale,
             numRequested=num_requested)
 
         result = self.stub.FindSimilars(spec)
+        result = result.generatedSmiles
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})
@@ -60,12 +63,13 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                                 force_unique=False):
 
         spec = generativesampler_pb2.GenerativeSpec(
-            model=generativesampler_pb2.GenerativeSampler.MegaMolBART,
+            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
             smiles=smiles,
-            radius=radius,
-            numPoints=num_points)
+            radius=self.radius_scale,
+            numRequested=num_points)
 
         result = self.stub.Interpolate(spec)
+        result = result.generatedSmiles
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})

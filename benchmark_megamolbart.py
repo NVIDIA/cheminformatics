@@ -36,7 +36,9 @@ def do_sampling(data, func, num_samples, radius_list, radius_scale):
     for radius in radius_list:
         simulated_radius = radius / radius_scale
         
-        for smiles in data:
+        for pos,smiles in enumerate(data):
+            if pos % 50 == 0:
+                print(radius, pos)
             smiles_df = func(smiles, num_samples, radius=simulated_radius)
 
             smiles_df = smiles_df[smiles_df['Generated']]
@@ -84,14 +86,15 @@ def plot_results(overall):
 
 
 if __name__ == '__main__':
-
-    # num_molecules = 10
-    # num_samples = 10
-    # radius_list = [0.00001, 0.00005, 0.0001, 0.0005, 0.001]  
-    num_molecules = 2
-    num_samples = 5
-    radius_list = [0.00001, 0.00005]    
+    DEFAULT_MAX_SEQ_LEN = 512
+    num_molecules = 500
+    num_samples = 10
+    radius_list = [0.00001, 0.00005, 0.0001, 0.0005]
     data = pd.read_csv(BENCHMARK_DRUGS_PATH)
+    mask = data['canonical_smiles'].map(len) <= DEFAULT_MAX_SEQ_LEN
+    print(data.shape)
+    data = data[mask]
+    print(data.shape)
 
     with torch.no_grad():
         wf = MegaMolBART()

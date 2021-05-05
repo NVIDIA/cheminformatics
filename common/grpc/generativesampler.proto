@@ -10,8 +10,9 @@ package nvidia.cheminformatics.grpc;
 
 
 enum GenerativeModel {
-  CDDD = 0;
+  CDDD = 0;,
   MolBART = 1;
+  MegaMolBART = 2;
 }
 
 

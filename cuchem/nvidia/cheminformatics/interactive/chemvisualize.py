@@ -701,6 +701,8 @@ class ChemVisualization(metaclass=Singleton):
                                                        'value': 'nvidia.cheminformatics.wf.generative.Cddd'},
                                                        {'label': 'MolBART Model',
                                                        'value': 'nvidia.cheminformatics.wf.generative.MolBART'},
+                                                       {'label': 'MegatronMolBART Model',
+                                                       'value': 'nvidia.cheminformatics.wf.generative.MegatronMolBART'},
                                                      ],
                                              value=self.generative_wf_cls,
                                              clearable=False),

@@ -140,7 +140,20 @@ fi
 # Compare Docker version to find Nvidia Container Toolkit support.
 # Please refer https://github.com/NVIDIA/nvidia-docker
 DOCKER_VERSION_WITH_GPU_SUPPORT="19.03.0"
-DOCKER_VERSION=$(docker version | grep -i version | head -1 | awk '{print $2'})
+if [ -x "$(command -v docker)" ]; then
+	DOCKER_VERSION=$(docker version | grep -i version | head -1 | awk '{print $2'})
+fi
+
+if [ -e /workspace/cuchem/startdash.py ]; then
+    # When inside container in dev mode
+	CUCHEM_LOC="/workspace/cuchem/"
+elif [ -e /opt/nvidia/cheminfomatics/cuchem/startdash.py ]; then
+	# When inside container in prod mode
+	CUCHEM_LOC="/opt/nvidia/cheminfomatics/cuchem/"
+else
+	# On baremetal
+	CUCHEM_LOC="./"
+fi
 
 PARAM_RUNTIME="--runtime=nvidia"
 if [ "$DOCKER_VERSION_WITH_GPU_SUPPORT" == "$(echo -e "$DOCKER_VERSION\n$DOCKER_VERSION_WITH_GPU_SUPPORT" | sort -V | head -1)" ];
@@ -149,6 +162,7 @@ then
 fi
 
 DOCKER_CMD="docker run \
+    --rm \
 	--network host \
 	${PARAM_RUNTIME} \
 	-p ${JUPYTER_PORT}:8888 \
@@ -260,16 +274,14 @@ dbSetup() {
 
 
 dash() {
-	if [[ -e "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
+	if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
 		# Executed within container or a managed env.
+		set -x
 		dbSetup "${DATA_MOUNT_PATH}"
-		if [[ ! -e "/workspace/cuchem/startdash.py" ]]; then
-			cd /opt/nvidia/cheminfomatics/cuchem/; python3 startdash.py analyze $@
-		else
-			cd /workspace/cuchem/; python3 startdash.py analyze $@
-		fi
+		cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
 	else
 		# run a container and start dash inside container.
+		export ADDITIONAL_PARAM="$@"
 		docker-compose --env-file .cheminf_local_environment  \
 			-f setup/docker_compose.yml \
 			--project-directory . \
@@ -278,16 +290,23 @@ dash() {
 	exit
 }
 
+down() {
+	docker-compose --env-file .cheminf_local_environment  \
+			-f setup/docker_compose.yml \
+			--project-directory . \
+			down
+}
 
 cache() {
-	if [[ "$0" == "/opt/nvidia/cheminfomatics/launch.sh" ]]; then
+	if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
+		set -x
 		# Executed within container or a managed env.
 		dbSetup "${DATA_MOUNT_PATH}"
-	    python3 startdash.py cache $@
+	    cd ${CUCHEM_LOC}; python3 startdash.py cache $@
 	else
 		dbSetup "${DATA_PATH}"
 		# run a container and start dash inside container.
-		${DOCKER_CMD} -it ${CUCHEM_CONT} python startdash.py cache $@
+		${DOCKER_CMD} -it ${CUCHEM_CONT} ./launch.sh cache $@
 	fi
 	exit
 }
@@ -296,7 +315,7 @@ cache() {
 test() {
 	dbSetup "${DATA_PATH}"
 	# run a container and start dash inside container.
-	${DOCKER_CMD} -w /workspace/cuchem -it ${CUCHEM_CONT}  pytest tests
+	${DOCKER_CMD} -w ${CUCHEM_LOC} -it ${CUCHEM_CONT}  pytest tests
 	exit
 }
 
@@ -326,6 +345,8 @@ case $1 in
 	dash)
 		$@
 		;;
+	down)
+		;&
 	cache)
 		$@
 		;;

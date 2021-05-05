@@ -46,6 +46,10 @@ ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 # Any line that needs to be executed without refering to cache should be below
 # this line.
 # TODO: The following lines will change once the current refactor is complete
+RUN mkdir -p /opt/nvidia/cuchem/grpc
+COPY common/generated /opt/nvidia/cuchem/grpc
+ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
+
 COPY common/ /tmp/common
 RUN cd /tmp/common; pip install .
 RUN mkdir -p /opt/nvidia/ \

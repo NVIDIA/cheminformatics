@@ -31,23 +31,24 @@ import grpc
 from locust import task, User, constant
 
 sys.path.insert(0, "generated")
-import similaritysampler_pb2_grpc
-import similaritysampler_pb2
+import generativesampler_pb2
+import generativesampler_pb2_grpc
 
 from tests.utils import stopwatch
 
 
 class GRPCLocust(User):
-    host = 'http://127.0.0.1'
+    host = 'http://192.167.100.2'
     wait_time = constant(.1)
 
     @task
     @stopwatch('GRPC_Sample')
     def client_task(self):
-        with grpc.insecure_channel('127.0.0.1:50051') as channel:
-            stub = similaritysampler_pb2_grpc.SimilaritySamplerStub(channel)
-            spec = similaritysampler_pb2.SimilaritySpec(
-                model=similaritysampler_pb2.SimilarityModel.MolBART,
+        with grpc.insecure_channel('192.167.100.2:50051') as channel:
+            stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
+
+            spec = generativesampler_pb2.GenerativeSpec(
+                model=generativesampler_pb2.GenerativeModel.MegaMolBART,
                 smiles='CN1C=NC2=C1C(=O)N(C(=O)N2C)C',
                 radius=0.0001,
                 numRequested=10)

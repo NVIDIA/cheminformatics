@@ -40,7 +40,6 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                              num_requested:int=10,
                              radius=None,
                              force_unique=False):
-
         spec = generativesampler_pb2.GenerativeSpec(
             model=generativesampler_pb2.GenerativeModel.MegaMolBART,
             smiles=smiles,

@@ -59,4 +59,3 @@ def test_dataframe_interpolate():
 
         result = stub.Interpolate(spec)
         logger.info(result)
-

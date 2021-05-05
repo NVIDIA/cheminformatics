@@ -156,6 +156,7 @@ DOCKER_CMD="docker run \
 	-p ${PLOTLY_PORT}:5000 \
 	-v ${PROJECT_PATH}:/workspace \
 	-v ${DATA_PATH}:${DATA_MOUNT_PATH} \
+	-u $(id -u ${USER}):$(id -g ${USER}) \
 	--shm-size=1g \
 	--ulimit memlock=-1 \
 	--ulimit stack=67108864 \
@@ -201,7 +202,7 @@ dev() {
 	local CONTAINER_OPTION=$1
 	local CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
 
-	if [[ "${CONTAINER_OPTION}"=="1" ]]; then
+	if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
 		CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
 	fi
 

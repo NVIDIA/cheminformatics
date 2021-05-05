@@ -30,9 +30,6 @@ from dask.distributed import Client, LocalCluster
 from nvidia.cheminformatics.utils.dask import initialize_cluster
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.data.cluster_wf import FINGER_PRINT_FILES
-from nvidia.cheminformatics.wf.cluster.cpukmeansumap import CpuKmeansUmap
-from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
-from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
 from cuchemcommon.utils.logger import initialize_logfile, log_results
 from cuchemcommon.context import Context
 from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
@@ -102,6 +99,10 @@ To start dash:
         """
         Create Cache
         """
+        context = Context()
+        data_dir = context.get_config('data_mount_path', default='/data')
+        cache_dir = os.path.join(data_dir, 'cache')
+
         parser = argparse.ArgumentParser(description='Create cache')
 
         parser.add_argument('-ct', '--cache_type',
@@ -114,7 +115,7 @@ To start dash:
         parser.add_argument('-c', '--cache_directory',
                             dest='cache_directory',
                             type=str,
-                            default='./.cache_dir',
+                            default=cache_dir,
                             help='Location to create fingerprint cache')
 
         parser.add_argument('--batch_size',
@@ -134,6 +135,12 @@ To start dash:
                             action='store_true',
                             default=False,
                             help='Show debug message')
+
+        parser.add_argument('-m', '--n_mol',
+                            dest='n_mol',
+                            type=int,
+                            default=-1,
+                            help='Number of molecules for analysis. Use negative numbers for using the whole dataset.')
 
         args = parser.parse_args(sys.argv[2:])
 
@@ -159,7 +166,7 @@ To start dash:
 
             chem_data = ChEmblData(fp_type=prepocess_type)
             chem_data.save_fingerprints(
-                os.path.join(args.cache_directory, FINGER_PRINT_FILES), num_recs = -1,
+                os.path.join(args.cache_directory, FINGER_PRINT_FILES), num_recs = args.n_mol,
                 batch_size=args.batch_size)
 
             logger.info('Fingerprint generated in (hh:mm:ss.ms) {}'.format(
@@ -326,10 +333,12 @@ To start dash:
 
         n_molecules = args.n_mol
         if not args.cpu:
+            from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
             workflow = GpuKmeansUmap(n_molecules=n_molecules,
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
         else:
+            from nvidia.cheminformatics.wf.cluster.cpukmeansumap import CpuKmeansUmap
             workflow = CpuKmeansUmap(n_molecules=n_molecules,
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
@@ -361,6 +370,7 @@ To start dash:
             port = context.get_config('plotly_port', 5000)
 
             logger.info("Starting interactive visualization...")
+            from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
             v = ChemVisualization(workflow)
 
             logger.info('navigate to https://localhost: %s' % port)

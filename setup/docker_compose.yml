@@ -20,15 +20,15 @@ services:
     volumes:
       - './:/workspace'
       - "${DATA_PATH}:/data"
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: 1
-            capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #       - driver: nvidia
+    #         count: 1
+    #         capabilities: [gpu]
     working_dir: /workspace
-    command: ./launch.sh dash
+    command: ./launch.sh dash ${ADDITIONAL_PARAM}
     extra_hosts:
       - "megamolbart:192.167.100.2"
 
@@ -41,10 +41,10 @@ services:
     volumes:
         - './:/workspace'
         - "${DATA_PATH}:/data"
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: 1
-            capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #       - driver: nvidia
+    #         count: 1
+    #         capabilities: [gpu]

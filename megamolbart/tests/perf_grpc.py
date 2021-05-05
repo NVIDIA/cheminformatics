@@ -54,4 +54,3 @@ class GRPCLocust(User):
                 numRequested=10)
 
             response = stub.FindSimilars(spec)
-            # response = stub.Interpolate(spec)

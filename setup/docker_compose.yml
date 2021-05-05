@@ -9,7 +9,7 @@ networks:
 
 services:
   cuchemUI:
-    image: nvcr.io/nvstaging/clara/cheminformatics_demo:0.0.1
+    image: "${CUCHEM_CONT}"
     hostname: cuchemUI
     networks:
       cuchemNet:
@@ -33,7 +33,7 @@ services:
       - "megamolbart:192.167.100.2"
 
   megamolbart:
-    image: nvcr.io/nvstaging/clara/cheminformatics_megamolbart:0.0.1
+    image: "${MEGAMOLBART_CONT}"
     hostname: 'megamolbart'
     networks:
       cuchemNet:

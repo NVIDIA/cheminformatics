@@ -200,8 +200,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda() # dims: batch, tokens, embedding
         combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
 
-
-
         return self.inverse_transform(interpolated_emb, self.model, k=k, mem_pad_mask=combined_mask, sanitize=True), combined_mask
 
 

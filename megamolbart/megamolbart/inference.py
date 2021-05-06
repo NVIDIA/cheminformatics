@@ -73,6 +73,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
                 'load': CHECKPOINTS_DIR # this is the checkpoint path
             }
 
+        self.device = 'cuda' # Megatron arg loading seems to only work with GPU
+        self.radius_scale = 0.5 # TODO adjust this once model is trained
+
         torch.set_grad_enabled(False) # Testing this instead of `with torch.no_grad():` context since it doesn't exit
         initialize_megatron(args_defaults=model_args)
         model_args = get_args()
@@ -138,7 +141,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         Returns
             embedding array and boolean mask
         """
-
+        
         assert isinstance(smiles, str)
         if pad_length:
             assert pad_length >= len(smiles) + 2
@@ -166,6 +169,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         batch_size = 1 # TODO: parallelize this loop as a batch
         for memory in embeddings.permute(1, 0, 2):
+
             decode_fn = partial(model._decode_fn,
                                 mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
                                 memory=memory)
@@ -229,15 +233,16 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   num_requested:int=10,
                                   radius=None,
                                   force_unique=False):
-        radius = radius if radius else self.radius_scale
+        distance = radius * self.radius_scale if radius else self.radius_scale
         embedding, pad_mask = self.smiles2embedding(self.model,
                                                     smiles,
                                                     self.tokenizer)
 
-        neighboring_embeddings = self.addjitter(embedding, radius, cnt=num_requested)
+        neighboring_embeddings = self.addjitter(embedding, distance, cnt=num_requested)
 
         generated_mols = self.inverse_transform(embeddings=neighboring_embeddings, model=self.model,
                                                 k=1, mem_pad_mask=pad_mask.bool().cuda(), sanitize=True)
+
         generated_mols = [smiles] + generated_mols
         return generated_mols, neighboring_embeddings, pad_mask
 
@@ -247,11 +252,12 @@ class MegaMolBART(BaseGenerativeWorkflow):
                              num_requested:int=10,
                              radius=None,
                              force_unique=False):
-        radius = radius if radius else self.radius_scale
+        distance = radius * self.radius_scale if radius else self.radius_scale
+
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
-                                           radius=radius,
+                                           radius=distance,
                                            force_unique=force_unique)
 
         generated_df = pd.DataFrame({'SMILES': generated_mols,
@@ -264,7 +270,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
             generated_df = self.compute_unique_smiles(generated_df,
                                                    neighboring_embeddings,
                                                    inv_transform_funct,
-                                                   radius=radius)
+                                                   radius=distance)
 
         smile_list = list(generated_df['SMILES'])
 

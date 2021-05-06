@@ -30,7 +30,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(MorganFingerprint)) -> None:
         super().__init__(dao)
 
-        self.radius_scale = 0.0001
+        self.radius_scale = 2.1
 
         channel = grpc.insecure_channel('192.167.100.2:50051')
         self.stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)

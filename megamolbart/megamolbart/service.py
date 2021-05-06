@@ -16,9 +16,12 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
 
 
     def FindSimilars(self, spec, context):
+
+        smile_str = ''.join(spec.smiles)
+
         _, generated_smiles = \
                 self.megamolbart.find_similars_smiles(
-                    spec.smiles[0],
+                    smile_str,
                     num_requested=spec.numRequested,
                     radius=spec.radius)
         return generativesampler_pb2.SmilesList(generatedSmiles=generated_smiles)

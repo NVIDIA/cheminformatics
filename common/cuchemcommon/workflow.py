@@ -28,7 +28,7 @@ def _(embedding, radius, cnt):
 
 class BaseGenerativeWorkflow:
 
-    def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(MorganFingerprint)) -> None:
+    def __init__(self, dao: GenerativeWfDao = None) -> None:
         self.dao = dao
         self.radius_scale = None
 

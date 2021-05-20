@@ -276,7 +276,6 @@ dbSetup() {
 dash() {
 	if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
 		# Executed within container or a managed env.
-		set -x
 		dbSetup "${DATA_MOUNT_PATH}"
 		cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
 	else
@@ -290,6 +289,7 @@ dash() {
 	exit
 }
 
+
 down() {
 	docker-compose --env-file .cheminf_local_environment  \
 			-f setup/docker_compose.yml \
@@ -299,7 +299,6 @@ down() {
 
 cache() {
 	if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-		set -x
 		# Executed within container or a managed env.
 		dbSetup "${DATA_MOUNT_PATH}"
 	    cd ${CUCHEM_LOC}; python3 startdash.py cache $@
@@ -337,8 +336,6 @@ case $1 in
 		$@
 		;;
 	root)
-		;&
-	dbSetup)
 		;&
 	test)
 		;&

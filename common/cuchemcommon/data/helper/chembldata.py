@@ -60,6 +60,7 @@ class ChEmblData(object, metaclass=Singleton):
 
         if not os.path.exists(db_file):
             logger.error('%s not found', db_file)
+            raise Exception('{} not found'.format(db_file))
             sys.exit(1)
 
         self.fp_type = fp_type

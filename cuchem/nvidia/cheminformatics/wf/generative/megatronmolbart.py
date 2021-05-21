@@ -51,7 +51,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})
-        generated_df.iat[ 0, 1] = False
+        generated_df['Generated'].iat[0] = False
 
         return generated_df
 
@@ -72,7 +72,8 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})
-        generated_df.iat[ 0, 1] = False
+        generated_df.iat[0, 1] = False
+        generated_df.iat[0, 1] = False
 
         return generated_df
 

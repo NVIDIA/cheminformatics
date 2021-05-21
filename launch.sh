@@ -114,6 +114,7 @@ DASK_PORT=${DASK_PORT:-9001}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
 DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
+GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN:=""}
 
 ###############################################################################
 #
@@ -186,7 +187,7 @@ build() {
 	docker build --network host -t ${CUCHEM_CONT} -f Dockerfile.cuchem .
 
 	echo "Building ${MEGAMOLBART_CONT}..."
-    docker build --network host -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart .
+    docker build --network host -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} .
 
 	set +e
 	exit
@@ -276,6 +277,7 @@ dbSetup() {
 dash() {
 	if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
 		# Executed within container or a managed env.
+		set -x
 		dbSetup "${DATA_MOUNT_PATH}"
 		cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
 	else
@@ -289,7 +291,6 @@ dash() {
 	exit
 }
 
-
 down() {
 	docker-compose --env-file .cheminf_local_environment  \
 			-f setup/docker_compose.yml \
@@ -299,6 +300,7 @@ down() {
 
 cache() {
 	if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
+		set -x
 		# Executed within container or a managed env.
 		dbSetup "${DATA_MOUNT_PATH}"
 	    cd ${CUCHEM_LOC}; python3 startdash.py cache $@

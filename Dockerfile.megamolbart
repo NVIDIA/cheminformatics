@@ -1,4 +1,7 @@
 FROM nvcr.io/nvidia/pytorch:20.11-py3
+ARG GITHUB_ACCESS_TOKEN
+ARG MEGAMOLBART_REPO="github.com/MolecularAI/MolBART.git"
+ARG MEGAMOLBART_BRANCH="megatron-molbart-with-zinc"
 
 ENV UCX_LOG_LEVEL error
 ENV PATH /opt/conda/bin:$PATH
@@ -32,9 +35,7 @@ RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
     && cd /opt/pysmilesutils-mirror; pip install .
 
 ## MegaMolBART code and weights
-RUN wget --quiet -O /tmp/megatron_molbart.zip \
-    http://rilango-work.nvidia.com/megatron_molbart/MolBART-megatron-molbart-with-zinc.zip \
-    && unzip /tmp/megatron_molbart.zip -d /opt \
+RUN git clone https://${GITHUB_ACCESS_TOKEN}@${MEGAMOLBART_REPO} --branch ${MEGAMOLBART_BRANCH} /opt/MolBART \
     && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
     && cd /opt/MolBART; pip install .
 
@@ -63,7 +64,5 @@ RUN cd /tmp/common; pip install .
 RUN mkdir -p /opt/nvidia/cuchem/grpc
 COPY common/generated /opt/nvidia/cuchem/grpc
 ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
-
-COPY megamolbart/ /opt/nvidia/megamolbart
 
 CMD cd /opt/nvidia/megamolbart && python3 launch.py

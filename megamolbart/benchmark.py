@@ -7,9 +7,9 @@ import matplotlib.pyplot as plt
 import torch
 from rdkit import Chem
 
-import sys
-sys.path.insert(0, "/workspace/megamolbart")
-from megamolbart.inference import MegaMolBART
+import grpc
+import generativesampler_pb2
+import generativesampler_pb2_grpc
 
 
 BENCHMARK_DRUGS_PATH = '/workspace/cuchem/tests/data/benchmark_approved_drugs.csv'
@@ -30,16 +30,32 @@ def validate_smiles_list(smiles_list):
     return smiles_clean_list
 
 
-def do_sampling(data, func, num_samples, radius_list, radius_scale):
+def do_sampling(data, func, num_samples, radius_list, radius_scale, generation_type):
     """Sampling for single molecule and interpolation between two molecules."""
     smiles_results = list()
+
     for radius in radius_list:
         simulated_radius = radius / radius_scale
-        
-        for pos,smiles in enumerate(data):
+
+        for pos, smiles in enumerate(data):
             if pos % 50 == 0:
                 print(radius, pos)
-            smiles_df = func(smiles, num_samples, radius=simulated_radius)
+
+            spec = generativesampler_pb2.GenerativeSpec(
+                model=generativesampler_pb2.GenerativeModel.MegaMolBART,
+                smiles=smiles,
+                radius=0.0001,
+                numRequested=num_samples)
+
+            result = func(spec)
+            result = result.generatedSmiles
+            smiles_df = pd.DataFrame({'SMILES': result,
+                                      'Generated': [True for i in range(len(result))]})
+            if generation_type == 'sample':
+                smiles_df['Generated'].iat[0] = False
+            else:
+                smiles_df['Generated'].iat[0] = False
+                smiles_df['Generated'].iat[smiles_df.shape[0] - 1] = False
 
             smiles_df = smiles_df[smiles_df['Generated']]
             # All molecules are valid and not the same as input
@@ -60,10 +76,10 @@ def calc_statistics(df, level):
     """Calculate validity and uniqueness statistics per molecule or per radius / sampling type"""
     def _percent_valid(df):
         return len(df.dropna()) / float(len(df))
-    
+
     def _percent_unique(df):
         return len(set(df.dropna().tolist())) / float(len(df))
-    
+
     results = df.groupby(level=level).agg([_percent_valid, _percent_unique])
     results.columns = ['percent_valid', 'percent_unique']
     return results
@@ -76,7 +92,7 @@ def plot_results(overall):
     for ax, sample, kind in zip(axList, ['interp', 'single'], ['bar', 'line']):
         plt_data = overall.loc[sample]
         plt_data.plot(kind=kind, ax=ax)
-        ax.set(title=f'Latent Space Sampling Type: {sample.title()}')    
+        ax.set(title=f'Latent Space Sampling Type: {sample.title()}')
         if sample == 'single':
             ax.set(xlabel='Radius', ylabel='Percent')
         else:
@@ -97,26 +113,29 @@ if __name__ == '__main__':
     print(data.shape)
 
     with torch.no_grad():
-        wf = MegaMolBART()
         master_df = list()
-        for sample_type in ['single', 'interp']:
 
-            # func is what controls which sampling is used
-            if sample_type == 'single':
-                sampled_data = data['canonical_smiles'].sample(n=num_molecules, replace=False, random_state=0).tolist()
-                func = wf.find_similars_smiles
-                smiles_results = do_sampling(sampled_data, func, num_samples, radius_list, wf.radius_scale)
-            else:
-                # Sample two at a time -- must ensure seed is different each time
-                sampled_data = [data['canonical_smiles'].sample(n=2, replace=False, random_state=i).tolist() for i in range(num_molecules)]
-                func = wf.interpolate_from_smiles
-                # radius not used for sampling two at a time -- enter dummy here
-                smiles_results = do_sampling(sampled_data, func, num_samples, [1.0], 1.0)
-                #smiles_results['RADIUS'] = np.NaN
+        with grpc.insecure_channel('localhost:50051') as channel:
+            stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
 
-            smiles_results['SAMPLE'] = sample_type
-            master_df.append(smiles_results)
-    
+            for sample_type in ['single', 'interp']:
+
+                # func is what controls which sampling is used
+                if sample_type == 'single':
+                    sampled_data = data['canonical_smiles'].sample(
+                        n=num_molecules, replace=False, random_state=0).tolist()
+                    smiles_results = do_sampling(sampled_data, stub.FindSimilars, num_samples, radius_list, 1.0, 'sample')
+                else:
+                    # Sample two at a time -- must ensure seed is different each time
+                    sampled_data = [data['canonical_smiles'].sample(
+                        n=2, replace=False, random_state=i).tolist() for i in range(num_molecules)]
+                    # radius not used for sampling two at a time -- enter dummy here
+                    smiles_results = do_sampling(sampled_data, stub.Interpolate, num_samples, [1.0], 1.0, 'interpolate')
+                    #smiles_results['RADIUS'] = np.NaN
+
+                smiles_results['SAMPLE'] = sample_type
+                master_df.append(smiles_results)
+
     indexes = ['SAMPLE', 'RADIUS', 'INPUT']
     master_df = pd.concat(master_df, axis=0).set_index(indexes)
     results = calc_statistics(master_df, indexes)
@@ -124,11 +143,8 @@ if __name__ == '__main__':
 
     with open(os.path.join(BENCHMARK_OUTPUT_PATH, 'results.md'), 'w') as fh:
         results.reset_index().to_markdown(fh)
-    
+
     with open(os.path.join(BENCHMARK_OUTPUT_PATH, 'overall.md'), 'w') as fh:
         overall.reset_index().to_markdown(fh)
 
     plot_results(overall)
-    
-    
-

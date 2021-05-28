@@ -187,7 +187,9 @@ build() {
 	docker build --network host -t ${CUCHEM_CONT} -f Dockerfile.cuchem .
 
 	echo "Building ${MEGAMOLBART_CONT}..."
-    docker build --network host -t ${MEGAMOLBART_CONT} -f Dockerfile.megamolbart --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} .
+    docker build --network host -t ${MEGAMOLBART_CONT} \
+		-f Dockerfile.megamolbart \
+		--build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} .
 
 	set +e
 	exit
@@ -322,7 +324,13 @@ test() {
 
 
 jupyter() {
-	${DOCKER_CMD} -it ${CUCHEM_CONT} jupyter-lab --no-browser --port=8888 --ip=0.0.0.0 --notebook-dir=/workspace --NotebookApp.password=\"\" --NotebookApp.token=\"\" --NotebookApp.password_required=False
+	${DOCKER_CMD} -it ${CUCHEM_CONT} jupyter-lab --no-browser \
+		--port=8888 \
+		--ip=0.0.0.0 \
+		--notebook-dir=/workspace \
+		--NotebookApp.password=\"\" \
+		--NotebookApp.token=\"\" \
+		--NotebookApp.password_required=False
 	exit
 }
 

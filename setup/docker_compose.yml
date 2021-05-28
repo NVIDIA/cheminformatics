@@ -16,7 +16,6 @@ services:
         ipv4_address: 192.167.100.1
     ports:
       - "5000:5000"
-      - "8787:8787"
     volumes:
       - './:/workspace'
       - "${DATA_PATH}:/data"

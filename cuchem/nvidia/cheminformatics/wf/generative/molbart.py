@@ -46,7 +46,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         self.bart_model = self.load_model(model_chk_path, self.tokenizer, max_seq_len)
 
         self.bart_model.to('cuda')
-        self.radius_scale = 0.0001
+        self.min_jitter_radius = 0.0001
 
     def load_tokenizer(self, tokenizer_path):
         """Load pickled tokenizer
@@ -177,29 +177,32 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
     def find_similars_smiles_list(self,
                                   smiles:str,
                                   num_requested:int=10,
-                                  radius=None,
+                                  scaled_radius=None,
                                   force_unique=False):
-        radius = radius if radius else self.radius_scale
+        radius = self._compute_radius(scaled_radius)
+
         embedding, pad_mask = self.smiles2embedding(self.bart_model,
                                                     smiles,
                                                     self.tokenizer)
 
         neighboring_embeddings = self.addjitter(embedding, radius, cnt=num_requested)
 
-        generated_mols = self.inverse_transform(neighboring_embeddings, k=1, mem_pad_mask=pad_mask.bool().cuda())
+        generated_mols = self.inverse_transform(neighboring_embeddings,
+                                                k=1,
+                                                mem_pad_mask=pad_mask.bool().cuda())
         generated_mols = [smiles] + generated_mols
         return generated_mols, neighboring_embeddings, pad_mask
 
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=None,
+                             scaled_radius=None,
                              force_unique=False):
-        radius = radius if radius else self.radius_scale
+
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
-                                           radius=radius,
+                                           scaled_radius=scaled_radius,
                                            force_unique=force_unique)
 
         generated_df = pd.DataFrame({'SMILES': generated_mols,
@@ -207,6 +210,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         generated_df.iat[ 0, 1] = False
 
         if force_unique:
+            radius = self._compute_radius(scaled_radius)
             inv_transform_funct = partial(self.inverse_transform,
                                    mem_pad_mask=pad_mask)
             generated_df = self.compute_unique_smiles(generated_df,
@@ -218,9 +222,10 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
     def interpolate_from_smiles(self,
                                 smiles:List,
                                 num_points:int=10,
-                                radius=None,
+                                scaled_radius=None,
                                 force_unique=False):
-        radius = radius if radius else self.radius_scale
+        radius = self._compute_radius(scaled_radius)
+
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')
@@ -230,10 +235,10 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         for idx in range(len(smiles) - 1):
             interplocated_mol = [smiles[idx]]
             interplocated, combined_mask = self.interpolate_molecules(smiles[idx],
-                                                                          smiles[idx + 1],
-                                                                          num_points,
-                                                                          self.tokenizer,
-                                                                          k=k)
+                                                                      smiles[idx + 1],
+                                                                      num_points,
+                                                                      self.tokenizer,
+                                                                      k=k)
             interplocated_mol += interplocated
             interplocated_mol.append(smiles[idx + 1])
 
@@ -253,7 +258,6 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                                                        interplocated_mol,
                                                        inv_transform_funct,
                                                        radius=radius)
-
 
             result_df.append(interp_df)
 

@@ -22,15 +22,15 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         self.default_model_loc = download_cddd_models()
         self.dao = dao
         self.cddd_embeddings = Embeddings(model_dir=self.default_model_loc)
-        self.radius_scale = 0.5
+        self.min_jitter_radius = 0.5
 
     def find_similars_smiles_list(self,
                                   smiles: str,
                                   num_requested: int = 10,
-                                  radius=None,
+                                  scaled_radius=None,
                                   force_unique=False):
 
-        radius = radius if radius else self.radius_scale
+        radius = self._compute_radius(scaled_radius)
         embedding = self.cddd_embeddings.func.seq_to_emb(smiles).squeeze()
         neighboring_embeddings = self.addjitter(embedding, radius, cnt=num_requested)
 
@@ -42,12 +42,11 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=None,
+                             scaled_radius=None,
                              force_unique=False):
-        radius = radius if radius else self.radius_scale
         generated_mols, neighboring_embeddings = self.find_similars_smiles_list(smiles,
                                                         num_requested=num_requested,
-                                                        radius=radius,
+                                                        scaled_radius=scaled_radius,
                                                         force_unique=force_unique)
 
         generated_df = pd.DataFrame({'SMILES': generated_mols,
@@ -55,6 +54,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         generated_df.iat[ 0, 1] = False
 
         if force_unique:
+            radius = self._compute_radius(scaled_radius)
             generated_df = self.compute_unique_smiles(generated_df,
                                                    neighboring_embeddings,
                                                    self.cddd_embeddings.inverse_transform,
@@ -64,10 +64,10 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
     def interpolate_from_smiles(self,
                                 smiles: List,
                                 num_points: int = 10,
-                                radius=None,
+                                scaled_radius=None,
                                 force_unique=False):
 
-        radius = radius if radius else self.radius_scale
+        radius = self._compute_radius(scaled_radius)
         num_points = int(num_points) + 2
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')

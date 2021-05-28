@@ -39,19 +39,13 @@ RUN git clone https://${GITHUB_ACCESS_TOKEN}@${MEGAMOLBART_REPO} --branch ${MEGA
     && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
     && cd /opt/MolBART; pip install .
 
+## Megatron-MolBART checkpoint -- TODO: remove these
 RUN mkdir -p /models/megamolbart \
     && wget --quiet -O /tmp/megamolbart_checkpoints_20210427.tgz \
     http://rilango-work.nvidia.com/megatron_molbart/megamolbart_checkpoints_20210427.tgz \
     && cp /opt/MolBART/bart_vocab.txt /models/megamolbart/bart_vocab.txt \
     && tar xzf /tmp/megamolbart_checkpoints_20210427.tgz -C /models/megamolbart
 ENV PYTHONPATH /opt/MolBART/megatron_molbart:/opt/MolBART
-
-# ## MolBART Models and Weights -- TODO: remove these
-# RUN mkdir -p /models/molbart \
-#     && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
-#     http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \
-#     && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
-#     http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
 
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 
@@ -65,4 +59,5 @@ RUN mkdir -p /opt/nvidia/cuchem/grpc
 COPY common/generated /opt/nvidia/cuchem/grpc
 ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
 
+COPY megamolbart/ /opt/nvidia/megamolbart/
 CMD cd /opt/nvidia/megamolbart && python3 launch.py

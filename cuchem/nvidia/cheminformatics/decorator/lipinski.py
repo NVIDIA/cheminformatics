@@ -5,6 +5,7 @@ import pandas
 from typing import Union
 
 from rdkit import Chem
+from rdkit.Chem import QED
 
 from nvidia.cheminformatics.decorator import BaseMolPropertyDecorator
 
@@ -72,7 +73,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                 rotatable_bonds.append({'value': NaN, 'level': 'info'})
 
             try:
-                qed = Chem.QED.qed(m)
+                qed = QED.qed(m)
                 qeds.append({'value': round(qed, 4),
                              'level': 'info' if qed < LipinskiRuleOfFiveDecorator.MAX_QED else 'error'})
             except Exception as ex:

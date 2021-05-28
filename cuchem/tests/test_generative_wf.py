@@ -16,9 +16,9 @@ def interpolation(wf, num_points = 20, force_unique=False):
 
     smiles = ['CHEMBL6328', 'CHEMBL415286']
     # smiles = ['CHEMBL10454', 'CHEMBL10469']
-    genreated_df = wf.interpolate_from_id(smiles,
-                                          num_points=num_points,
-                                          force_unique=force_unique)
+    genreated_df = wf.interpolate_by_id(smiles,
+                                        num_points=num_points,
+                                        force_unique=force_unique)
 
     genreated_df = MolecularStructureDecorator().decorate(genreated_df)
     genreated_df = LipinskiRuleOfFiveDecorator().decorate(genreated_df)
@@ -45,9 +45,9 @@ def test_cddd_similar_smiles():
     wf = Cddd()
     num_to_generate = 3
 
-    generated_smiles = wf.find_similars_smiles_from_id(['CHEMBL6273'],
-                                                        num_requested=num_to_generate,
-                                                        force_unique=True)
+    generated_smiles = wf.find_similars_smiles_by_id(['CHEMBL6273'],
+                                                      num_requested=num_to_generate,
+                                                      force_unique=True)
     logger.info(generated_smiles)
 
     assert len(generated_smiles) == num_to_generate + 1
@@ -64,9 +64,9 @@ def test_molbart_similar_smiles():
     wf = MolBART()
     num_to_generate = 3
 
-    generated_smiles = wf.find_similars_smiles_from_id(['CHEMBL6273'],
-                                                       num_requested=num_to_generate,
-                                                       force_unique=True)
+    generated_smiles = wf.find_similars_smiles_by_id(['CHEMBL6273'],
+                                                      num_requested=num_to_generate,
+                                                      force_unique=True)
 
     logger.info('# of generated SMILES %s', len(generated_smiles))
     logger.info(generated_smiles)

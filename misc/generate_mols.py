@@ -62,8 +62,8 @@ def generate():
         try:
             if lipinski_score >= 3 and qed <= LipinskiRuleOfFiveDecorator.MAX_QED:
                 generated_list = wf.find_similars_smiles_list(smiles,
-                                                            num_requested=num_to_generate,
-                                                            radius=0.0001)
+                                                              num_requested=num_to_generate,
+                                                              radius=0.0001)
                 for new_smiles in generated_list:
                     lipinski_score, qed = score_molecule(new_smiles)
 

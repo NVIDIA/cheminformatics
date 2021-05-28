@@ -30,28 +30,36 @@ class BaseGenerativeWorkflow:
 
     def __init__(self, dao: GenerativeWfDao = None) -> None:
         self.dao = dao
-        self.radius_scale = None
+        self.min_jitter_radius = None
 
     def interpolate_from_smiles(self,
                                 smiles:List,
                                 num_points:int=10,
-                                radius=None,
+                                scaled_radius=None,
                                 force_unique=False):
         NotImplemented
 
     def find_similars_smiles_list(self,
                                   smiles:str,
                                   num_requested:int=10,
-                                  radius=None,
+                                  scaled_radius=None,
                                   force_unique=False):
         NotImplemented
 
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=None,
+                             scaled_radius=None,
                              force_unique=False):
         NotImplemented
+
+
+    def _compute_radius(self, scaled_radius):
+        if scaled_radius:
+            return float(scaled_radius * self.min_jitter_radius)
+        else:
+            return self.min_jitter_radius
+
 
     def addjitter(self,
                   embedding,
@@ -75,11 +83,16 @@ class BaseGenerativeWorkflow:
         Instead it simply orders the df by SMILES to identify the duplicates.
         """
 
-        radius = radius if radius else self.radius_scale
+        radius = radius if radius else self.min_jitter_radius
 
         for index, row in interp_df.iterrows():
             smile_string = row['SMILES']
-            canonical_smile = CanonSmiles(smile_string)
+            try:
+                canonical_smile = CanonSmiles(smile_string)
+            except:
+                # If a SMILES cannot be canonicalized, just use the original
+                canonical_smile = smile_string
+
             row['SMILES'] = canonical_smile
 
         for i in range(5):
@@ -121,7 +134,7 @@ class BaseGenerativeWorkflow:
 
         return interp_df
 
-    def interpolate_from_id(self,
+    def interpolate_by_id(self,
                             ids:List,
                             id_type:str='chembleid',
                             num_points=10,
@@ -129,10 +142,8 @@ class BaseGenerativeWorkflow:
                             scaled_radius:int=1):
         smiles = None
 
-        if not self.radius_scale:
+        if not self.min_jitter_radius:
             raise Exception('Property `radius_scale` must be defined in model class.')
-        else:
-            radius = float(scaled_radius * self.radius_scale)
 
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(ids)]
@@ -143,10 +154,10 @@ class BaseGenerativeWorkflow:
 
         return self.interpolate_from_smiles(smiles,
                                             num_points=num_points,
-                                            radius=radius,
+                                            scaled_radius=scaled_radius,
                                             force_unique=force_unique)
 
-    def find_similars_smiles_from_id(self,
+    def find_similars_smiles_by_id(self,
                                      chemble_id:str,
                                      id_type:str='chembleid',
                                      num_requested=10,
@@ -154,10 +165,8 @@ class BaseGenerativeWorkflow:
                                      scaled_radius:int=1):
         smiles = None
 
-        if not self.radius_scale:
+        if not self.min_jitter_radius:
             raise Exception('Property `radius_scale` must be defined in model class.')
-        else:
-            radius = float(scaled_radius * self.radius_scale)
 
         if id_type.lower() == 'chembleid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(chemble_id)]
@@ -168,5 +177,5 @@ class BaseGenerativeWorkflow:
 
         return self.find_similars_smiles(smiles[0],
                                          num_requested=num_requested,
-                                         radius=radius,
+                                         scaled_radius=scaled_radius,
                                          force_unique=force_unique)

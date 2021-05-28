@@ -60,7 +60,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         super().__init__()
 
         self.device = 'cuda' # Megatron arg loading seems to only work with GPU
-        self.radius_scale = 0.0001 # TODO adjust this once model is trained
+        self.min_jitter_radius = 2.1 # TODO adjust this once model is trained
         self.max_seq_len = DEFAULT_MAX_SEQ_LEN
 
         model_args = {
@@ -74,7 +74,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
             }
 
         self.device = 'cuda' # Megatron arg loading seems to only work with GPU
-        self.radius_scale = 0.5 # TODO adjust this once model is trained
 
         torch.set_grad_enabled(False) # Testing this instead of `with torch.no_grad():` context since it doesn't exit
         initialize_megatron(args_defaults=model_args)
@@ -141,7 +140,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         Returns
             embedding array and boolean mask
         """
-        
+
         assert isinstance(smiles, str)
         if pad_length:
             assert pad_length >= len(smiles) + 2
@@ -231,9 +230,10 @@ class MegaMolBART(BaseGenerativeWorkflow):
     def find_similars_smiles_list(self,
                                   smiles:str,
                                   num_requested:int=10,
-                                  radius=None,
+                                  scaled_radius=None,
                                   force_unique=False):
-        distance = radius * self.radius_scale if radius else self.radius_scale
+        distance = self._compute_radius(scaled_radius)
+
         embedding, pad_mask = self.smiles2embedding(self.model,
                                                     smiles,
                                                     self.tokenizer)
@@ -250,14 +250,14 @@ class MegaMolBART(BaseGenerativeWorkflow):
     def find_similars_smiles(self,
                              smiles:str,
                              num_requested:int=10,
-                             radius=None,
+                             scaled_radius=None,
                              force_unique=False):
-        distance = radius * self.radius_scale if radius else self.radius_scale
+        distance = self._compute_radius(scaled_radius)
 
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
-                                           radius=distance,
+                                           scaled_radius=distance,
                                            force_unique=force_unique)
 
         generated_df = pd.DataFrame({'SMILES': generated_mols,
@@ -279,9 +279,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
     def interpolate_from_smiles(self,
                                 smiles:List,
                                 num_points:int=10,
-                                radius=None,
+                                scaled_radius=None,
                                 force_unique=False):
-        radius = radius if radius else self.radius_scale
+        distance = self._compute_radius(scaled_radius)
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')
@@ -311,7 +311,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                 interp_df = self.compute_unique_smiles(interp_df,
                                                        interpolated_mol,
                                                        inv_transform_funct,
-                                                       radius=radius)
+                                                       radius=distance)
 
             result_df.append(interp_df)
 

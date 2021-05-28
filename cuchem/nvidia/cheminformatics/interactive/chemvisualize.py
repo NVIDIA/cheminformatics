@@ -279,15 +279,15 @@ class ChemVisualization(metaclass=Singleton):
         scaled_radius = int(scaled_radius)
 
         if rd_generation_type == 'SAMPLE':
-            self.genreated_df = generative_wf.find_similars_smiles_from_id(chemble_ids,
-                                                                           num_requested=n2generate,
-                                                                           scaled_radius=scaled_radius,
-                                                                           force_unique=True)
+            self.genreated_df = generative_wf.find_similars_smiles_by_id(chemble_ids,
+                                                                         num_requested=n2generate,
+                                                                         scaled_radius=scaled_radius,
+                                                                         force_unique=True)
         else:
-            self.genreated_df = generative_wf.interpolate_from_id(chemble_ids,
-                                                             num_points=n2generate,
-                                                             scaled_radius=scaled_radius,
-                                                             force_unique=True)
+            self.genreated_df = generative_wf.interpolate_by_id(chemble_ids,
+                                                                num_points=n2generate,
+                                                                scaled_radius=scaled_radius,
+                                                                force_unique=True)
 
         if show_generated_mol is None:
             show_generated_mol = 0

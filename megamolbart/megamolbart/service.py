@@ -23,7 +23,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
                 self.megamolbart.find_similars_smiles(
                     smile_str,
                     num_requested=spec.numRequested,
-                    radius=spec.radius)
+                    scaled_radius=spec.radius)
         return generativesampler_pb2.SmilesList(generatedSmiles=generated_smiles)
 
     def Interpolate(self, spec, context):
@@ -31,6 +31,6 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
         _, generated_smiles  = self.megamolbart.interpolate_from_smiles(
                     spec.smiles,
                     num_points=spec.numRequested,
-                    radius=spec.radius)
+                    scaled_radius=spec.radius)
         return generativesampler_pb2.SmilesList(generatedSmiles=generated_smiles)
 

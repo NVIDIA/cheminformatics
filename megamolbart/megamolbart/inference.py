@@ -9,10 +9,9 @@ from functools import partial
 from pathlib import Path
 
 from megatron_bart import MegatronBART
-from megatron.checkpointing import load_checkpoint
+from checkpointing import load_checkpoint
 from megatron.initialize import initialize_megatron
 from megatron import get_args
-# from megatron.training import get_model
 from  megatron_molbart.megatron_bart import MegatronBART
 
 from molbart.decoder import DecodeSampler
@@ -81,6 +80,12 @@ class MegaMolBART(BaseGenerativeWorkflow):
         self.tokenizer = self.load_tokenizer(model_args.vocab_file)
         self.model = self.load_model(self.tokenizer, DEFAULT_MAX_SEQ_LEN, model_args)
 
+    def _compute_radius(self, scaled_radius): # TODO REMOVE
+        if scaled_radius:
+            return float(scaled_radius * self.min_jitter_radius)
+        else:
+            return self.min_jitter_radius
+
     def load_tokenizer(self, tokenizer_vocab_path):
         """Load tokenizer from vocab file
 
@@ -130,7 +135,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         model.eval()
         return model
 
-    def smiles2embedding(self, model, smiles, tokenizer, pad_length=None):
+    def smiles2embedding(self, smiles, pad_length=None):
         """Calculate embedding and padding mask for smiles with optional extra padding
 
         Params
@@ -145,20 +150,20 @@ class MegaMolBART(BaseGenerativeWorkflow):
         if pad_length:
             assert pad_length >= len(smiles) + 2
 
-        tokens = tokenizer.tokenise([smiles], pad=True)
+        tokens = self.tokenizer.tokenise([smiles], pad=True)
 
         # Append to tokens and mask if appropriate
         if pad_length:
             for i in range(len(tokens['original_tokens'])):
                 n_pad = pad_length - len(tokens['original_tokens'][i])
-                tokens['original_tokens'][i] += [tokenizer.pad_token] * n_pad
+                tokens['original_tokens'][i] += [self.tokenizer.pad_token] * n_pad
                 tokens['masked_pad_masks'][i] += [1] * n_pad
 
-        token_ids = torch.tensor(tokenizer.convert_tokens_to_ids(tokens['original_tokens'])).cuda().T
+        token_ids = torch.tensor(self.tokenizer.convert_tokens_to_ids(tokens['original_tokens'])).cuda().T
         pad_mask = torch.tensor(tokens['masked_pad_masks']).bool().cuda().T
         encode_input = {"encoder_input": token_ids, "encoder_pad_mask": pad_mask}
 
-        embedding = model.encode(encode_input)
+        embedding = self.model.encode(encode_input)
         torch.cuda.empty_cache()
         return embedding, pad_mask
 
@@ -207,21 +212,17 @@ class MegaMolBART(BaseGenerativeWorkflow):
             list of interpolated smiles molecules
         """
 
-        pad_length = max(len(smiles1), len(smiles2)) + 2 # add 2 for start / stop
-        embedding1, pad_mask1 = self.smiles2embedding(self.model,
-                                                      smiles1,
-                                                      tokenizer,
+        pad_length = max(len(smiles1), len(smiles2)) + 2  # add 2 for start / stop
+        embedding1, pad_mask1 = self.smiles2embedding(smiles1,
                                                       pad_length=pad_length)
 
-        embedding2, pad_mask2 = self.smiles2embedding(self.model,
-                                                      smiles2,
-                                                      tokenizer,
+        embedding2, pad_mask2 = self.smiles2embedding(smiles2,
                                                       pad_length=pad_length)
 
-        scale = torch.linspace(0.0, 1.0, num_interp+2)[1:-1] # skip first and last because they're the selected molecules
+        scale = torch.linspace(0.0, 1.0, num_interp+2)[1:-1]  # skip first and last because they're the selected molecules
         scale = scale.unsqueeze(0).unsqueeze(-1).cuda()
 
-        interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda() # dims: batch, tokens, embedding
+        interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()  # dims: batch, tokens, embedding
         combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
 
         return self.inverse_transform(interpolated_emb, self.model, k=k, mem_pad_mask=combined_mask, sanitize=True), combined_mask
@@ -234,9 +235,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   force_unique=False):
         distance = self._compute_radius(scaled_radius)
 
-        embedding, pad_mask = self.smiles2embedding(self.model,
-                                                    smiles,
-                                                    self.tokenizer)
+        embedding, pad_mask = self.smiles2embedding(smiles)
 
         neighboring_embeddings = self.addjitter(embedding, distance, cnt=num_requested)
 
@@ -262,7 +261,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         generated_df = pd.DataFrame({'SMILES': generated_mols,
                                      'Generated': [True for i in range(len(generated_mols))]})
-        generated_df.iat[ 0, 1] = False
+        generated_df.iat[0, 1] = False
 
         if force_unique:
             inv_transform_funct = partial(self.inverse_transform,

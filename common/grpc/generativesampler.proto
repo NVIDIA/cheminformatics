@@ -10,13 +10,14 @@ package nvidia.cheminformatics.grpc;
 
 
 enum GenerativeModel {
-  CDDD = 0;,
+  CDDD = 0;
   MolBART = 1;
   MegaMolBART = 2;
 }
 
 
 service GenerativeSampler {
+  rpc SmilesToEmbedding(GenerativeSpec) returns (EmbeddingList) {};
   rpc FindSimilars(GenerativeSpec) returns (SmilesList) {};
   rpc Interpolate(GenerativeSpec) returns (SmilesList) {};
 }
@@ -27,9 +28,15 @@ message GenerativeSpec {
   repeated string smiles = 2;
   optional float radius = 3;
   optional int32 numRequested = 4;
+  optional int32 padding = 5;
 }
 
 
 message SmilesList {
   repeated string generatedSmiles = 1;
 }
+
+message EmbeddingList{
+  repeated float embedding = 1;
+}
+

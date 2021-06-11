@@ -1,8 +1,10 @@
-from nvidia.cheminformatics.utils.data_peddler import CDDD_DEFAULT_MODLE_LOC
+from nvidia.cheminformatics.utils.data_peddler import CDDD_DEFAULT_MODLE_LOC, download_cddd_models
+
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 import numpy as np
+import pandas as pd
 
 import logging
 from abc import ABC
@@ -11,9 +13,24 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from cddd.inference import InferenceModel
 
-from nvidia.cheminformatics.utils.data_peddler import download_cddd_models
-
 logger = logging.getLogger(__name__)
+
+
+def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles'):
+    """Calculate Morgan fingerprints on SMILES strings
+
+    Args:
+        dataframe (pd.DataFrame): dataframe containing a SMILES column for calculation
+
+    Returns:
+        pd.DataFrame: new dataframe containing fingerprints
+    """
+    mf = MorganFingerprint()
+    fp = mf.transform(dataframe, col_name=smiles_col)
+    fp = pd.DataFrame(fp)
+    fp.index = dataframe.index
+    return fp
+
 
 class TransformationDefaults(Enum):
     MorganFingerprint = {'radius':2, 'nBits':512}
@@ -43,8 +60,8 @@ class MorganFingerprint(BaseTransformation):
         self.kwargs.update(kwargs)
         self.func = AllChem.GetMorganFingerprintAsBitVect
 
-    def transform(self, data):
-        data = data['transformed_smiles']
+    def transform(self, data, col_name='transformed_smiles'):
+        data = data[col_name]
         fp_array = []
         for mol in data:
             m = Chem.MolFromSmiles(mol)

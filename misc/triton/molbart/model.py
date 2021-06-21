@@ -150,7 +150,7 @@ class TritonPythonModel:
             tokenizer_path: str, path to pickled tokenizer
 
         Returns:
-            MolEncTokeniser tokenizer object
+            MolEncTokenizer tokenizer object
         """
 
         tokenizer_path = Path(tokenizer_path)
@@ -165,7 +165,7 @@ class TritonPythonModel:
 
         Params:
             model_checkpoint_path: str, path to saved model checkpoint
-            tokenizer: MolEncTokeniser tokenizer object
+            tokenizer: MolEncTokenizer tokenizer object
             max_seq_len: int, maximum sequence length
 
         Returns:

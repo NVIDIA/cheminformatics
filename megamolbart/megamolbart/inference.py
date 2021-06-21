@@ -8,25 +8,20 @@ from typing import List
 from functools import partial
 from pathlib import Path
 
-from megatron_bart import MegatronBART
-from checkpointing import load_checkpoint
 from megatron.initialize import initialize_megatron
 from megatron import get_args
-from  megatron_molbart.megatron_bart import MegatronBART
 
-from molbart.decoder import DecodeSampler
-from molbart.tokeniser import MolEncTokeniser
+from megatron_bart import MegatronBART
+from checkpointing import load_checkpoint
+from decoder import DecodeSampler
+from tokenizer import MolEncTokenizer
+from util import (REGEX, DEFAULT_CHEM_TOKEN_START, DEFAULT_MAX_SEQ_LEN, 
+                  DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR, 
+                  DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS)
 
 from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 
 logger = logging.getLogger(__name__)
-
-# TODO add to model specific utility code
-REGEX = "\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|\(|\)|\.|=|#|-|\+|\\\\|\/|:|~|@|\?|>|\*|\$|\%[0-9]{2}|[0-9]"
-DEFAULT_CHEM_TOKEN_START = 272
-DEFAULT_MAX_SEQ_LEN = 512
-DEFAULT_VOCAB_PATH = '/models/megamolbart/bart_vocab.txt'
-CHECKPOINTS_DIR = '/models/megamolbart/checkpoints'
 
 
 @add_jitter.register(torch.Tensor)
@@ -55,30 +50,38 @@ def clean_smiles_list(smiles_list, standardize=True):
 
 class MegaMolBART(BaseGenerativeWorkflow):
 
-    def __init__(self) -> None:
+    def __init__(self, 
+                 max_seq_len=DEFAULT_MAX_SEQ_LEN,
+                 vocab_path=DEFAULT_VOCAB_PATH,
+                 regex=REGEX, 
+                 default_chem_token_start=DEFAULT_CHEM_TOKEN_START,
+                 checkpoints_dir=CHECKPOINTS_DIR,
+                 num_layers=DEFAULT_NUM_LAYERS, 
+                 hidden_size=DEFAULT_D_MODEL, 
+                 num_attention_heads=DEFAULT_NUM_HEADS,
+                 decoder_max_seq_len=None) -> None:
         super().__init__()
 
+        torch.set_grad_enabled(False) # Testing this instead of `with torch.no_grad():` context since it doesn't exit
+        
         self.device = 'cuda' # Megatron arg loading seems to only work with GPU
         self.min_jitter_radius = 2.1 # TODO adjust this once model is trained
-        self.max_seq_len = DEFAULT_MAX_SEQ_LEN
+        self.max_model_position_embeddings = max_seq_len
 
-        model_args = {
-                'num_layers': 4,
-                'hidden_size': 256,
-                'num_attention_heads': 8,
-                'max_position_embeddings': DEFAULT_MAX_SEQ_LEN,
+        args = {
+                'num_layers': num_layers,
+                'hidden_size': hidden_size,
+                'num_attention_heads': num_attention_heads,
+                'max_position_embeddings': self.max_model_position_embeddings,
                 'tokenizer_type': 'GPT2BPETokenizer',
-                'vocab_file': DEFAULT_VOCAB_PATH,
-                'load': CHECKPOINTS_DIR # this is the checkpoint path
+                'vocab_file': vocab_path,
+                'load': checkpoints_dir
             }
 
-        self.device = 'cuda' # Megatron arg loading seems to only work with GPU
-
-        torch.set_grad_enabled(False) # Testing this instead of `with torch.no_grad():` context since it doesn't exit
-        initialize_megatron(args_defaults=model_args)
-        model_args = get_args()
-        self.tokenizer = self.load_tokenizer(model_args.vocab_file)
-        self.model = self.load_model(self.tokenizer, DEFAULT_MAX_SEQ_LEN, model_args)
+        initialize_megatron(args_defaults=args, ignore_unknown_args=True)
+        args = get_args()
+        self.tokenizer = self.load_tokenizer(args.vocab_file, regex, default_chem_token_start)
+        self.model = self.load_model(args, self.tokenizer, decoder_max_seq_len)
 
     def _compute_radius(self, scaled_radius): # TODO REMOVE
         if scaled_radius:
@@ -86,30 +89,30 @@ class MegaMolBART(BaseGenerativeWorkflow):
         else:
             return self.min_jitter_radius
 
-    def load_tokenizer(self, tokenizer_vocab_path):
+    def load_tokenizer(self, tokenizer_vocab_path, regex, default_chem_token_start):
         """Load tokenizer from vocab file
 
         Params:
             tokenizer_vocab_path: str, path to tokenizer vocab
 
         Returns:
-            MolEncTokeniser tokenizer object
+            MolEncTokenizer tokenizer object
         """
 
         tokenizer_vocab_path = Path(tokenizer_vocab_path)
-        tokenizer = MolEncTokeniser.from_vocab_file(
+        tokenizer = MolEncTokenizer.from_vocab_file(
             tokenizer_vocab_path,
-            REGEX,
-            DEFAULT_CHEM_TOKEN_START)
+            regex,
+            default_chem_token_start)
 
         return tokenizer
 
-    def load_model(self, tokenizer, max_seq_len, args):
+    def load_model(self, args, tokenizer, decoder_max_seq_len=None):
         """Load saved model checkpoint
 
         Params:
-            tokenizer: MolEncTokeniser tokenizer object
-            max_seq_len: int, maximum sequence length
+            tokenizer: MolEncTokenizer tokenizer object
+            decoder_max_seq_len: int, maximum sequence length
             args: Megatron initialized arguments
 
         Returns:
@@ -118,7 +121,12 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         vocab_size = len(tokenizer)
         pad_token_idx = tokenizer.vocab[tokenizer.pad_token]
-        sampler = DecodeSampler(tokenizer, max_seq_len)
+
+        # TODO how to handle length overrun for batch processing
+        if not decoder_max_seq_len:
+            decoder_max_seq_len = args.max_position_embeddings 
+
+        sampler = DecodeSampler(tokenizer, decoder_max_seq_len)
         model = MegatronBART(
                             sampler,
                             pad_token_idx,
@@ -127,7 +135,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                             args.num_layers,
                             args.num_attention_heads,
                             args.hidden_size * 4,
-                            max_seq_len,
+                            args.max_position_embeddings,
                             dropout=0.1,
                             )
         load_checkpoint(model, None, None)
@@ -150,7 +158,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         if pad_length:
             assert pad_length >= len(smiles) + 2
 
-        tokens = self.tokenizer.tokenise([smiles], pad=True)
+        tokens = self.tokenizer.tokenize([smiles], pad=True)
 
         # Append to tokens and mask if appropriate
         if pad_length:
@@ -197,7 +205,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         return smiles_interp_list
 
-
     def interpolate_molecules(self, smiles1, smiles2, num_interp, tokenizer, k=1):
         """Interpolate between two molecules in embedding space.
 
@@ -205,7 +212,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
             smiles1: str, input SMILES molecule
             smiles2: str, input SMILES molecule
             num_interp: int, number of molecules to interpolate
-            tokenizer: MolEncTokeniser tokenizer object
+            tokenizer: MolEncTokenizer tokenizer object
             k: number of molecules for beam search, default 1. Can increase if there are issues with validity
 
         Returns
@@ -227,7 +234,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         return self.inverse_transform(interpolated_emb, self.model, k=k, mem_pad_mask=combined_mask, sanitize=True), combined_mask
 
-
     def find_similars_smiles_list(self,
                                   smiles:str,
                                   num_requested:int=10,
@@ -244,7 +250,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         generated_mols = [smiles] + generated_mols
         return generated_mols, neighboring_embeddings, pad_mask
-
 
     def find_similars_smiles(self,
                              smiles:str,

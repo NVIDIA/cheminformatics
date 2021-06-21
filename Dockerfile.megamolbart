@@ -29,6 +29,7 @@ RUN cd /tmp/apex/ \
         --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
 ## PySMILES
+# TODO: Replace the following lines once the repo is available.
 RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
     http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
     && tar xzf /tmp/pysmilesutils-mirror.tgz -C /opt \
@@ -39,7 +40,7 @@ RUN git clone https://${GITHUB_ACCESS_TOKEN}@${MEGAMOLBART_REPO} --branch ${MEGA
     && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
     && cd /opt/MolBART; pip install .
 
-## Megatron-MolBART checkpoint -- TODO: remove these
+## Megatron-MolBART checkpoint -- TODO: update checkpoint
 RUN mkdir -p /models/megamolbart \
     && wget --quiet -O /tmp/megamolbart_checkpoints_20210427.tgz \
     http://rilango-work.nvidia.com/megatron_molbart/megamolbart_checkpoints_20210427.tgz \

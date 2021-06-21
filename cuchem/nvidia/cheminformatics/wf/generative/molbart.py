@@ -1,3 +1,5 @@
+# TODO: Remove MolBART references once MegaMolBART is complete ?
+
 import logging
 import numpy as np
 import pandas as pd
@@ -55,7 +57,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
             tokenizer_path: str, path to pickled tokenizer
 
         Returns:
-            MolEncTokeniser tokenizer object
+            MolEncTokenizer tokenizer object
         """
 
         tokenizer_path = Path(tokenizer_path)
@@ -70,7 +72,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         Params:
             model_checkpoint_path: str, path to saved model checkpoint
-            tokenizer: MolEncTokeniser tokenizer object
+            tokenizer: MolEncTokenizer tokenizer object
             max_seq_len: int, maximum sequence length
 
         Returns:
@@ -93,7 +95,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         Params
             smiles: string, input SMILES molecule
-            tokenizer: MolEncTokeniser tokenizer object
+            tokenizer: MolEncTokenizer tokenizer object
             pad_length: optional extra
 
         Returns
@@ -104,7 +106,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         if pad_length:
             assert pad_length >= len(smiles) + 2
 
-        tokens = tokenizer.tokenise([smiles], pad=True)
+        tokens = tokenizer.tokenize([smiles], pad=True)
 
         # Append to tokens and mask if appropriate
         if pad_length:
@@ -129,7 +131,7 @@ class MolBART(BaseGenerativeWorkflow, metaclass=Singleton):
             smiles1: str, input SMILES molecule
             smiles2: str, input SMILES molecule
             num_interp: int, number of molecules to interpolate
-            tokenizer: MolEncTokeniser tokenizer object
+            tokenizer: MolEncTokenizer tokenizer object
             k: number of molecules for beam search, default 1. Can increase if there are issues with validity
 
         Returns

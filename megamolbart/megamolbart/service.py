@@ -12,10 +12,12 @@ logger = logging.getLogger(__name__)
 class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
 
     def __init__(self, *args, **kwargs):
-        self.megamolbart = MegaMolBART()
+        decoder_max_seq_len = kwargs['decoder_max_seq_len'] if 'decoder_max_seq_len' in kwargs else None
+        self.megamolbart = MegaMolBART(decoder_max_seq_len=decoder_max_seq_len)
 
 
     # TODO update to accept batched input if similes2embedding does
+    # TODO how to handle length overrun for batch processing --> see also MegaMolBART.load_model in inference.py
     def SmilesToEmbedding(self, spec, context):
 
         smile_str = ''.join(spec.smiles)

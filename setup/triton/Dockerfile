@@ -10,11 +10,13 @@ RUN wget  --quiet -O /tmp/pysmilesutils-mirror.tgz \
     && tar -xf /tmp/pysmilesutils-mirror.tgz -C /opt \
     && cd /opt/pysmilesutils-mirror; pip install .
 
+# TODO: Remove once MegaMolBART is complete ?
 RUN wget  --quiet -O /tmp/molbart-mirror.tgz \
     http://rilango-work.nvidia.com/molbart/molbart-mirror.tgz \
     && tar -xf /tmp/molbart-mirror.tgz -C /opt \
     && cd /opt/molbart-mirror; pip install -r requirements.txt; pip install .
 
+# TODO: Remove once MegaMolBART is complete ?
 RUN mkdir -p /models/molbart \
     && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
     http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \

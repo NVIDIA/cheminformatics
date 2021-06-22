@@ -148,6 +148,58 @@ class ChEmblData(object, metaclass=Singleton):
             cur.execute(select_stmt)
             return cur.fetchall()
 
+    def fetch_approved_drugs(self):
+        """Fetch approved drugs with phase >=3 as dataframe
+
+        Args:
+            chembl_db_path (string): path to chembl sqlite database
+        Returns:
+            pd.DataFrame: dataframe containing SMILES strings and molecule index
+        """
+        logger.debug('Fetching ChEMBL approved drugs...')
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+                closing(con.cursor()) as cur:
+            select_stmt = """SELECT
+                di.molregno,
+                cs.canonical_smiles,
+                di.max_phase_for_ind
+            FROM
+                drug_indication AS di
+            LEFT JOIN compound_structures AS cs ON di.molregno = cs.molregno
+            WHERE
+                di.max_phase_for_ind >= 3
+                AND cs.canonical_smiles IS NOT NULL;"""
+            cur.execute(select_stmt)
+            return cur.fetchall()
+
+    def fetch_random_samples(self, num_samples, max_len):
+        """Fetch random samples from ChEMBL as dataframe
+
+        Args:
+            num_samples (int): number of samples to select
+            chembl_db_path (string): path to chembl sqlite database
+        Returns:
+            pd.DataFrame: dataframe containing SMILES strings and molecule index
+        """
+        logger.debug('Fetching ChEMBL random samples...')
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+                closing(con.cursor()) as cur:
+            select_stmt = """SELECT 
+                cs.molregno, 
+                cs.canonical_smiles,
+                LENGTH(cs.canonical_smiles) as len
+            FROM 
+                compound_structures AS cs
+            WHERE 
+                cs.canonical_smiles IS NOT NULL
+            AND
+                len <= """ + f'{max_len}' + """
+            ORDER BY RANDOM() 
+            LIMIT """ + f'{num_samples};'
+
+            cur.execute(select_stmt)
+            return cur.fetchall()
+
     def fetch_molecule_cnt(self):
         logger.debug('Finding number of molecules...')
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \

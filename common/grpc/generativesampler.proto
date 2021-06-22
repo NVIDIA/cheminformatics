@@ -20,6 +20,7 @@ service GenerativeSampler {
   rpc SmilesToEmbedding(GenerativeSpec) returns (EmbeddingList) {};
   rpc FindSimilars(GenerativeSpec) returns (SmilesList) {};
   rpc Interpolate(GenerativeSpec) returns (SmilesList) {};
+  rpc GetIteration(GenerativeSpec) returns (IterationVal) {};
 }
 
 
@@ -40,3 +41,6 @@ message EmbeddingList{
   repeated float embedding = 1;
 }
 
+message IterationVal{
+  int32 iteration = 1;
+}

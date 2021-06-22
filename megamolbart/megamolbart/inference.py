@@ -138,7 +138,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                             args.max_position_embeddings,
                             dropout=0.1,
                             )
-        load_checkpoint(model, None, None)
+        self.iteration = load_checkpoint(model, None, None)
         model = model.cuda()
         model.eval()
         return model

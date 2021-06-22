@@ -29,6 +29,11 @@ class GenerativeSamplerStub(object):
                 request_serializer=generativesampler__pb2.GenerativeSpec.SerializeToString,
                 response_deserializer=generativesampler__pb2.SmilesList.FromString,
                 )
+        self.GetIteration = channel.unary_unary(
+                '/nvidia.cheminformatics.grpc.GenerativeSampler/GetIteration',
+                request_serializer=generativesampler__pb2.GenerativeSpec.SerializeToString,
+                response_deserializer=generativesampler__pb2.IterationVal.FromString,
+                )
 
 
 class GenerativeSamplerServicer(object):
@@ -52,6 +57,12 @@ class GenerativeSamplerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetIteration(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_GenerativeSamplerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -69,6 +80,11 @@ def add_GenerativeSamplerServicer_to_server(servicer, server):
                     servicer.Interpolate,
                     request_deserializer=generativesampler__pb2.GenerativeSpec.FromString,
                     response_serializer=generativesampler__pb2.SmilesList.SerializeToString,
+            ),
+            'GetIteration': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetIteration,
+                    request_deserializer=generativesampler__pb2.GenerativeSpec.FromString,
+                    response_serializer=generativesampler__pb2.IterationVal.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -128,5 +144,22 @@ class GenerativeSampler(object):
         return grpc.experimental.unary_unary(request, target, '/nvidia.cheminformatics.grpc.GenerativeSampler/Interpolate',
             generativesampler__pb2.GenerativeSpec.SerializeToString,
             generativesampler__pb2.SmilesList.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetIteration(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nvidia.cheminformatics.grpc.GenerativeSampler/GetIteration',
+            generativesampler__pb2.GenerativeSpec.SerializeToString,
+            generativesampler__pb2.IterationVal.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

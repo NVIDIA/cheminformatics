@@ -1,3 +1,4 @@
+import os
 import generativesampler_pb2
 from rdkit import Chem
 import numpy as np
@@ -6,6 +7,10 @@ import cupy
 from cuml.metrics import pairwise_distances
 from nvidia.cheminformatics.utils.metrics import spearmanr
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+from nvidia.cheminformatics.utils.dataset import ZINC_TRIE_DIR, generate_trie_filename
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def sanitized_smiles(smiles):
@@ -17,6 +22,18 @@ def sanitized_smiles(smiles):
     else:
         return np.NaN
 
+
+def get_model_iteration(stub):
+    """Get Model iteration"""
+    spec = generativesampler_pb2.GenerativeSpec(
+        model=generativesampler_pb2.GenerativeModel.MegaMolBART,
+        smiles="CCC", # all are dummy vars for this calculation
+        radius=0.0001,
+        numRequested=1,
+        padding=0)
+
+    result = stub.GetIteration(spec)
+    return result.iteration
 
 class Metric():
     def __init__(self):
@@ -33,7 +50,7 @@ class Metric():
         metric_result = list()
         for index in range(len(smiles_dataset.data)):
             smiles = smiles_dataset.data.iloc[index]
-            print('           SMILES', index, smiles)
+            logger.info(f'SMILES: {smiles}')
             result = self.sample(smiles, num_samples, func, radius)
             metric_result.append(result)
         return np.array(metric_result)
@@ -41,7 +58,7 @@ class Metric():
     def calculate(self, smiles, num_samples, func, radius):
         metric_array = self.sample_many(smiles, num_samples, func, radius)
         metric = self.calculate_metric(metric_array, num_samples)
-        return pd.Series({self.name:metric, 'radius':radius, 'num_samples':num_samples})
+        return pd.Series({'name': self.name, 'value': metric, 'radius': radius, 'num_samples': num_samples})
 
 
 class Validity(Metric):
@@ -85,14 +102,49 @@ class Unique(Metric):
         result = len(pd.Series([sanitized_smiles(x) for x in result]).dropna().unique())
         return result
 
-    def calculate_metric(self, metric_array, num_samples):
-        total_samples = len(metric_array) * num_samples
-        return np.nansum(metric_array) / float(total_samples)
 
+class Novelty(Metric):
+    def __init__(self):
+        self.name = 'novelty'
 
+    def smiles_in_train(self, smiles):
+        """Determine if smiles was in training dataset"""
+        in_train = False
+
+        filename = generate_trie_filename(smiles)
+        trie_path = os.path.join(ZINC_TRIE_DIR, 'train', filename)
+        if os.path.exists(trie_path):
+            with open(trie_path, 'r') as fh:
+                smiles_list = fh.readlines()
+            smiles_list = [x.strip() for x in smiles_list]
+            in_train = smiles in smiles_list
+        else:
+            #logger.warn(f'Trie file {filename} not found.')
+            in_train = False
+
+        return in_train
+            
+    def sample(self, smiles, num_samples, func, radius):
+        spec = generativesampler_pb2.GenerativeSpec(
+                model=generativesampler_pb2.GenerativeModel.MegaMolBART,
+                smiles=smiles,
+                radius=radius,
+                numRequested=num_samples)
+
+        result = func(spec)
+        result = result.generatedSmiles[1:]
+
+        if isinstance(smiles, list):
+            result = result[:-1]
+        assert len(result) == num_samples
+
+        result = pd.Series([sanitized_smiles(x) for x in result]).dropna()
+        result = sum([self.smiles_in_train(x) for x in result])
+        return result
+
+        
 class NearestNeighborCorrelation(Metric):
     """Sperman's Rho for correlation of pairwise Tanimoto distances vs Euclidean distance from embeddings"""
-    # TODO return padding array and zero out padded values
     
     def __init__(self):
         self.name = 'nearest neighbor correlation'
@@ -143,4 +195,5 @@ class NearestNeighborCorrelation(Metric):
     def calculate(self, smiles_dataset, fingerprint_dataset, stub, top_k=None):
         embeddings = self.sample_many(smiles_dataset, stub)
         metric = self.calculate_metric(embeddings, fingerprint_dataset, top_k)
-        return pd.Series({self.name:cupy.nanmean(metric), 'top_k':top_k})
+        metric = cupy.nanmean(metric)
+        return pd.Series({'name': self.name, 'value': metric, 'top_k':top_k})

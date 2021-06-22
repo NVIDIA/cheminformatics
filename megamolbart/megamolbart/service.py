@@ -8,12 +8,18 @@ from megamolbart.inference import MegaMolBART
 
 logger = logging.getLogger(__name__)
 
-
 class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
 
     def __init__(self, *args, **kwargs):
         decoder_max_seq_len = kwargs['decoder_max_seq_len'] if 'decoder_max_seq_len' in kwargs else None
         self.megamolbart = MegaMolBART(decoder_max_seq_len=decoder_max_seq_len)
+
+        try:
+            iteration = int(self.megamolbart.iteration)
+        except:
+            iteration = 0
+        self.iteration = iteration
+        logger.info(f'Loaded iteration {self.iteration}')
 
 
     # TODO update to accept batched input if similes2embedding does
@@ -51,4 +57,8 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
                     num_points=spec.numRequested,
                     scaled_radius=spec.radius)
         return generativesampler_pb2.SmilesList(generatedSmiles=generated_smiles)
+
+
+    def GetIteration(self, spec, context):
+        return generativesampler_pb2.IterationVal(iteration=self.iteration)
 

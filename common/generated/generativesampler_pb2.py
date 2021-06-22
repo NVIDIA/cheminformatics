@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x17generativesampler.proto\x12\x1bnvidia.cheminformatics.grpc\"\xcb\x01\n\x0eGenerativeSpec\x12;\n\x05model\x18\x01 \x01(\x0e\x32,.nvidia.cheminformatics.grpc.GenerativeModel\x12\x0e\n\x06smiles\x18\x02 \x03(\t\x12\x13\n\x06radius\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x19\n\x0cnumRequested\x18\x04 \x01(\x05H\x01\x88\x01\x01\x12\x14\n\x07padding\x18\x05 \x01(\x05H\x02\x88\x01\x01\x42\t\n\x07_radiusB\x0f\n\r_numRequestedB\n\n\x08_padding\"%\n\nSmilesList\x12\x17\n\x0fgeneratedSmiles\x18\x01 \x03(\t\"\"\n\rEmbeddingList\x12\x11\n\tembedding\x18\x01 \x03(\x02*9\n\x0fGenerativeModel\x12\x08\n\x04\x43\x44\x44\x44\x10\x00\x12\x0b\n\x07MolBART\x10\x01\x12\x0f\n\x0bMegaMolBART\x10\x02\x32\xd2\x02\n\x11GenerativeSampler\x12n\n\x11SmilesToEmbedding\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a*.nvidia.cheminformatics.grpc.EmbeddingList\"\x00\x12\x66\n\x0c\x46indSimilars\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x65\n\x0bInterpolate\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\x17generativesampler.proto\x12\x1bnvidia.cheminformatics.grpc\"\xcb\x01\n\x0eGenerativeSpec\x12;\n\x05model\x18\x01 \x01(\x0e\x32,.nvidia.cheminformatics.grpc.GenerativeModel\x12\x0e\n\x06smiles\x18\x02 \x03(\t\x12\x13\n\x06radius\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x19\n\x0cnumRequested\x18\x04 \x01(\x05H\x01\x88\x01\x01\x12\x14\n\x07padding\x18\x05 \x01(\x05H\x02\x88\x01\x01\x42\t\n\x07_radiusB\x0f\n\r_numRequestedB\n\n\x08_padding\"%\n\nSmilesList\x12\x17\n\x0fgeneratedSmiles\x18\x01 \x03(\t\"\"\n\rEmbeddingList\x12\x11\n\tembedding\x18\x01 \x03(\x02\"!\n\x0cIterationVal\x12\x11\n\titeration\x18\x01 \x01(\x05*9\n\x0fGenerativeModel\x12\x08\n\x04\x43\x44\x44\x44\x10\x00\x12\x0b\n\x07MolBART\x10\x01\x12\x0f\n\x0bMegaMolBART\x10\x02\x32\xbc\x03\n\x11GenerativeSampler\x12n\n\x11SmilesToEmbedding\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a*.nvidia.cheminformatics.grpc.EmbeddingList\"\x00\x12\x66\n\x0c\x46indSimilars\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x65\n\x0bInterpolate\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12h\n\x0cGetIteration\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a).nvidia.cheminformatics.grpc.IterationVal\"\x00\x62\x06proto3'
 )
 
 _GENERATIVEMODEL = _descriptor.EnumDescriptor(
@@ -48,8 +48,8 @@ _GENERATIVEMODEL = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=337,
-  serialized_end=394,
+  serialized_start=372,
+  serialized_end=429,
 )
 _sym_db.RegisterEnumDescriptor(_GENERATIVEMODEL)
 
@@ -198,6 +198,38 @@ _EMBEDDINGLIST = _descriptor.Descriptor(
   serialized_end=335,
 )
 
+
+_ITERATIONVAL = _descriptor.Descriptor(
+  name='IterationVal',
+  full_name='nvidia.cheminformatics.grpc.IterationVal',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  create_key=_descriptor._internal_create_key,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='iteration', full_name='nvidia.cheminformatics.grpc.IterationVal.iteration', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  serialized_options=None,
+  is_extendable=False,
+  syntax='proto3',
+  extension_ranges=[],
+  oneofs=[
+  ],
+  serialized_start=337,
+  serialized_end=370,
+)
+
 _GENERATIVESPEC.fields_by_name['model'].enum_type = _GENERATIVEMODEL
 _GENERATIVESPEC.oneofs_by_name['_radius'].fields.append(
   _GENERATIVESPEC.fields_by_name['radius'])
@@ -211,6 +243,7 @@ _GENERATIVESPEC.fields_by_name['padding'].containing_oneof = _GENERATIVESPEC.one
 DESCRIPTOR.message_types_by_name['GenerativeSpec'] = _GENERATIVESPEC
 DESCRIPTOR.message_types_by_name['SmilesList'] = _SMILESLIST
 DESCRIPTOR.message_types_by_name['EmbeddingList'] = _EMBEDDINGLIST
+DESCRIPTOR.message_types_by_name['IterationVal'] = _ITERATIONVAL
 DESCRIPTOR.enum_types_by_name['GenerativeModel'] = _GENERATIVEMODEL
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -235,6 +268,13 @@ EmbeddingList = _reflection.GeneratedProtocolMessageType('EmbeddingList', (_mess
   })
 _sym_db.RegisterMessage(EmbeddingList)
 
+IterationVal = _reflection.GeneratedProtocolMessageType('IterationVal', (_message.Message,), {
+  'DESCRIPTOR' : _ITERATIONVAL,
+  '__module__' : 'generativesampler_pb2'
+  # @@protoc_insertion_point(class_scope:nvidia.cheminformatics.grpc.IterationVal)
+  })
+_sym_db.RegisterMessage(IterationVal)
+
 
 
 _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
@@ -244,8 +284,8 @@ _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=397,
-  serialized_end=735,
+  serialized_start=432,
+  serialized_end=876,
   methods=[
   _descriptor.MethodDescriptor(
     name='SmilesToEmbedding',
@@ -274,6 +314,16 @@ _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
     containing_service=None,
     input_type=_GENERATIVESPEC,
     output_type=_SMILESLIST,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
+    name='GetIteration',
+    full_name='nvidia.cheminformatics.grpc.GenerativeSampler.GetIteration',
+    index=3,
+    containing_service=None,
+    input_type=_GENERATIVESPEC,
+    output_type=_ITERATIONVAL,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),

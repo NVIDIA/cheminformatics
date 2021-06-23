@@ -188,7 +188,7 @@ build() {
     DATE=$(date +%y%m%d)
 
     echo "Building ${CUCHEM_CONT}..."
-    docker build --no-cache --network host \
+    docker build --network host \
         -t ${CUCHEM_CONT}:latest \
         -t ${CUCHEM_CONT}:${DATE} \
         -f Dockerfile.cuchem .

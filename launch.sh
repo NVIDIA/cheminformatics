@@ -188,7 +188,7 @@ build() {
     DATE=$(date +%y%m%d)
 
     echo "Building ${CUCHEM_CONT}..."
-    docker build --no-cache --network host \
+    docker build --network host \
         -t ${CUCHEM_CONT}:latest \
         -t ${CUCHEM_CONT}:${DATE} \
         -f Dockerfile.cuchem .
@@ -231,6 +231,7 @@ dev() {
     local CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
 
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
+        DOCKER_CMD="${DOCKER_CMD} -v /home/mgill/storage/data/az/megamolbart/checkpoints/megatron:/models/megamolbart/checkpoints"
         CONT=${MEGAMOLBART_SERVICE_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
     fi
 

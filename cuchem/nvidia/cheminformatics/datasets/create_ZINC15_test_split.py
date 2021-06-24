@@ -28,7 +28,7 @@ from rdkit.Chem.Crippen import MolLogP
 from rdkit.Chem.Descriptors import ExactMolWt
 from rdkit import Chem
 
-DATA_BENCHMARK_DIR = '/workspace/cuchem/tests/data'
+DATA_BENCHMARK_DIR = '/workspace/cuchem/nvidia/cheminformatics/data'
 NUM_PROCESSES = (mp.cpu_count() * 2) - 1 # --> max num proceses, but needs more memory
 NUM_DATA = 20000
 
@@ -50,8 +50,9 @@ if __name__ == '__main__':
     for fil in zinc_test_filelist:
         benchmark_df.append(pd.read_csv(fil, names=['canonical_smiles']))
     benchmark_df = pd.concat(benchmark_df, axis=0).reset_index(drop=True)
-    assert NUM_DATA <= len(benchmark_df)
     benchmark_df = benchmark_df.sample(n=NUM_DATA, replace=False, random_state=0).reset_index(drop=True)
+    assert NUM_DATA <= len(benchmark_df)
+    benchmark_df['length'] = benchmark_df['canonical_smiles'].map(len)
 
     # Calculate properties -- parallelized
     pool = mp.Pool(processes=NUM_PROCESSES)
@@ -60,15 +61,17 @@ if __name__ == '__main__':
     outputs = pool.map(calc_properties, chunks)
     outputs = pd.concat(outputs, axis=0).reset_index(drop=True)
     benchmark_df = pd.concat([benchmark_df, outputs], axis=1)
+    benchmark_df.index.name = 'index'
 
     fp = calc_morgan_fingerprints(benchmark_df[['canonical_smiles']])
     fp.columns = fp.columns.astype(np.int64)
     fp.index = fp.index.astype(np.int64)
+    fp.index.name = 'index'
     for col in fp.columns:
         fp[col] = fp[col].astype(np.float32)
 
     # Write results
-    benchmark_df.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_zinc15_test.csv'))
-    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_zinc15_test.csv'))
+    benchmark_df.reset_index().to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_zinc15_test.csv'), index=False)
+    fp.reset_index().to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_zinc15_test.csv'), index=False)
     # fp_hdf5 = cudf.DataFrame(fp)
     # fp_hdf5.to_hdf(os.path.join(DATA_BENCHMARK_DIR, 'filter_00.h5', 'fingerprints', format='table'))

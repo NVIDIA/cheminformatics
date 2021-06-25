@@ -25,12 +25,13 @@ ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
 
-# TODO: Replace the following lines once the repo is available.
+# TODO: Replace the following lines once the PySMILES repo is available.
 RUN wget  --quiet -O /tmp/pysmilesutils-mirror.tgz \
     http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
     && tar -xf /tmp/pysmilesutils-mirror.tgz -C /opt \
     && cd /opt/pysmilesutils-mirror; pip install .
 
+# MolBART
 # TODO: Remove once MegaMolBART is complete
 RUN wget  --quiet -O /tmp/molbart-mirror.tgz \
     http://rilango-work.nvidia.com/molbart/molbart-mirror.tgz \

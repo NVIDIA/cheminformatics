@@ -1,52 +1,5 @@
-FROM nvcr.io/nvidia/pytorch:20.11-py3
-ARG GITHUB_ACCESS_TOKEN
-ARG MEGAMOLBART_REPO="github.com/MolecularAI/MolBART.git"
-ARG MEGAMOLBART_BRANCH="megatron-molbart-with-zinc"
-
-ENV UCX_LOG_LEVEL error
-ENV PATH /opt/conda/bin:$PATH
-ENV CUDA_HOME /usr/local/cuda
-SHELL ["/bin/bash", "-c"]
-RUN echo "source activate base" > /etc/bash.bashrc
-
-RUN apt update && DEBIAN_FRONTEND=noninteractive \
-    && apt-get install -y wget git unzip tmux vim libxrender1 \
-    && rm -rf /var/lib/apt/lists/*
-
-## Environment setup -- original installation
-# RUN conda install -n base -c rdkit rdkit pandas==1.1.3 matplotlib numpy \
-#     && conda clean -ay
-# RUN conda run -n base pip install pytorch_lightning==1.1.0 pytest pytest-order pybind11==2.6.2 six==1.15.0 regex deepspeed==0.3.10
-## Environment setup
-COPY megamolbart/conda/env.yml /tmp/.
-RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
-
-## Apex
-RUN cd /tmp && git clone https://github.com/NVIDIA/apex
-RUN cd /tmp/apex/ \
-    && /opt/conda/bin/python3 -m pip install -v \
-        --disable-pip-version-check --no-cache-dir \
-        --global-option="--cpp_ext" --global-option="--cuda_ext" ./
-
-## PySMILES
-# TODO: Replace the following lines once the repo is available.
-RUN wget --quiet -O /tmp/pysmilesutils-mirror.tgz \
-    http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
-    && tar xzf /tmp/pysmilesutils-mirror.tgz -C /opt \
-    && cd /opt/pysmilesutils-mirror; pip install .
-
-## MegaMolBART code and weights
-RUN git clone https://${GITHUB_ACCESS_TOKEN}@${MEGAMOLBART_REPO} --branch ${MEGAMOLBART_BRANCH} /opt/MolBART \
-    && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
-    && cd /opt/MolBART; pip install .
-
-## Megatron-MolBART checkpoint -- TODO: update checkpoint
-RUN mkdir -p /models/megamolbart \
-    && wget --quiet -O /tmp/megamolbart_checkpoints_20210427.tgz \
-    http://rilango-work.nvidia.com/megatron_molbart/megamolbart_checkpoints_20210427.tgz \
-    && cp /opt/MolBART/bart_vocab.txt /models/megamolbart/bart_vocab.txt \
-    && tar xzf /tmp/megamolbart_checkpoints_20210427.tgz -C /models/megamolbart
-ENV PYTHONPATH /opt/MolBART/megatron_molbart:/opt/MolBART
+ARG SOURCE_CONTAINER
+FROM ${SOURCE_CONTAINER}
 
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 

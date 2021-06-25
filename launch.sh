@@ -60,15 +60,17 @@ variables:
     CUCHEM_CONT
         container image, prepended with registry. e.g.,
         cheminformatics_demo:latest
-    MEGAMOLBART_CONT
-        container image, prepended with registry. e.g.,
-        cheminformatics_megamolbart:latest
-    DATA_PATH
-        path to data directory. e.g.,
-        /scratch/data/cheminformatics
+    MEGAMOLBART_TRAINING_CONT
+        container image for MegaMolBART training, prepended with registry. e.g.,
+        Note that this is a separate (precursor) container from any service associated containers
+    MEGAMOLBART_SERVICE_CONT
+        container image for MegaMolBART service, prepended with registry.
     PROJECT_PATH
         path to repository. e.g.,
         /home/user/projects/cheminformatics
+    DATA_PATH
+        path to data directory. e.g.,
+        /scratch/data/cheminformatics
     REGISTRY_ACCESS_TOKEN
         container registry access token. e.g.,
         Ckj53jGK...
@@ -107,13 +109,14 @@ fi
 ###############################################################################
 
 CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
-MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
-JUPYTER_PORT=${JUPYTER_PORT:-9000}
-PLOTLY_PORT=${PLOTLY_PORT:-5000}
-DASK_PORT=${DASK_PORT:-9001}
+MEGAMOLBART_TRAINING_CONT=${MEGAMOLBART_TRAINING_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest}
+MEGAMOLBART_SERVICE_CONT=${MEGAMOLBART_SERVICE_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart:latest}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
 DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
+JUPYTER_PORT=${JUPYTER_PORT:-9000}
+PLOTLY_PORT=${PLOTLY_PORT:-5000}
+DASK_PORT=${DASK_PORT:-9001}
 GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN:=""}
 
 ###############################################################################
@@ -125,12 +128,12 @@ GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN:=""}
 if [ $write_env -eq 1 ]; then
     echo CUCHEM_CONT=${CUCHEM_CONT} >> $LOCAL_ENV
     echo MEGAMOLBART_CONT=${MEGAMOLBART_CONT} >> $LOCAL_ENV
-    echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
-    echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
-    echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
     echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
     echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
     echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
+    echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
+    echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
+    echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
 fi
 
 ###############################################################################
@@ -190,12 +193,13 @@ build() {
         -t ${CUCHEM_CONT}:${DATE} \
         -f Dockerfile.cuchem .
 
-    echo "Building ${MEGAMOLBART_CONT}..."
+    echo "Building ${MEGAMOLBART_SERVICE_CONT}..."
     docker build --no-cache --network host \
-        -t ${MEGAMOLBART_CONT}:latest \
-        -t ${MEGAMOLBART_CONT}:${DATE} \
+        -t ${MEGAMOLBART_SERVICE_CONT}:latest \
+        -t ${MEGAMOLBART_SERVICE_CONT}:${DATE} \
+        --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT}:latest \
         -f Dockerfile.megamolbart \
-        --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} .
+        .
 
     set +e
     exit
@@ -205,9 +209,9 @@ build() {
 push() {
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
     docker push ${CUCHEM_CONT}:latest
-    docker push ${MEGAMOLBART_CONT}:latest
     docker push ${CUCHEM_CONT}:${DATE}
-    docker push ${MEGAMOLBART_CONT}:${DATE}
+    docker push ${MEGAMOLBART_SERVICE_CONT}:latest
+    docker push ${MEGAMOLBART_SERVICE_CONT}:${DATE}
     exit
 }
 
@@ -215,7 +219,7 @@ push() {
 pull() {
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
     docker pull ${CUCHEM_CONT}
-    docker pull ${MEGAMOLBART_CONT}
+    docker pull ${MEGAMOLBART_SERVICE_CONT}
     exit
 }
 
@@ -227,7 +231,7 @@ dev() {
     local CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
 
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
-        CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
+        CONT=${MEGAMOLBART_SERVICE_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
     fi
 
     set -x

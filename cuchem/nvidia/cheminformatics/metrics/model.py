@@ -4,13 +4,14 @@ from rdkit import Chem
 import numpy as np
 import pandas as pd
 import cupy
+import cudf
 from cuml.metrics import pairwise_distances
-from cuml import LinearRegression, ElasticNet
-from cuml.ensemble.randomforestregressor import RandomForestRegressor
+from sklearn.model_selection import ParameterGrid, KFold
 from cuml.metrics.regression import mean_squared_error
 from nvidia.cheminformatics.utils.metrics import spearmanr
 from nvidia.cheminformatics.utils.distance import tanimoto_calculate
 from nvidia.cheminformatics.utils.dataset import ZINC_TRIE_DIR, generate_trie_filename
+from functools import lru_cache
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,7 @@ def get_model_iteration(stub):
 
     result = stub.GetIteration(spec)
     return result.iteration
+
 
 class BaseSampleMetric():
     """Base class for metrics based on sampling for a single SMILES string"""
@@ -70,7 +72,7 @@ class BaseEmbeddingMetric():
     def __init__(self):
         self.name = None
 
-    def sample(self, smiles, max_len, stub):
+    def sample(self, smiles, max_len, stub, zero_padded_vals, average_tokens):
 
         spec = generativesampler_pb2.GenerativeSpec(
                 model=generativesampler_pb2.GenerativeModel.MegaMolBART,
@@ -80,24 +82,30 @@ class BaseEmbeddingMetric():
                 padding=max_len)
 
         result = stub.SmilesToEmbedding(spec)
-        # Shape is the first two values -- not needed           
+        shape = [int(x) for x in result.embedding[:2]]
+        assert shape[0] == max_len
         embedding = cupy.array(result.embedding[2:])
 
-        # Zero out padded values
-        embedding = embedding.reshape(max_len, -1)
-        embedding[len(smiles):, :] = 0.0
-        
-        embedding = embedding.flatten()
+        embedding = embedding.reshape(shape)
+        if zero_padded_vals:
+            embedding[len(smiles):, :] = 0.0
+
+        if average_tokens:
+            embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
+            assert embedding.shape[0] == shape[-1]
+        else:
+            embedding = embedding.flatten()
         return embedding
 
     def calculate_metric(self):
         raise NotImplemented
 
-    def sample_many(self, smiles_dataset, stub):
+    @lru_cache(maxsize=None)
+    def sample_many(self, smiles_dataset, stub, zero_padded_vals=True, average_tokens=False):
         # Calculate pairwise distances for embeddings
         embeddings = []
         for smiles in smiles_dataset.data.to_pandas():
-            embedding = self.sample(smiles, smiles_dataset.max_len, stub)
+            embedding = self.sample(smiles, smiles_dataset.max_len, stub, zero_padded_vals, average_tokens)
             embeddings.append(embedding)
         
         return cupy.asarray(embeddings)
@@ -194,23 +202,26 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
     def __init__(self):
         self.name = 'nearest neighbor correlation'
 
-    def calculate_metric(self, embeddings, fingerprint_dataset, top_k=None):
+    def calculate_metric(self, embeddings, fingerprints, top_k=None):
         embeddings_dist = pairwise_distances(embeddings)
         del embeddings
 
-        # Calculate pairwise distances for fingerprints
-        fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
-        fingerprints = cupy.asarray(fingerprints, order='C')
         fingerprints_dist = tanimoto_calculate(fingerprints, calc_distance=True)
-        del fingerprints, fingerprint_dataset
+        del fingerprints
 
         corr = spearmanr(fingerprints_dist, embeddings_dist, top_k)
         return corr
 
     def calculate(self, smiles_dataset, fingerprint_dataset, stub, top_k=None):
-        embeddings = self.sample_many(smiles_dataset, stub)
-        metric = self.calculate_metric(embeddings, fingerprint_dataset, top_k)
+        embeddings = self.sample_many(smiles_dataset, stub, zero_padded_vals=True, average_tokens=False)
+
+        # Calculate pairwise distances for fingerprints
+        fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
+        fingerprints = cupy.asarray(fingerprints, order='C')
+        
+        metric = self.calculate_metric(embeddings, fingerprints, top_k)
         metric = cupy.nanmean(metric)
+        top_k = embeddings.shape[0] - 1 if not top_k else top_k
         return pd.Series({'name': self.name, 'value': metric, 'top_k':top_k})
 
 
@@ -219,53 +230,48 @@ class Modelability(BaseEmbeddingMetric):
     
     def __init__(self):
         self.name = 'modelability'
+        self.embeddings = None
 
-    def calculate_metric(self, embeddings, params, fingerprint_dataset, top_k=None):
-        # ML models
-
-        from IPython import embed
-        embed()
-
-        for param in params.columns:
-            rf_model = RandomForestRegressor(n_estimators=10, 
-                                             random_state=0)
-            rf_model.fit(embeddings[:, :100], params[param]) # DEBUG -- memory issue
+    def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
+        """Perform grid search with cross validation and return score"""
+        negative_mean_squared_error = lambda x, y: -1 * mean_squared_error(x, y).item()
+        
+        best_score = -1 * np.inf # want to maximize objective
+        for param in ParameterGrid(param_dict):
+            estimator.set_params(**param)
+            metric_list = []
             
+            # Generate CV folds
+            kfold_gen = KFold(n_splits=n_splits, shuffle=True, random_state=0)
+            for train_idx, test_idx in kfold_gen.split(xdata, ydata):
+                xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
+                estimator.fit(xtrain, ytrain)
+                ypred = estimator.predict(xtest)
+                score = negative_mean_squared_error(ypred, ytest)
+                metric_list.append(score)
+                
+            metric = np.array(metric_list).mean()
+            best_score = max(metric, best_score)
+        return best_score
 
-        # Calculate pairwise distances for fingerprints
+    def calculate_metric(self, embeddings, fingerprints, properties, estimator, param_dict):
+        """Perform grid search for each metric and calculate ratio"""
+
+        metric_array = []
+        for col in properties.columns:
+            props = properties[col].astype(cupy.float32).to_array()
+            embedding_error = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, props)
+            fingerprint_error = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, props)
+            metric_array.append(embedding_error / fingerprint_error)
+        return cupy.array(metric_array)
+
+    def calculate(self, smiles_dataset, fingerprint_dataset, properties, stub, estimator, param_dict):
+        embeddings = self.sample_many(smiles_dataset, stub, zero_padded_vals=False, average_tokens=True)
+        embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
+
         fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
-        fingerprints = cupy.asarray(fingerprints, order='C')
-        # CUML fitting
-        del fingerprints, fingerprint_dataset
+        fingerprints = cupy.asarray(fingerprints, order='C', dtype=cupy.float32)
 
-    def calculate(self, smiles_dataset, fingerprint_dataset, stub):
-        embeddings = self.sample_many(smiles_dataset, stub)
-        metric = self.calculate_metric(embeddings, smiles_dataset.properties, fingerprint_dataset)
-
-        # metric = cupy.nanmean(metric)
-        # return pd.Series({'name': self.name, 'value': metric})
-
-
-from cuml import LinearRegression, ElasticNet
-from cuml.ensemble.randomforestregressor import RandomForestRegressor
-from cuml.metrics.regression import mean_squared_error
-import cupy
-import cudf
-
-embeddings = cupy.fromfile('embeddings.pkl').reshape(10,-1).astype(cupy.float32)
-params = cudf.read_hdf('params.hdf', 'params')
-
-n_estimator_list = [10, 50, 10000]
-rf_model = RandomForestRegressor(n_estimators=n_estimator_list[0], 
-                                    random_state=0)
-
-# for col in params.columns:
-col = 'mw'
-best_mse = np.inf
-params[col] = params[col].astype(cupy.float32)
-for n_estimator in n_estimator_list:
-    rf_model.n_estimators = n_estimator # warm start
-    rf_model.fit(embeddings[:, :100], params[col]) # DEBUG -- memory issue
-    predict = rf_model.predict(embeddings[:, :100])
-    error = mean_squared_error(params[col], predict)
-    best_mse = min(error.item(), best_mse)
+        metric = self.calculate_metric(embeddings, fingerprints, properties, estimator, param_dict)
+        metric = cupy.nanmean(metric)
+        return pd.Series({'name': self.name, 'value': metric})

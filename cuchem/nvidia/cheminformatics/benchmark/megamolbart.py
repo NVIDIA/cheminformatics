@@ -60,6 +60,11 @@ fingerprint_dataset.load(smiles_dataset.data.index)
 n_data = len(smiles_dataset.data)
 assert (fingerprint_dataset.data.index == smiles_dataset.data.index)
 
+# DEBUG
+n_data = 10000
+smiles_dataset.data = smiles_dataset.data.iloc[:n_data]
+smiles_dataset.properties = smiles_dataset.properties.iloc[:n_data]
+fingerprint_dataset.data = fingerprint_dataset.data.iloc[:n_data]
 
 def save_metric_results(metric_list):
     metric_df = pd.concat(metric_list, axis=1).T

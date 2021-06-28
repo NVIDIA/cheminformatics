@@ -23,7 +23,7 @@ OUTPUT_DIR = '/workspace/megamolbart/benchmark'
 DEFAULT_MAX_SEQ_LEN = 512 # TODO: Import from MegaMolBART codebase?
 
 num_samples = 10
-radius_list = [0.01, 0.1] # TODO calculate radius and automate this
+radius_list = [0.01, 0.1, 0.5] # TODO calculate radius and automate this
 top_k_list = [None, 50, 100, 500] # TODO decide on top k value
 
 # Metrics

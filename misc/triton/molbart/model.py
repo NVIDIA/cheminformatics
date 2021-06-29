@@ -56,7 +56,7 @@ from rdkit.Chem import Draw, PandasTools
 
 import triton_python_backend_utils as pb_utils
 
-CDDD_DEFAULT_MODLE_LOC = '/model/cddd'
+CDDD_DEFAULT_MODLE_LOC = '/models/cddd'
 
 @singledispatch
 def add_jitter(embedding, radius, cnt):

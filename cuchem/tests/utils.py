@@ -7,9 +7,8 @@ import logging
 
 from locust import events
 
-from nvidia.cheminformatics.utils.dask import initialize_cluster
+from cuchem.utils.dask import initialize_cluster
 from cuchemcommon.context import Context
-
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +18,11 @@ def _fetch_chembl_test_dataset(n_molecules=None):
         n_molecules = 1000
 
     from cuchemcommon.data.cluster_wf import ChemblClusterWfDao
-    from nvidia.cheminformatics.fingerprint import MorganFingerprint
+    from cuchemcommon.fingerprint import MorganFingerprint
 
     dao = ChemblClusterWfDao(MorganFingerprint)
     mol_df = dao.fetch_molecular_embedding(n_molecules=n_molecules)
-    assert isinstance(mol_df, dask.dataframe.core.DataFrame),\
+    assert isinstance(mol_df, dask.dataframe.core.DataFrame), \
         'Incorrect data structure from DAO'
 
     return n_molecules, dao, mol_df
@@ -84,4 +83,5 @@ def stopwatch(request_type):
             return result
 
         return wrapper
+
     return _stopwatch

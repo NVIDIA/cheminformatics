@@ -46,9 +46,9 @@ Download the ChEMBL database (version 27):
 ./launch.sh dbSetup
 ```
 
-Launch the dash interactive ChEMBL exploration tool:
+Launch the interactive ChEMBL exploration tool:
 ```
-./launch.sh dash
+./launch.sh start
 ```
 
 ```
@@ -96,7 +96,7 @@ It is best to create the cache at `DATA_MOUNT_PATH` property defined in `~/.chem
 
 Once generated, the cached fingerprints can be used for analysis using `-c` option.
 ```
-./launch.sh dash -c /data/fp
+./launch.sh start -c /data/fp
 ```
 
 ### Conda

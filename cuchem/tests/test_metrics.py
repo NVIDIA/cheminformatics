@@ -38,8 +38,9 @@ _this_directory = os.path.dirname(os.path.realpath(__file__))
 _parent_directory = os.path.dirname(_this_directory)
 sys.path.insert(0, _parent_directory)  # TODO is there a better way to add nvidia directory to the path
 
-from nvidia.cheminformatics.utils.metrics import batched_silhouette_scores, rankdata, get_kth_unique_value, corr_pairwise, spearmanr
-from nvidia.cheminformatics.utils.distance import tanimoto_calculate
+from cuchem.utils.metrics import batched_silhouette_scores, rankdata, get_kth_unique_value, \
+    corr_pairwise, spearmanr
+from cuchem.utils.distance import tanimoto_calculate
 
 _data_dir = os.path.join(_this_directory, 'data')
 benchmark_approved_drugs_path = os.path.join(_data_dir, 'benchmark_approved_drugs.csv')
@@ -210,8 +211,11 @@ def test_run_get_kth_unique_value(n_rows, n_cols, max_int, top_k, axis):
     assert np.allclose(kth_values_cpu, cupy.asnumpy(kth_values_gpu), equal_nan=True)
 
 
-@pytest.mark.parametrize('pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k', run_spearman_rho_params)
-def test_run_spearman_rho(pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k):
+@pytest.mark.parametrize(
+    'pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data, top_k',
+    run_spearman_rho_params)
+def test_run_spearman_rho(pca_approved_drugs_csv, fingerprint_approved_drugs_csv, cluster_column, n_dims_eucl_data,
+                          top_k):
     """Validate the spearman rho scoring"""
 
     # Load PCA data to use as Euclidean distances

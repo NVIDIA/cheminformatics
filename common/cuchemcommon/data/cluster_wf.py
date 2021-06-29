@@ -1,18 +1,16 @@
-import os
-import math
-import cudf
-import dask_cudf
-import dask
 import logging
-import sqlite3
-from contextlib import closing
-
+import math
+import os
 from typing import List
 
-from . import ClusterWfDAO
-from cuchemcommon.data.helper.chembldata import BATCH_SIZE, ChEmblData
+import cudf
+import dask
+import dask_cudf
 from cuchemcommon.context import Context
+from cuchemcommon.data.helper.chembldata import BATCH_SIZE, ChEmblData
 from cuchemcommon.utils.singleton import Singleton
+
+from . import ClusterWfDAO
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +27,8 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
         return chem_data._meta_df()
 
     def fetch_molecular_embedding(self,
-                                  n_molecules:int,
-                                  cache_directory:str=None):
+                                  n_molecules: int,
+                                  cache_directory: str = None):
         context = Context()
         if cache_directory:
             hdf_path = os.path.join(cache_directory, FINGER_PRINT_FILES)
@@ -43,16 +41,16 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
         else:
             logger.info('Reading molecules from database...')
             mol_df = self.chem_data.fetch_mol_embedding(num_recs=n_molecules,
-                                                   batch_size=context.batch_size)
+                                                        batch_size=context.batch_size)
 
         return mol_df
 
-    def fetch_molecular_embedding_by_id(self, molecule_id:List):
+    def fetch_molecular_embedding_by_id(self, molecule_id: List):
         context = Context()
         meta = self.chem_data._meta_df()
         fp_df = self.chem_data._fetch_mol_embedding(molregnos=molecule_id,
-                                               batch_size=context.batch_size) \
-                         .astype(meta.dtypes)
+                                                    batch_size=context.batch_size) \
+            .astype(meta.dtypes)
 
         fp_df = cudf.from_pandas(fp_df)
         fp_df = dask_cudf.from_cudf(fp_df, npartitions=1).reset_index()

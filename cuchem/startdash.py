@@ -17,7 +17,6 @@
 import os
 import sys
 import atexit
-import logging
 
 import logging
 import warnings
@@ -27,19 +26,19 @@ from datetime import datetime
 
 from dask.distributed import Client, LocalCluster
 
-from nvidia.cheminformatics.utils.dask import initialize_cluster
+from cuchemcommon.context import Context
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.data.cluster_wf import FINGER_PRINT_FILES
+from cuchemcommon.fingerprint import MorganFingerprint, Embeddings
 from cuchemcommon.utils.logger import initialize_logfile, log_results
-from cuchemcommon.context import Context
-from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
+from cuchem.utils.dask import initialize_cluster
 
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
 
 logging.basicConfig(level=logging.INFO)
 
-logger = logging.getLogger('nvidia.cheminformatics')
+logger = logging.getLogger('cuchem.cheminformatics')
 formatter = logging.Formatter(
     '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
@@ -109,7 +108,7 @@ To start dash:
                             dest='cache_type',
                             type=str,
                             default='MorganFingerprint',
-                            choices = ['MorganFingerprint','Embeddings'],
+                            choices=['MorganFingerprint','Embeddings'],
                             help='Type of data preprocessing (MorganFingerprint or Embeddings)')
 
         parser.add_argument('-c', '--cache_directory',
@@ -189,9 +188,9 @@ To start dash:
             logger.setLevel(logging.DEBUG)
 
         from waitress import serve
-        from nvidia.cheminformatics.api import app
+        from api import app
 
-        context = Context()
+        Context()
         # port = context.get_config('plotly_port', 6000)
         port = 8081
         serve(app, host='0.0.0.0', port=port)
@@ -221,14 +220,13 @@ To start dash:
         import grpc
         import similaritysampler_pb2_grpc
         from concurrent import futures
-        from nvidia.cheminformatics.grpc import SimilaritySampler
+        from cuchem.cheminformatics.grpc import SimilaritySampler
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         similaritysampler_pb2_grpc.add_SimilaritySamplerServicer_to_server(SimilaritySampler(), server)
         server.add_insecure_port(f'[::]:{args.port}')
         server.start()
         server.wait_for_termination()
-
 
     def analyze(self):
         """
@@ -307,8 +305,7 @@ To start dash:
         if args.debug:
             logger.setLevel(logging.DEBUG)
 
-        benchmark_file = os.path.join(args.output_dir, 'benchmark.csv')
-        initialize_logfile(benchmark_file)
+        benchmark_file = initialize_logfile()
 
         client = initialize_cluster(not args.cpu,
                                     n_cpu=args.n_cpu,
@@ -333,12 +330,12 @@ To start dash:
 
         n_molecules = args.n_mol
         if not args.cpu:
-            from nvidia.cheminformatics.wf.cluster.gpukmeansumap import GpuKmeansUmap
+            from cuchem.wf.cluster.gpukmeansumap import GpuKmeansUmap
             workflow = GpuKmeansUmap(n_molecules=n_molecules,
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
         else:
-            from nvidia.cheminformatics.wf.cluster.cpukmeansumap import CpuKmeansUmap
+            from cuchem.wf.cluster.cpukmeansumap import CpuKmeansUmap
             workflow = CpuKmeansUmap(n_molecules=n_molecules,
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
@@ -370,7 +367,7 @@ To start dash:
             port = context.get_config('plotly_port', 5000)
 
             logger.info("Starting interactive visualization...")
-            from nvidia.cheminformatics.interactive.chemvisualize import ChemVisualization
+            from cuchem.interactive.chemvisualize import ChemVisualization
             v = ChemVisualization(workflow)
 
             logger.info('navigate to https://localhost: %s' % port)

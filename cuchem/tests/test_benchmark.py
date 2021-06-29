@@ -25,26 +25,24 @@ import pandas as pd
 
 from tests.utils import _create_context
 from cuchemcommon.utils.logger import initialize_logfile
-from nvidia.cheminformatics.utils.plot_benchmark_results \
+from cuchem.utils.plot_benchmark_results \
     import prepare_benchmark_df, prepare_acceleration_stacked_plot
-
 
 logger = logging.getLogger(__name__)
 
-
 # Parameter lists
-run_benchmark_params = [([{'test_type': 'nvidia.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap',
+run_benchmark_params = [([{'test_type': 'cuchem.cheminformatics.wf.cluster.gpukmeansumap.GpuKmeansUmap',
                            'use_gpu': True,
-                           'n_workers':  1,
+                           'n_workers': 1,
                            'n_mol': 5000},
-                          {'test_type': 'nvidia.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap',
+                          {'test_type': 'cuchem.cheminformatics.wf.cluster.cpukmeansumap.CpuKmeansUmap',
                            'use_gpu': False,
                            'n_workers': 10,
                            'n_mol': 5000}])]
 
-@pytest.mark.parametrize('benchmark_config_list', run_benchmark_params)
-def test_run_benchmark(benchmark_config_list):
 
+# @pytest.mark.parametrize('benchmark_config_list', run_benchmark_params)
+def test_run_benchmark(benchmark_config_list):
     output_dir = tempfile.tempdir
     output_file = os.path.join(output_dir, 'benchmark.csv')
     initialize_logfile(output_file)

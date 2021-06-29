@@ -5,7 +5,7 @@ import dask
 
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.data.cluster_wf import FINGER_PRINT_FILES
-from nvidia.cheminformatics.fingerprint import MorganFingerprint, Embeddings
+from cuchemcommon.fingerprint import MorganFingerprint, Embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def test_cache_morganfingerprint():
     logger.info(type(cache_dir))
 
     # Write to cache
-    chem_data = ChEmblData(fp_type = MorganFingerprint)
+    chem_data = ChEmblData(fp_type=MorganFingerprint)
     chem_data.save_fingerprints(os.path.join(cache_dir, FINGER_PRINT_FILES),
                                 num_recs=num_recs)
 
@@ -36,6 +36,7 @@ def test_cache_morganfingerprint():
     logger.info('Expected %s rec found %s.', num_recs, mol_df.shape[0])
     assert mol_df.shape[0] <= num_recs, \
         ('Expected %d rec found %d.' % (num_recs, mol_df.shape[0]))
+
 
 def test_cache_cddd_embeddings():
     """
@@ -50,7 +51,7 @@ def test_cache_cddd_embeddings():
     logger.info(type(cache_dir))
 
     # Write to cache
-    chem_data = ChEmblData(fp_type = Embeddings)
+    chem_data = ChEmblData(fp_type=Embeddings)
     chem_data.save_fingerprints(os.path.join(cache_dir, FINGER_PRINT_FILES),
                                 num_recs=num_recs)
 

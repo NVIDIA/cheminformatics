@@ -1,12 +1,11 @@
-import os
 import logging
-from io import StringIO
+import os
 from configparser import RawConfigParser
+from io import StringIO
 
 from cuchemcommon.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
-
 
 CONFIG_FILE = '.cheminf_local_environment'
 
@@ -21,7 +20,7 @@ class Context(metaclass=Singleton):
         self.benchmark_file = None
         self.cache_directory = None
         self.n_molecule = None
-        self.batch_size = None
+        self.batch_size = 10000
 
         self.config = {}
         if os.path.exists(CONFIG_FILE):

@@ -1,5 +1,6 @@
 from typing import List
 
+
 class ClusterWfDAO(object):
     """
     Base class for all DAO for fetching data for Clustering Workflows
@@ -9,20 +10,20 @@ class ClusterWfDAO(object):
         """
         Returns df with dtype set for structure without any column filter.
         """
-        NotImplemented
+        return NotImplemented
 
-    def fetch_molecular_embedding(self, n_molecules:int, cache_directory:str=None):
+    def fetch_molecular_embedding(self, n_molecules: int, cache_directory: str = None):
         """
         Fetch molecular properties from database/cache into a dask array.
         """
-        NotImplemented
+        return NotImplemented
 
-    def fetch_molecular_embedding_by_id(self, molecule_id:List):
+    def fetch_molecular_embedding_by_id(self, molecule_id: List):
         """
         Fetch molecular properties from database for the given id. Id depends on
         the backend databse. For chemble DB it should be molregid.
         """
-        NotImplemented
+        return NotImplemented
 
     def fetch_id_from_smile(self, new_molecules: List):
         """
@@ -30,7 +31,7 @@ class ClusterWfDAO(object):
         of molecules depends on database/service used. For e.g. it could be
         ChemblId or molreg_id for Chemble database.
         """
-        NotImplemented
+        return NotImplemented
 
 
 class GenerativeWfDao(object):
@@ -41,4 +42,4 @@ class GenerativeWfDao(object):
         of molecules depends on database/service used. For e.g. it could be
         ChemblId or molreg_id for Chemble database.
         """
-        NotImplemented
+        return NotImplemented

@@ -1,4 +1,5 @@
-ARG SOURCE_CONTAINER
+# Copyright 2020 NVIDIA Corporation
+ARG SOURCE_CONTAINER=nvcr.io/nvidia/pytorch:20.11-py3
 FROM ${SOURCE_CONTAINER}
 
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache

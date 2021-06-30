@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class GenericBenchmarkDataset():
+class GenericCSVDataset():
     def __init__(self):
         self.name = None
         self.index_col = None
@@ -16,7 +16,7 @@ class GenericBenchmarkDataset():
         self.data_path = None
         self.data = None
 
-    def _load_csv(self, columns, length_columns=None):
+    def _load_csv(self, columns, length_columns=None, return_remaining=False):
         columns = [columns] if not isinstance(columns, list) else columns
         data = cudf.read_csv(self.data_path).drop_duplicates(subset=columns)
 
@@ -36,18 +36,43 @@ class GenericBenchmarkDataset():
         data.rename(columns=renamer, inplace=True)
 
         if len(out_col) == 1:
-            data = data[out_col[0]] # Series
+            cleaned_data = data[out_col[0]] # Series
         else:
-            data = data[out_col] # DataFrame
-        self.data = data
+            cleaned_data = data[out_col] # DataFrame
+        
+        if return_remaining:
+            if length_columns:
+                remain_columns = [x for x in data.columns if (x not in out_col) & (x not in length_columns)]
+            else:
+                remain_columns = [x for x in data.columns if (x not in out_col)]
+            other_data = data[remain_columns]
+        else:
+            other_data = None
+        return cleaned_data, other_data
 
+    def load(self, columns=['canonical_smiles'], length_columns=['length']):
+        self.data, _ = self._load_csv(columns, length_columns)
+
+
+class GenericFingerprintDataset():
+    def __init__(self):
+        self.name = None
+        self.index_col = None
+        self.data = None
+        self.data_path = None
+
+    def load(self, index=None):
+        data = cudf.read_csv(self.data_path)
+        if self.index_col:
+            data = data.set_index(self.index_col).sort_index()
+
+        if index:
+            data = data.loc[index]
+        self.data = data
         return
 
-    def load(self):
-        raise NotImplemented
 
-
-class ChEMBL_Approved_Drugs(GenericBenchmarkDataset):
+class ChEMBL_Approved_Drugs(GenericCSVDataset):
     def __init__(self, index_col='molregno', max_len=None, index=None):
         self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
 
@@ -57,14 +82,17 @@ class ChEMBL_Approved_Drugs(GenericBenchmarkDataset):
         self.index = index
         self.length = None
 
-        self.data_path = '/workspace/cuchem/tests/data/benchmark_approved_drugs.csv'
+        data_path = pathlib.Path(__file__).absolute()
+        while 'cuchem/nvidia' in data_path.as_posix(): # stop at cuchem base path
+            data_path = data_path.parent 
+        self.data_path = os.path.join(data_path, 
+                                      'tests', 
+                                      'data',
+                                      'benchmark_approved_drugs.csv')
         assert os.path.exists(self.data_path)
-        
-    def load(self, columns=['canonical_smiles'], length_columns=['length']):
-        self._load_csv(columns, length_columns)
 
 
-class ChEMBL_20K_Samples(GenericBenchmarkDataset):
+class ChEMBL_20K_Samples(GenericCSVDataset):
 
     def __init__(self, index_col='molregno', max_len=None, index=None):
         self.name = 'ChEMBL 20K Samples'
@@ -81,11 +109,8 @@ class ChEMBL_20K_Samples(GenericBenchmarkDataset):
                                       'benchmark_ChEMBL_random_sampled_drugs.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, columns=['canonical_smiles'], length_columns=['length']):
-        self._load_csv(columns, length_columns)
 
-
-class ChEMBL_20K_Fingerprints(GenericBenchmarkDataset):
+class ChEMBL_20K_Fingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='molregno'):
         self.name = 'ChEMBL 20K Fingerprints'
 
@@ -96,12 +121,35 @@ class ChEMBL_20K_Fingerprints(GenericBenchmarkDataset):
                                       'fingerprints_ChEMBL_random_sampled_drugs.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, index=None):
-        data = cudf.read_csv(self.data_path)
-        if self.index_col:
-            data = data.set_index(self.index_col).sort_index()
 
-        if index:
-            data = data.loc[index]
-        self.data = data
-        return
+class ZINC15_TestSplit_20K_Samples(GenericCSVDataset):
+
+    def __init__(self, index_col='index', max_len=None, index=None):
+        self.name = 'ZINC15 Test Split 20K Samples'
+
+        assert (max_len is None) | (index is None)
+        self.index_col = index_col
+        self.max_len = max_len
+        self.index = index
+        self.data = None
+        self.length = None
+
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(), 
+                                      'data', 
+                                      'benchmark_zinc15_test.csv')
+        assert os.path.exists(self.data_path)
+
+    def load(self, columns=['canonical_smiles'], length_columns=['length']):
+        self.data, self.properties = self._load_csv(columns, length_columns, return_remaining=True)
+
+
+class ZINC15_TestSplit_20K_Fingerprints(GenericFingerprintDataset):
+    def __init__(self, index_col='index'):
+        self.name = 'ZINC15 Test Split 20K Fingerprints'
+
+        self.index_col = index_col
+        self.data = None
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(), 
+                                      'data', 
+                                      'fingerprints_zinc15_test.csv')
+        assert os.path.exists(self.data_path)

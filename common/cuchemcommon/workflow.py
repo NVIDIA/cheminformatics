@@ -1,15 +1,11 @@
 import logging
-from typing import List
-
-from rdkit.Chem import Draw, PandasTools, CanonSmiles
-import numpy as np
-import pandas as pd
 # import torch
 from functools import singledispatch
+from typing import List
 
+import numpy as np
 from cuchemcommon.data import GenerativeWfDao
-from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
-from cuchemcommon.fingerprint import MorganFingerprint
+from rdkit.Chem import PandasTools, CanonSmiles
 
 logger = logging.getLogger(__name__)
 
@@ -33,33 +29,31 @@ class BaseGenerativeWorkflow:
         self.min_jitter_radius = None
 
     def interpolate_from_smiles(self,
-                                smiles:List,
-                                num_points:int=10,
+                                smiles: List,
+                                num_points: int = 10,
                                 scaled_radius=None,
                                 force_unique=False):
         NotImplemented
 
     def find_similars_smiles_list(self,
-                                  smiles:str,
-                                  num_requested:int=10,
+                                  smiles: str,
+                                  num_requested: int = 10,
                                   scaled_radius=None,
                                   force_unique=False):
         NotImplemented
 
     def find_similars_smiles(self,
-                             smiles:str,
-                             num_requested:int=10,
+                             smiles: str,
+                             num_requested: int = 10,
                              scaled_radius=None,
                              force_unique=False):
         NotImplemented
-
 
     def _compute_radius(self, scaled_radius):
         if scaled_radius:
             return float(scaled_radius * self.min_jitter_radius)
         else:
             return self.min_jitter_radius
-
 
     def addjitter(self,
                   embedding,
@@ -115,15 +109,15 @@ class BaseGenerativeWorkflow:
 
         # Ensure all generated molecules are valid.
         for i in range(5):
-            PandasTools.AddMoleculeColumnToFrame(interp_df,'SMILES')
+            PandasTools.AddMoleculeColumnToFrame(interp_df, 'SMILES')
             invalid_mol_df = interp_df[interp_df['ROMol'].isnull()]
 
             if not invalid_mol_df.empty:
                 invalid_index = invalid_mol_df.index.to_list()
                 for idx in invalid_index:
                     embeddings[idx] = self.addjitter(embeddings[idx],
-                                                        radius,
-                                                        cnt=1)
+                                                     radius,
+                                                     cnt=1)
                 interp_df['SMILES'] = embedding_funct(embeddings)
             else:
                 break
@@ -135,11 +129,11 @@ class BaseGenerativeWorkflow:
         return interp_df
 
     def interpolate_by_id(self,
-                            ids:List,
-                            id_type:str='chembleid',
-                            num_points=10,
-                            force_unique=False,
-                            scaled_radius:int=1):
+                          ids: List,
+                          id_type: str = 'chembleid',
+                          num_points=10,
+                          force_unique=False,
+                          scaled_radius: int = 1):
         smiles = None
 
         if not self.min_jitter_radius:
@@ -158,11 +152,11 @@ class BaseGenerativeWorkflow:
                                             force_unique=force_unique)
 
     def find_similars_smiles_by_id(self,
-                                     chemble_id:str,
-                                     id_type:str='chembleid',
-                                     num_requested=10,
-                                     force_unique=False,
-                                     scaled_radius:int=1):
+                                   chemble_id: str,
+                                   id_type: str = 'chembleid',
+                                   num_requested=10,
+                                   force_unique=False,
+                                   scaled_radius: int = 1):
         smiles = None
 
         if not self.min_jitter_radius:

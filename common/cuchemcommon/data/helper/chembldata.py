@@ -1,8 +1,5 @@
 import os
-import sys
 import warnings
-warnings.filterwarnings("ignore", message=r"deprecated", category=FutureWarning)
-
 import pandas
 import sqlite3
 import logging
@@ -12,10 +9,26 @@ from dask import delayed, dataframe
 
 from contextlib import closing
 from cuchemcommon.utils.singleton import Singleton
-# from cuchemcommon.smiles import RemoveSalt, PreprocessSmiles
 from cuchemcommon.context import Context
 
-# SMILES_TRANSFORMS = [RemoveSalt(), PreprocessSmiles()]
+warnings.filterwarnings("ignore", message=r"deprecated", category=FutureWarning)
+logger = logging.getLogger(__name__)
+
+BATCH_SIZE = 100000
+ADDITIONAL_FEILD = ['canonical_smiles', 'transformed_smiles']
+IMP_PROPS = [
+    'alogp',
+    'aromatic_rings',
+    'full_mwt',
+    'psa',
+    'rtb']
+IMP_PROPS_TYPE = [pandas.Series([], dtype='float64'),
+                  pandas.Series([], dtype='int64'),
+                  pandas.Series([], dtype='float64'),
+                  pandas.Series([], dtype='float64'),
+                  pandas.Series([], dtype='int64')]
+ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
+                         pandas.Series([], dtype='object')]
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
@@ -26,27 +39,6 @@ WHERE cp.molregno = md.molregno
         AND md.molregno = cs.molregno
         AND md.molregno in (%s)
 """
-
-
-logger = logging.getLogger(__name__)
-
-
-BATCH_SIZE = 100000
-IMP_PROPS = [
-    'alogp',
-    'aromatic_rings',
-    'full_mwt',
-    'psa',
-    'rtb']
-ADDITIONAL_FEILD = ['canonical_smiles', 'transformed_smiles']
-
-IMP_PROPS_TYPE = [pandas.Series([], dtype='float64'),
-                  pandas.Series([], dtype='int64'),
-                  pandas.Series([], dtype='float64'),
-                  pandas.Series([], dtype='float64'),
-                  pandas.Series([], dtype='int64')]
-ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
-                         pandas.Series([], dtype='object')]
 
 
 # DEPRECATED. Please add code to DAO classes.
@@ -61,7 +53,6 @@ class ChEmblData(object, metaclass=Singleton):
         if not os.path.exists(db_file):
             logger.error('%s not found', db_file)
             raise Exception('{} not found'.format(db_file))
-            sys.exit(1)
 
         self.fp_type = fp_type
         self.chembl_db = 'file:%s?mode=ro' % db_file
@@ -73,7 +64,7 @@ class ChEmblData(object, metaclass=Singleton):
         Returns compound properties and structure filtered by ChEMBL IDs along
         with a list of columns.
         """
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = SQL_MOLECULAR_PROP % " ,".join(list(map(str, molregnos)))
             cur.execute(select_stmt)
@@ -95,9 +86,9 @@ class ChEmblData(object, metaclass=Singleton):
                     AND md.molregno = cs.molregno
                     AND md.chembl_id in (%s)
             """
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
-            select_stmt = sql_stml % "'%s'" %"','".join([ x.strip().upper() for x in chemble_ids])
+            select_stmt = sql_stml % "'%s'" % "','".join([x.strip().upper() for x in chemble_ids])
             cur.execute(select_stmt)
 
             cols = list(map(lambda x: x[0], cur.description))
@@ -105,7 +96,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def fetch_molregno_by_chemblId(self, chemblIds):
         logger.debug('Fetch ChEMBL ID using molregno...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT md.molregno as molregno
@@ -115,14 +106,14 @@ class ChEmblData(object, metaclass=Singleton):
                 WHERE cp.molregno = md.molregno
                     AND md.molregno = cs.molregno
                     AND md.chembl_id in (%s)
-            ''' %  "'%s'" %"','".join(chemblIds)
+            ''' % "'%s'" % "','".join(chemblIds)
             cur.execute(select_stmt)
             return cur.fetchall()
 
     def fetch_id_from_chembl(self, new_molecules: List):
         logger.debug('Fetch ChEMBL ID using molregno...')
 
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT cs.molregno as molregno, md.chembl_id as chembl_id,
@@ -131,20 +122,20 @@ class ChEmblData(object, metaclass=Singleton):
                     molecule_dictionary md
                 WHERE md.molregno = cs.molregno
                     AND md.chembl_id in (%s)
-            ''' %  "'%s'" %"','".join([ x.strip().upper() for x in new_molecules])
+            ''' % "'%s'" % "','".join([x.strip().upper() for x in new_molecules])
             cur.execute(select_stmt)
 
             return cur.fetchall()
 
     def fetch_chemblId_by_molregno(self, molregnos):
         logger.debug('Fetch ChEMBL ID using molregno...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT md.chembl_id as chembl_id
                 FROM molecule_dictionary md
                 WHERE md.molregno in (%s)
-            ''' %  ", ".join(list(map(str, molregnos)))
+            ''' % ", ".join(list(map(str, molregnos)))
             cur.execute(select_stmt)
             return cur.fetchall()
 
@@ -157,7 +148,7 @@ class ChEmblData(object, metaclass=Singleton):
             pd.DataFrame: dataframe containing SMILES strings and molecule index
         """
         logger.debug('Fetching ChEMBL approved drugs...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = """SELECT
                 di.molregno,
@@ -182,19 +173,19 @@ class ChEmblData(object, metaclass=Singleton):
             pd.DataFrame: dataframe containing SMILES strings and molecule index
         """
         logger.debug('Fetching ChEMBL random samples...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
-            select_stmt = """SELECT 
-                cs.molregno, 
+            select_stmt = """SELECT
+                cs.molregno,
                 cs.canonical_smiles,
                 LENGTH(cs.canonical_smiles) as len
-            FROM 
+            FROM
                 compound_structures AS cs
-            WHERE 
+            WHERE
                 cs.canonical_smiles IS NOT NULL
             AND
                 len <= """ + f'{max_len}' + """
-            ORDER BY RANDOM() 
+            ORDER BY RANDOM()
             LIMIT """ + f'{num_samples};'
 
             cur.execute(select_stmt)
@@ -202,7 +193,7 @@ class ChEmblData(object, metaclass=Singleton):
 
     def fetch_molecule_cnt(self):
         logger.debug('Finding number of molecules...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con,  \
+        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT count(*)
@@ -221,7 +212,7 @@ class ChEmblData(object, metaclass=Singleton):
 
         prop_meta = {'id': pandas.Series([], dtype='int64')}
         prop_meta.update(dict(zip(IMP_PROPS + ADDITIONAL_FEILD,
-                              IMP_PROPS_TYPE + ADDITIONAL_FEILD_TYPE)))
+                                  IMP_PROPS_TYPE + ADDITIONAL_FEILD_TYPE)))
         prop_meta.update({i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
 
         return pandas.DataFrame(prop_meta)
@@ -229,7 +220,6 @@ class ChEmblData(object, metaclass=Singleton):
     def _fetch_mol_embedding(self,
                              start=0,
                              batch_size=BATCH_SIZE,
-                            #  smiles_transforms=SMILES_TRANSFORMS,
                              molregnos=None,
                              **transformation_kwargs):
         """
@@ -239,7 +229,7 @@ class ChEmblData(object, metaclass=Singleton):
 
         logger.info('Fetching %d records starting %d...' % (batch_size, start))
 
-        imp_cols = [ 'cp.' + col for col in IMP_PROPS]
+        imp_cols = ['cp.' + col for col in IMP_PROPS]
 
         if molregnos is None:
             select_stmt = '''
@@ -264,7 +254,7 @@ class ChEmblData(object, metaclass=Singleton):
             ''' % (', '.join(imp_cols), " ,".join(list(map(str, molregnos))), start, batch_size)
 
         df = pandas.read_sql(select_stmt,
-                            sqlite3.connect(self.chembl_db, uri=True))
+                             sqlite3.connect(self.chembl_db, uri=True))
 
         # Smiles -> Smiles transformation and filtering
         # TODO: Discuss internally to find use or refactor this code to remove
@@ -302,27 +292,29 @@ class ChEmblData(object, metaclass=Singleton):
         """
         logger.debug('Fetching properties for all molecules...')
 
-        if not num_recs or num_recs < 0:
+        if num_recs is None or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
-        logger.info(num_recs)
-        logger.info(batch_size)
+        logger.info('num_recs %d', num_recs)
+        logger.info('batch_size %d', batch_size)
         meta_df = self._meta_df(**transformation_kwargs)
 
         dls = []
         for start in range(0, num_recs, batch_size):
             bsize = min(num_recs - start, batch_size)
-            dl_data = delayed(self._fetch_mol_embedding) \
-                             (start=start, batch_size=bsize, molregnos=molregnos, **transformation_kwargs)
+            dl_data = delayed(self._fetch_mol_embedding)(start=start,
+                                                         batch_size=bsize,
+                                                         molregnos=molregnos,
+                                                         **transformation_kwargs)
             dls.append(dl_data)
 
         return dataframe.from_delayed(dls, meta=meta_df)
 
-    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None, batch_size = 5000):
+    def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None, batch_size=5000):
         """
         Generates fingerprints for all ChEMBL ID's in the database
         """
         logger.debug('Fetching molecules from database for fingerprints...')
 
-        mol_df = self.fetch_mol_embedding(num_recs=num_recs, batch_size = batch_size)
+        mol_df = self.fetch_mol_embedding(num_recs=num_recs, batch_size=batch_size)
         mol_df.to_hdf(hdf_path, 'fingerprints')

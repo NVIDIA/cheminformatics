@@ -1,5 +1,4 @@
 # Copyright 2020 NVIDIA Corporation
-# SPDX-License-Identifier: Apache-2.0
 FROM nvidia/cuda:11.0-base
 
 RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
@@ -63,4 +62,4 @@ RUN mkdir -p /opt/nvidia/ \
 
 ENV UCX_LOG_LEVEL error
 
-CMD cd /opt/nvidia/cheminfomatics; /opt/nvidia/cheminfomatics/launch.sh dash
+CMD cd /opt/nvidia/cheminfomatics; /opt/nvidia/cheminfomatics/launch.sh start

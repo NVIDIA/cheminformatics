@@ -2,9 +2,9 @@ import logging
 import pandas
 from rdkit import Chem
 
-from nvidia.cheminformatics.wf.generative import MolBART, Cddd
+from cuchem.wf.generative import MolBART, Cddd
 from tests.utils import _create_context
-from nvidia.cheminformatics.decorator import LipinskiRuleOfFiveDecorator, MolecularStructureDecorator, lipinski
+from cuchem.decorator import LipinskiRuleOfFiveDecorator, MolecularStructureDecorator, lipinski
 import dask.dataframe as dd
 import multiprocessing
 

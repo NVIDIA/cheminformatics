@@ -14,14 +14,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import logging
-
+import os
 from datetime import datetime
-from .sysinfo import get_machine_config, print_machine_config
+
 from cuchemcommon.context import Context
 
-BENCHMARK_FILE = './benchmark.csv'
+from .sysinfo import get_machine_config, print_machine_config
+
+BENCHMARK_FILE = '/data/benchmark.csv'
 
 logger = logging.getLogger(__name__)
 
@@ -36,19 +37,20 @@ def initialize_logfile(benchmark_file=BENCHMARK_FILE):
         with open(benchmark_file, 'w') as fh:
             fh.write(f'# {config_message}\n')
             fh.write('date,benchmark_type,step,time(hh:mm:ss.ms),n_molecules,n_workers,metric_name,metric_value\n')
+    return benchmark_file
 
 
 class MetricsLogger(object):
 
     def __init__(self,
-               task_name,
-               n_molecules):
+                 task_name,
+                 n_molecules):
 
         self.task_name = task_name
         self.n_molecules = n_molecules
         self.start_time = None
-        self.metric_name=None
-        self.metric_value=None
+        self.metric_name = None
+        self.metric_value = None
 
         self.metric_func = None
         self.metric_func_args = None

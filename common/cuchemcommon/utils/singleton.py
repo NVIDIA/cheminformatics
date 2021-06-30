@@ -8,6 +8,7 @@ Metaclass for singletons.
 
 logger = logging.getLogger(__name__)
 
+
 class Singleton(type):
     """
     Ensures single instance of a class.

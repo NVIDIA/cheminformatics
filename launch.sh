@@ -34,12 +34,9 @@ launch utility script
 launch.sh [command]
 
     valid commands:
-
-    build
-    pull
-    push
-    root
-    jupyter
+        start
+        stop
+        build
 
 
 Getting Started tl;dr
@@ -108,7 +105,7 @@ fi
 #
 ###############################################################################
 
-CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
+CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.2}
 MEGAMOLBART_TRAINING_CONT=${MEGAMOLBART_TRAINING_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest}
 MEGAMOLBART_SERVICE_CONT=${MEGAMOLBART_SERVICE_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart:latest}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
@@ -119,6 +116,7 @@ PLOTLY_PORT=${PLOTLY_PORT:-5000}
 DASK_PORT=${DASK_PORT:-9001}
 GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN:=""}
 
+DEV_PYTHONPATH="/workspace/cuchem:/workspace/common:/workspace/common/generated/"
 ###############################################################################
 #
 # If $LOCAL_ENV was not found, write out a template for user to edit
@@ -187,17 +185,19 @@ build() {
     set -e
     DATE=$(date +%y%m%d)
 
-    echo "Building ${CUCHEM_CONT}..."
+    IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
+    echo "Building ${CUCHEM_CONT_BASENAME}..."
     docker build --network host \
-        -t ${CUCHEM_CONT}:latest \
-        -t ${CUCHEM_CONT}:${DATE} \
+        -t ${CUCHEM_CONT_BASENAME}:latest \
+        -t ${CUCHEM_CONT_BASENAME}:${DATE} \
         -f Dockerfile.cuchem .
 
-    echo "Building ${MEGAMOLBART_SERVICE_CONT}..."
+    IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_SERVICE_CONT}
+    echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
     docker build --no-cache --network host \
-        -t ${MEGAMOLBART_SERVICE_CONT}:latest \
-        -t ${MEGAMOLBART_SERVICE_CONT}:${DATE} \
-        --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT}:latest \
+        -t ${MEGAMOLBART_CONT_BASENAME}:latest \
+        -t ${MEGAMOLBART_CONT_BASENAME}:${DATE} \
+        --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT} \
         -f Dockerfile.megamolbart \
         .
 
@@ -225,24 +225,17 @@ pull() {
 
 
 dev() {
-
-    set -x
     local CONTAINER_OPTION=$1
     local CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
 
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} -v /home/mgill/storage/data/az/megamolbart/checkpoints/megatron:/models/megamolbart/checkpoints"
+        DOCKER_CMD="${DOCKER_CMD} -v $PROJECT_PATH}/megamolbart/checkpoints/megatron:/models/megamolbart/checkpoints"
         CONT=${MEGAMOLBART_SERVICE_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
     fi
 
-    set -x
-    ${DOCKER_CMD} -it ${CONT} bash
-    exit
-}
+    ${DOCKER_CMD} -e PYTHONPATH="${DEV_PYTHONPATH}" \
+        -it ${CONT} bash
 
-
-root() {
-    ${DOCKER_CMD} -it --user root ${CUCHEM_CONT} bash
     exit
 }
 
@@ -288,14 +281,14 @@ dbSetup() {
 }
 
 
-dash() {
+start() {
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
         # Executed within container or a managed env.
-        set -x
         dbSetup "${DATA_MOUNT_PATH}"
         cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
     else
         # run a container and start dash inside container.
+        echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
         export ADDITIONAL_PARAM="$@"
         docker-compose --env-file .cheminf_local_environment  \
             -f setup/docker_compose.yml \
@@ -305,12 +298,14 @@ dash() {
     exit
 }
 
-down() {
+
+stop() {
     docker-compose --env-file .cheminf_local_environment  \
-            -f setup/docker_compose.yml \
-            --project-directory . \
-            down
+        -f setup/docker_compose.yml \
+        --project-directory . \
+        down
 }
+
 
 cache() {
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
@@ -330,7 +325,10 @@ cache() {
 test() {
     dbSetup "${DATA_PATH}"
     # run a container and start dash inside container.
-    ${DOCKER_CMD} -w ${CUCHEM_LOC} -it ${CUCHEM_CONT}  pytest tests
+    ${DOCKER_CMD} -w /workspace/cuchem \
+        -e PYTHONPATH="${DEV_PYTHONPATH}" \
+        ${CUCHEM_CONT}  \
+        pytest tests
     exit
 }
 
@@ -357,14 +355,12 @@ case $1 in
     dev)
         $@
         ;;
-    root)
-        ;&
     test)
         ;&
-    dash)
+    start)
         $@
         ;;
-    down)
+    stop)
         ;&
     cache)
         $@

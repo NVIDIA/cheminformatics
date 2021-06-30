@@ -22,6 +22,8 @@ cddd/
 .ssh/
 .vscode-server/
 .wget-hsts
+.idea/
+.venv/
 
 __pycache__
 dask-worker-space

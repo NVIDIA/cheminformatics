@@ -36,4 +36,3 @@
 
 #     def transform(self, data):
 #         return filter_smiles(data)
-

@@ -14,9 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pynvml as nv
-import psutil
 from collections import Counter
+
+import psutil
+import pynvml as nv
+
 
 def get_machine_config():
     """Get machine config for CPU and GPU(s)"""
@@ -26,14 +28,14 @@ def get_machine_config():
     logical_cores = psutil.cpu_count(logical=True)
 
     cpufreq = psutil.cpu_freq()
-    cpufreq_max = cpufreq.max # Mhz
+    cpufreq_max = cpufreq.max  # Mhz
     cpufreq_min = cpufreq.min
     cpufreq_cur = cpufreq.current
 
     svmem = psutil.virtual_memory()
-    mem_total = svmem.total / (1024.0 **3) # GB
-    mem_avail = svmem.available / (1024.0 **3)
-    
+    mem_total = svmem.total / (1024.0 ** 3)  # GB
+    mem_avail = svmem.available / (1024.0 ** 3)
+
     # GPU config
     nv.nvmlInit()
     driver_version = nv.nvmlSystemGetDriverVersion()
@@ -42,7 +44,7 @@ def get_machine_config():
     for i in range(deviceCount):
         handle = nv.nvmlDeviceGetHandleByIndex(i)
         gpu_devices.append(nv.nvmlDeviceGetName(handle).decode("utf-8"))
-        gpu_mem = nv.nvmlDeviceGetMemoryInfo(handle).total  / (1024.0 **3)
+        gpu_mem = nv.nvmlDeviceGetMemoryInfo(handle).total / (1024.0 ** 3)
         gpu_mems.append(gpu_mem)
 
     return {'cpu': {'physical_cores': physical_cores, 'logical_cores': logical_cores,
@@ -58,7 +60,7 @@ def print_machine_config(config):
     ram = int(round(config['cpu']['total_mem_GB'], 0))
     cpu_config_message = f'{cpu_freq} MHz CPU with {cpu_cores} cores, {ram} GB RAM'
 
-    gpu_devices = Counter([(x, int(round(y, 0))) for x,y in zip(config['gpu']['devices'], config['gpu']['mem_GB'])])
+    gpu_devices = Counter([(x, int(round(y, 0))) for x, y in zip(config['gpu']['devices'], config['gpu']['mem_GB'])])
     gpu_config_message = ''
     for (handle, mem), count in gpu_devices.items():
         gpu_config_message += f'{count} x {handle} GPU(s)'

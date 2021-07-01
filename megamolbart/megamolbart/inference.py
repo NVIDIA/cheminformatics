@@ -4,6 +4,7 @@ import logging
 from functools import partial
 from pathlib import Path
 from typing import List
+from rdkit import Chem
 
 import pandas as pd
 import torch

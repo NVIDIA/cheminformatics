@@ -225,16 +225,18 @@ pull() {
 
 
 dev() {
+    set -x
     local CONTAINER_OPTION=$1
-    local CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1}
+    local CONT=${CUCHEM_CONT}
 
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} -v $PROJECT_PATH}/megamolbart/checkpoints/megatron:/models/megamolbart/checkpoints"
-        CONT=${MEGAMOLBART_SERVICE_CONT:=nvcr.io/nvidia/clara/cheminformatics_megamolbart:0.0.1}
+        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/megamolbart/checkpoints/megatron:/models/megamolbart/checkpoints"
+        CONT=${MEGAMOLBART_SERVICE_CONT}
+    else
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}"
     fi
 
-    ${DOCKER_CMD} -e PYTHONPATH="${DEV_PYTHONPATH}" \
-        -it ${CONT} bash
+    ${DOCKER_CMD} -it ${CONT} bash
 
     exit
 }

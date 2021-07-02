@@ -106,7 +106,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         if n_pca and n_obs > n_pca:
             with MetricsLogger('pca', self.n_molecules) as ml:
-                if self.pca == None:
+                if self.pca is None:
                     self.pca = cuDaskPCA(client=dask_client, n_components=n_pca)
                     self.pca.fit(embedding)
                 embedding = self.pca.transform(embedding)

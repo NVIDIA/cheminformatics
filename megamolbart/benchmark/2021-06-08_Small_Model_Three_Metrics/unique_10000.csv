@@ -3,3 +3,4 @@ unique,radius,num_samples,iteration,run_time,data_size
 0.0715,0.001,10.0,10000.0,5052.487608,1000.0
 0.1134,0.01,10.0,10000.0,5053.221484,1000.0
 0.4796,0.1,10.0,10000.0,5050.720059,1000.0
+# NOTE: uniqueness was scaled by validity before plotting

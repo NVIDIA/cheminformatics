@@ -14,6 +14,7 @@ import generativesampler_pb2_grpc
 from datetime import datetime
 import os
 import logging
+import argparse
 from cuml.ensemble.randomforestregressor import RandomForestRegressor
 from cuml import LinearRegression, ElasticNet
 from cuml.svm import SVR
@@ -25,8 +26,30 @@ sys.path.insert(0, '/workspace/cuchem')
 from cuchem.datasets.loaders import ZINC15_TestSplit_20K_Samples, ZINC15_TestSplit_20K_Fingerprints
 from cuchem.metrics.model import Validity, Unique, Novelty, NearestNeighborCorrelation, Modelability, get_model_iteration
 
-OUTPUT_DIR = '/workspace/megamolbart/benchmark'
-DEFAULT_MAX_SEQ_LEN = 512 # TODO: Import from MegaMolBART codebase?
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Model metrics')
+
+    parser.add_argument('-o', '--output_dir',
+                        dest='output_dir',
+                        default='/workspace/megamolbart/benchmark',
+                        type=str,
+                        help='Output directory for CSV files')
+
+    parser.add_argument('-l', '--max_seq_len',
+                        dest='max_seq_len',
+                        type=int,
+                        default=512,
+                        help='Default maximum sequence length')
+
+    args = parser.parse_args(sys.argv[1:])
+
+    return args
+
+
+args = parse_args()
+OUTPUT_DIR = args.output_dir
+DEFAULT_MAX_SEQ_LEN = args.max_seq_len # TODO: Import from MegaMolBART codebase?
 
 num_samples = 10
 radius_list = [0.01, 0.1, 0.5] # TODO calculate radius and automate this
@@ -53,10 +76,10 @@ lr_param_dict = {'normalize': [True]}
 en_estimator = ElasticNet(normalize=True)
 en_param_dict = {'alpha': [0.001, 0.01, 0.1, 1.0, 10.0, 100], 'l1_ratio': [0.1, 0.5, 1.0, 10.0]}
 
-model_dict = {'randomforest': [rf_estimator, rf_param_dict],
-              'supportvector': [sv_estimator, sv_param_dict],
-              'linearregression': [lr_estimator, lr_param_dict],
-              'elasticnet': [en_estimator, en_param_dict]}
+model_dict = {'random forest': [rf_estimator, rf_param_dict],
+              'support vector machine': [sv_estimator, sv_param_dict],
+              'linear regression': [lr_estimator, lr_param_dict],
+              'elastic net': [en_estimator, en_param_dict]}
 
 # Datasets
 smiles_dataset = ZINC15_TestSplit_20K_Samples(max_len=DEFAULT_MAX_SEQ_LEN)
@@ -76,7 +99,7 @@ def save_metric_results(metric_list):
     metric_df = pd.concat(metric_list, axis=1).T
     metric = metric_df['name'].iloc[0].replace(' ', '_')
     iteration = metric_df['iteration'].iloc[0]
-    metric_df.to_csv(os.path.join(OUTPUT_DIR, 'tables', f'{metric}_{iteration}.csv'), index=False)
+    metric_df.to_csv(os.path.join(OUTPUT_DIR, f'{metric}_{iteration}.csv'), index=False)
 
 
 convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)

@@ -180,14 +180,14 @@ DOCKER_CMD="docker run \
     -e TF_CPP_MIN_LOG_LEVEL=3 \
     -w /workspace"
 
+DATE=$(date +%y%m%d)
 
 build() {
     set -e
-    DATE=$(date +%y%m%d)
 
     IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
     echo "Building ${CUCHEM_CONT_BASENAME}..."
-    docker build --network host \
+    docker build --no-cache --network host \
         -t ${CUCHEM_CONT_BASENAME}:latest \
         -t ${CUCHEM_CONT_BASENAME}:${DATE} \
         -f Dockerfile.cuchem .

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import logging
 import os
 
@@ -139,7 +141,7 @@ class Validity(BaseSampleMetric):
 
 class Unique(BaseSampleMetric):
     def __init__(self):
-        self.name = 'unique'
+        self.name = 'uniqueness'
 
     def sample(self, smiles, num_samples, func, radius):
         spec = generativesampler_pb2.GenerativeSpec(
@@ -236,9 +238,8 @@ class Modelability(BaseEmbeddingMetric):
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
         """Perform grid search with cross validation and return score"""
-        negative_mean_squared_error = lambda x, y: -1 * mean_squared_error(x, y).item()
-
-        best_score = -1 * np.inf  # want to maximize objective
+        
+        best_score = np.inf
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
             metric_list = []
@@ -249,11 +250,11 @@ class Modelability(BaseEmbeddingMetric):
                 xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
-                score = negative_mean_squared_error(ypred, ytest)
+                score = mean_squared_error(ypred, ytest).item() # NB: convert to negative MSE and maximize metric for SKLearn GridSearch
                 metric_list.append(score)
 
             metric = np.array(metric_list).mean()
-            best_score = max(metric, best_score)
+            best_score = min(metric, best_score)
         return best_score
 
     def calculate_metric(self, embeddings, fingerprints, properties, estimator, param_dict):
@@ -264,7 +265,8 @@ class Modelability(BaseEmbeddingMetric):
             props = properties[col].astype(cupy.float32).to_array()
             embedding_error = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, props)
             fingerprint_error = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, props)
-            metric_array.append(embedding_error / fingerprint_error)
+            ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
+            metric_array.append(ratio)
         return cupy.array(metric_array)
 
     def calculate(self, smiles_dataset, fingerprint_dataset, properties, stub, estimator, param_dict):

@@ -25,4 +25,5 @@ dask-worker-space
 .vscode
 .cache_dir
 portal
-megamolbart/checkpoints/
+megamolbart/models
+setup

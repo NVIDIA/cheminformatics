@@ -22,7 +22,7 @@
 
     - name: nvidia-container-runtime apt repositories are registered
       apt_repository:
-        repo: "{{ item }}"    
+        repo: "{{ item }}"
         filename: nvidia-container-runtime
         state: present
         update_cache: yes
@@ -67,3 +67,50 @@
         state=present
       with_items:
         - docker-ce
+
+- name: User Configuration
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Ensure 'docker' group exists
+    become: yes
+    group:
+      name: docker
+    tags: id
+
+  - name: "Add '{{ ansible_user }}' user to 'docker' group."
+    become: yes
+    user:
+      name: "{{ ansible_user }}"
+      groups:
+        - docker
+      append: yes
+
+  - name: Take the newly added 'docker' group into account
+    meta: reset_connection
+
+  - name: Register current user's id
+    shell: id
+    register: id
+
+  - debug: var=ids
+
+- name: Restart
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Rebooting machine
+    reboot:
+
+- name: Start App
+  hosts: all
+  become: yes
+
+  tasks:
+  - name: Start Cheminfo container
+    command: docker run --name cheminfo --gpus all -d -v /tmp/:/data -p 5000:5000 nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1
+
+  - name: Progress
+    command: docker logs -f cheminfo

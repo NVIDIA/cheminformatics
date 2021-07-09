@@ -5,7 +5,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: 192.167.100.0/16
+        - subnet: ${SUBNET}
 
 services:
   cuchemUI:
@@ -13,12 +13,12 @@ services:
     hostname: cuchemUI
     networks:
       cuchemNet:
-        ipv4_address: 192.167.100.1
+        ipv4_address: ${IP_CUCHEM_UI}
     ports:
       - "5000:5000"
     volumes:
       - './:/workspace'
-      - "${DATA_PATH}:/data"
+      - "${CONTENT_PATH}/data:/data"
     deploy:
       resources:
         reservations:
@@ -26,20 +26,21 @@ services:
           - driver: nvidia
             count: 1
             capabilities: [gpu]
-    working_dir: /workspace
-    command: ./launch.sh start ${ADDITIONAL_PARAM}
+    working_dir: /opt/nvidia/cheminfomatics
+    command: /opt/nvidia/cheminfomatics/launch.sh start ${ADDITIONAL_PARAM}
     extra_hosts:
-      - "megamolbart:192.167.100.2"
+      - "megamolbart:${IP_MEGAMOLBART}"
 
   megamolbart:
     image: "${MEGAMOLBART_CONT}"
     hostname: 'megamolbart'
     networks:
       cuchemNet:
-        ipv4_address: 192.167.100.2
+        ipv4_address: ${IP_MEGAMOLBART}
     volumes:
         - './:/workspace'
-        - "${DATA_PATH}:/data"
+        - "${CONTENT_PATH}/data:/data"
+        - "${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
     deploy:
       resources:
         reservations:

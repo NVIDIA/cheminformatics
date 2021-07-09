@@ -2,6 +2,10 @@
 ARG SOURCE_CONTAINER=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest
 FROM ${SOURCE_CONTAINER}
 
+RUN apt update && DEBIAN_FRONTEND=noninteractive \
+    apt install --only-upgrade libssl1.1 openssl \
+    && apt purge -y libssl1.0.0
+
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 
 # Copy and add generated code to PYTHONPATH

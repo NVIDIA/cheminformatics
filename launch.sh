@@ -43,7 +43,7 @@ Getting Started tl;dr
 ----------------------------------------
 
     ./launch build
-    ./launch dash
+    ./launch start
     navigate browser to http://localhost:5000
 For more detailed info on getting started, see README.md
 
@@ -105,9 +105,9 @@ fi
 #
 ###############################################################################
 
-CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.2}
+CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:latest}
 MEGAMOLBART_TRAINING_CONT=${MEGAMOLBART_TRAINING_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest}
-MEGAMOLBART_SERVICE_CONT=${MEGAMOLBART_SERVICE_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart:latest}
+MEGAMOLBART_SERVICE_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidian/clara/megamolbart:latest}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
 DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
@@ -125,7 +125,7 @@ DEV_PYTHONPATH="/workspace/cuchem:/workspace/common:/workspace/common/generated/
 
 if [ $write_env -eq 1 ]; then
     echo CUCHEM_CONT=${CUCHEM_CONT} >> $LOCAL_ENV
-    echo MEGAMOLBART_CONT=${MEGAMOLBART_CONT} >> $LOCAL_ENV
+    echo MEGAMOLBART_SERVICE_CONT=${MEGAMOLBART_SERVICE_CONT} >> $LOCAL_ENV
     echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
     echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
     echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
@@ -207,11 +207,19 @@ build() {
 
 
 push() {
+    local VERSION=$1
+    set -x
+    IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
+    IFS=':' read -ra MEGAMOLBART_BASENAME <<< ${MEGAMOLBART_SERVICE_CONT}
+
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-    docker push ${CUCHEM_CONT}:latest
-    docker push ${CUCHEM_CONT}:${DATE}
-    docker push ${MEGAMOLBART_SERVICE_CONT}:latest
-    docker push ${MEGAMOLBART_SERVICE_CONT}:${DATE}
+    docker push ${CUCHEM_CONT_BASENAME}:latest
+    docker tag ${CUCHEM_CONT_BASENAME}:latest ${CUCHEM_CONT_BASENAME}:${VERSION}
+    docker push ${CUCHEM_CONT_BASENAME}:${VERSION}
+
+    docker push ${MEGAMOLBART_BASENAME}:latest
+    docker tag ${MEGAMOLBART_BASENAME}:latest ${MEGAMOLBART_BASENAME}:${VERSION}
+    docker push ${MEGAMOLBART_BASENAME}:${VERSION}
     exit
 }
 
@@ -230,10 +238,12 @@ dev() {
     local CONT=${CUCHEM_CONT}
 
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/megamolbart/checkpoints/megatron:/models/megamolbart/checkpoints"
+        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/megamolbart/models:/models/megamolbart/"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
         CONT=${MEGAMOLBART_SERVICE_CONT}
     else
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 
     ${DOCKER_CMD} -it ${CONT} bash
@@ -290,7 +300,7 @@ start() {
         cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
     else
         # run a container and start dash inside container.
-        echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
+        echo "${CUCHEM_CONT} ${MEGAMOLBART_SERVICE_CONT}"
         export ADDITIONAL_PARAM="$@"
         docker-compose --env-file .cheminf_local_environment  \
             -f setup/docker_compose.yml \
@@ -349,7 +359,8 @@ jupyter() {
 
 case $1 in
     build)
-        ;&
+        $@
+        ;;
     push)
         ;&
     pull)

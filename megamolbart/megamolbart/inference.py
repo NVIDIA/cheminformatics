@@ -63,7 +63,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         torch.set_grad_enabled(False)  # Testing this instead of `with torch.no_grad():` context since it doesn't exit
 
         self.device = 'cuda'  # Megatron arg loading seems to only work with GPU
-        self.min_jitter_radius = 2.1  # TODO adjust this once model is trained
+        self.min_jitter_radius = 1.0
         self.max_model_position_embeddings = max_seq_len
 
         args = {
@@ -76,10 +76,11 @@ class MegaMolBART(BaseGenerativeWorkflow):
             'load': checkpoints_dir
         }
 
-        initialize_megatron(args_defaults=args, ignore_unknown_args=True)
-        args = get_args()
-        self.tokenizer = self.load_tokenizer(args.vocab_file, regex, default_chem_token_start)
-        self.model = self.load_model(args, self.tokenizer, decoder_max_seq_len)
+        with torch.no_grad():
+            initialize_megatron(args_defaults=args, ignore_unknown_args=True)
+            args = get_args()
+            self.tokenizer = self.load_tokenizer(args.vocab_file, regex, default_chem_token_start)
+            self.model = self.load_model(args, self.tokenizer, decoder_max_seq_len)
 
     def _compute_radius(self, scaled_radius):  # TODO REMOVE
         if scaled_radius:
@@ -178,28 +179,29 @@ class MegaMolBART(BaseGenerativeWorkflow):
         smiles_interp_list = []
 
         batch_size = 1  # TODO: parallelize this loop as a batch
-        for memory in embeddings.permute(1, 0, 2):
+        with torch.no_grad():
+            for memory in embeddings.permute(1, 0, 2):
 
-            decode_fn = partial(model._decode_fn,
-                                mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
-                                memory=memory)
+                decode_fn = partial(model._decode_fn,
+                                    mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
+                                    memory=memory)
 
-            mol_strs, log_lhs = model.sampler.beam_decode(decode_fn,
-                                                          batch_size=batch_size,
-                                                          device='cuda',
-                                                          k=k)
-            mol_strs = sum(mol_strs, [])  # flatten list
+                mol_strs, log_lhs = model.sampler.beam_decode(decode_fn,
+                                                              batch_size=batch_size,
+                                                              device='cuda',
+                                                              k=k)
+                mol_strs = sum(mol_strs, [])  # flatten list
 
-            # TODO: add back sanitization and validity checking once model is trained
-            logger.warn('WARNING: MOLECULE VALIDATION AND SANITIZATION CURRENTLY DISABLED')
-            for smiles in mol_strs:
-                # mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
-                # if mol:
-                #     sanitized_smiles = Chem.MolToSmiles(mol)
-                #     if sanitized_smiles not in smiles_interp_list:
-                #         smiles_interp_list.append(sanitized_smiles)
-                #         break
-                smiles_interp_list.append(smiles)
+                # TODO: add back sanitization and validity checking once model is trained
+                logger.warn('WARNING: MOLECULE VALIDATION AND SANITIZATION CURRENTLY DISABLED')
+                for smiles in mol_strs:
+                    # mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
+                    # if mol:
+                    #     sanitized_smiles = Chem.MolToSmiles(mol)
+                    #     if sanitized_smiles not in smiles_interp_list:
+                    #         smiles_interp_list.append(sanitized_smiles)
+                    #         break
+                    smiles_interp_list.append(smiles)
 
         return smiles_interp_list
 
@@ -240,6 +242,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   scaled_radius=None,
                                   force_unique=False):
         distance = self._compute_radius(scaled_radius)
+        logger.info(f'Computing with distance {distance}...')
 
         embedding, pad_mask = self.smiles2embedding(smiles)
 
@@ -257,11 +260,12 @@ class MegaMolBART(BaseGenerativeWorkflow):
                              scaled_radius=None,
                              force_unique=False):
         distance = self._compute_radius(scaled_radius)
+        logger.info(f'Computing with distance {distance}...')
 
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
-                                           scaled_radius=distance,
+                                           scaled_radius=scaled_radius,
                                            force_unique=force_unique)
 
         generated_df = pd.DataFrame({'SMILES': generated_mols,
@@ -286,6 +290,8 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                 scaled_radius=None,
                                 force_unique=False):
         distance = self._compute_radius(scaled_radius)
+        logger.info(f'Computing with distance {distance}...')
+
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')

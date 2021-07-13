@@ -1,0 +1,4 @@
+name,value,radius,num_samples,iteration,run_time,data_size
+uniqueness,0.12857,0.01,10,610000,36383.275526,10000
+uniqueness,0.31911,0.1,10,610000,36453.618867,10000
+uniqueness,0.01619,0.5,10,610000,26175.038359,10000

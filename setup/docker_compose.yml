@@ -1,0 +1,50 @@
+version: "3.9"
+
+networks:
+  cuchemNet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${SUBNET}
+
+services:
+  cuchemUI:
+    image: "${CUCHEM_CONT}"
+    hostname: cuchemUI
+    networks:
+      cuchemNet:
+        ipv4_address: ${IP_CUCHEM_UI}
+    ports:
+      - "5000:5000"
+    volumes:
+      - './:/workspace'
+      - "${CONTENT_PATH}/data:/data"
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]
+    working_dir: /opt/nvidia/cheminfomatics
+    command: /opt/nvidia/cheminfomatics/launch.sh start ${ADDITIONAL_PARAM}
+    extra_hosts:
+      - "megamolbart:${IP_MEGAMOLBART}"
+
+  megamolbart:
+    image: "${MEGAMOLBART_CONT}"
+    hostname: 'megamolbart'
+    networks:
+      cuchemNet:
+        ipv4_address: ${IP_MEGAMOLBART}
+    volumes:
+        - './:/workspace'
+        - "${CONTENT_PATH}/data:/data"
+        - "${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: 1
+            capabilities: [gpu]

@@ -1,1 +1,0 @@
-from nvidia.cheminformatics.grpc.generative import SimilaritySampler as SimilaritySampler

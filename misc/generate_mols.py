@@ -2,9 +2,9 @@ import logging
 import pandas
 from rdkit import Chem
 
-from nvidia.cheminformatics.wf.generative import MolBART, Cddd
+from cuchem.wf.generative import MolBART, Cddd
 from tests.utils import _create_context
-from nvidia.cheminformatics.decorator import LipinskiRuleOfFiveDecorator, MolecularStructureDecorator, lipinski
+from cuchem.decorator import LipinskiRuleOfFiveDecorator, MolecularStructureDecorator, lipinski
 import dask.dataframe as dd
 import multiprocessing
 
@@ -62,8 +62,8 @@ def generate():
         try:
             if lipinski_score >= 3 and qed <= LipinskiRuleOfFiveDecorator.MAX_QED:
                 generated_list = wf.find_similars_smiles_list(smiles,
-                                                            num_requested=num_to_generate,
-                                                            radius=0.0001)
+                                                              num_requested=num_to_generate,
+                                                              radius=0.0001)
                 for new_smiles in generated_list:
                     lipinski_score, qed = score_molecule(new_smiles)
 

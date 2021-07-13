@@ -1,0 +1,5 @@
+name,value,model,iteration,run_time,data_size
+modelability,1.859535604931962,random forest,610000,711.04173,10000
+modelability,3.9454692140842496,support vector machine,610000,69.175584,10000
+modelability,4.146564116928782,linear regression,610000,1.207748,10000
+modelability,1.0,elastic net,610000,6.635356,10000

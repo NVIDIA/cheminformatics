@@ -7,7 +7,7 @@ from cuchemcommon.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = '.cheminf_local_environment'
+CONFIG_FILE = '.env'
 
 
 class Context(metaclass=Singleton):

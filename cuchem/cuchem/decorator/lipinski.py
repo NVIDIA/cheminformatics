@@ -6,7 +6,7 @@ import pandas
 from numpy.core.numeric import NaN
 from cuchem.decorator import BaseMolPropertyDecorator
 from rdkit import Chem
-from rdkit.Chem import QED
+from rdkit.Chem import QED, Descriptors, Lipinski
 
 logger = logging.getLogger(__name__)
 
@@ -36,38 +36,45 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
             m = Chem.MolFromSmiles(smiles)
 
             try:
-                logp = Chem.Descriptors.MolLogP(m)
+                logp = Descriptors.MolLogP(m)
                 mol_logp.append({'value': round(logp, 2),
                                  'level': 'info' if logp < LipinskiRuleOfFiveDecorator.MAX_LOGP else 'error'})
             except Exception as ex:
+                logger.exception(ex)
                 mol_logp.append({'value': NaN, 'level': 'info'})
 
             try:
-                wt = Chem.Descriptors.MolWt(m)
+                wt = Descriptors.MolWt(m)
                 mol_wt.append({'value': round(wt, 2),
                                'level': 'info' if wt < LipinskiRuleOfFiveDecorator.MAX_MOL_WT else 'error'})
             except Exception as ex:
+                logger.exception(ex)
                 mol_wt.append({'value': NaN, 'level': 'info'})
 
             try:
-                hdonor = Chem.Lipinski.NumHDonors(m)
+                hdonor = Lipinski.NumHDonors(m)
                 hdonors.append({'value': hdonor,
                                 'level': 'info' if hdonor < LipinskiRuleOfFiveDecorator.MAX_H_DONORS else 'error'})
             except Exception as ex:
+                logger.exception(ex)
                 hdonors.append({'value': NaN, 'level': 'info'})
 
             try:
-                hacceptor = Chem.Lipinski.NumHAcceptors(m)
-                hacceptors.append({'value': hacceptor,
-                                   'level': 'info' if hacceptor < LipinskiRuleOfFiveDecorator.MAX_H_DONORS else 'error'})
+                hacceptor = Lipinski.NumHAcceptors(m)
+                hacceptors.append(
+                    {'value': hacceptor,
+                     'level': 'info' if hacceptor < LipinskiRuleOfFiveDecorator.MAX_H_DONORS else 'error'})
             except Exception as ex:
+                logger.exception(ex)
                 hacceptors.append({'value': NaN, 'level': 'info'})
 
             try:
-                rotatable_bond = Chem.Lipinski.NumRotatableBonds(m)
-                rotatable_bonds.append({'value': rotatable_bond,
-                                        'level': 'info' if rotatable_bond < LipinskiRuleOfFiveDecorator.MAX_ROTATABLE_BONDS else 'error'})
+                rotatable_bond = Lipinski.NumRotatableBonds(m)
+                rotatable_bonds.append(
+                    {'value': rotatable_bond,
+                     'level': 'info' if rotatable_bond < LipinskiRuleOfFiveDecorator.MAX_ROTATABLE_BONDS else 'error'})
             except Exception as ex:
+                logger.exception(ex)
                 rotatable_bonds.append({'value': NaN, 'level': 'info'})
 
             try:

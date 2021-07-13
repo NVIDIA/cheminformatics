@@ -80,20 +80,24 @@ if [ -x "$(command -v docker)" ]; then
         PARAM_RUNTIME="--gpus all"
     fi
 else
-    echo -e "${RED}${BOLD}Please install docker. https://docs.docker.com/engine/install/${RESET}."
-    exit 1
-fi
-
-DOCKER_COMPOSE_SUPPORTED="1.29.1"
-if [ -x "$(command -v docker-compose)" ]; then
-    DOCKER_COMPOSE_VERSION=$(docker-compose version --short)
-    if [ "$(version "$DOCKER_COMPOSE_SUPPORTED")" -gt "$(version "$DOCKER_COMPOSE_VERSION")" ]; then
-        echo "${RED}${BOLD}Please upgrade docker-compose to ${DOCKER_COMPOSE_SUPPORTED} from https://docs.docker.com/compose/install/.${RESET}"
+    if [[ ! -d "/opt/nvidia/cheminfomatics" ]]; then
+        echo -e "${RED}${BOLD}Please install docker. https://docs.docker.com/engine/install/${RESET}."
         exit 1
     fi
-else
-    echo -e "${RED}${BOLD}Please install docker-compose. Version ${DOCKER_COMPOSE_SUPPORTED} or better. https://docs.docker.com/compose/install/${RESET}"
-    exit 1
+fi
+
+if [[ ! -d "/opt/nvidia/cheminfomatics" ]]; then
+    DOCKER_COMPOSE_SUPPORTED="1.29.1"
+    if [ -x "$(command -v docker-compose)" ]; then
+        DOCKER_COMPOSE_VERSION=$(docker-compose version --short)
+        if [ "$(version "$DOCKER_COMPOSE_SUPPORTED")" -gt "$(version "$DOCKER_COMPOSE_VERSION")" ]; then
+            echo "${RED}${BOLD}Please upgrade docker-compose to ${DOCKER_COMPOSE_SUPPORTED} from https://docs.docker.com/compose/install/.${RESET}"
+            exit 1
+        fi
+    else
+        echo -e "${RED}${BOLD}Please install docker-compose. Version ${DOCKER_COMPOSE_SUPPORTED} or better. https://docs.docker.com/compose/install/${RESET}"
+        exit 1
+    fi
 fi
 
 DATA_PATH="${CONTENT_PATH}/data"

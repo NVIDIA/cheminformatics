@@ -30,3 +30,4 @@ dask-worker-space
 .npm
 .cache_dir
 benchmark.csv
+.env

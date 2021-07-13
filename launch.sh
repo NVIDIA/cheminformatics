@@ -15,13 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-###############################################################################
-#
-# This is my $LOCAL_ENV file
-#
-LOCAL_ENV=.cheminf_local_environment
-#
-###############################################################################
+LOCAL_ENV=.env
 
 usage() {
     cat <<EOF
@@ -57,10 +51,7 @@ variables:
     CUCHEM_CONT
         container image, prepended with registry. e.g.,
         cheminformatics_demo:latest
-    MEGAMOLBART_TRAINING_CONT
-        container image for MegaMolBART training, prepended with registry. e.g.,
-        Note that this is a separate (precursor) container from any service associated containers
-    MEGAMOLBART_SERVICE_CONT
+    MEGAMOLBART_CONT
         container image for MegaMolBART service, prepended with registry.
     PROJECT_PATH
         path to repository. e.g.,
@@ -82,69 +73,9 @@ EOF
     exit
 }
 
-
-###############################################################################
-#
-# if $LOCAL_ENV file exists, source it to specify my environment
-#
-###############################################################################
-
-if [ -e ./$LOCAL_ENV ]
-then
-    echo sourcing environment from ./$LOCAL_ENV
-    . ./$LOCAL_ENV
-    write_env=0
-else
-    echo $LOCAL_ENV does not exist. Writing deafults to $LOCAL_ENV
-    write_env=1
-fi
-
-###############################################################################
-#
-# alternatively, override variable here.  These should be all that are needed.
-#
-###############################################################################
-
-CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:latest}
+source setup/env.sh
 MEGAMOLBART_TRAINING_CONT=${MEGAMOLBART_TRAINING_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest}
-MEGAMOLBART_SERVICE_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidian/clara/megamolbart:latest}
-PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
-DATA_PATH=${DATA_PATH:=/tmp}
-DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
-JUPYTER_PORT=${JUPYTER_PORT:-9000}
-PLOTLY_PORT=${PLOTLY_PORT:-5000}
-DASK_PORT=${DASK_PORT:-9001}
-GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN:=""}
-
 DEV_PYTHONPATH="/workspace/cuchem:/workspace/common:/workspace/common/generated/"
-###############################################################################
-#
-# If $LOCAL_ENV was not found, write out a template for user to edit
-#
-###############################################################################
-
-if [ $write_env -eq 1 ]; then
-    echo CUCHEM_CONT=${CUCHEM_CONT} >> $LOCAL_ENV
-    echo MEGAMOLBART_SERVICE_CONT=${MEGAMOLBART_SERVICE_CONT} >> $LOCAL_ENV
-    echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
-    echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
-    echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
-    echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
-    echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
-    echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
-fi
-
-###############################################################################
-#
-#          shouldn't need to make changes beyond this point
-#
-###############################################################################
-# Compare Docker version to find Nvidia Container Toolkit support.
-# Please refer https://github.com/NVIDIA/nvidia-docker
-DOCKER_VERSION_WITH_GPU_SUPPORT="19.03.0"
-if [ -x "$(command -v docker)" ]; then
-    DOCKER_VERSION=$(docker version | grep -i version | head -1 | awk '{print $2'})
-fi
 
 if [ -e /workspace/cuchem/startdash.py ]; then
     # When inside container in dev mode
@@ -157,42 +88,18 @@ else
     CUCHEM_LOC="./"
 fi
 
-PARAM_RUNTIME="--runtime=nvidia"
-if [ "$DOCKER_VERSION_WITH_GPU_SUPPORT" == "$(echo -e "$DOCKER_VERSION\n$DOCKER_VERSION_WITH_GPU_SUPPORT" | sort -V | head -1)" ];
-then
-    PARAM_RUNTIME="--gpus all"
-fi
-
-DOCKER_CMD="docker run \
-    --rm \
-    --network host \
-    ${PARAM_RUNTIME} \
-    -p ${JUPYTER_PORT}:8888 \
-    -p ${DASK_PORT}:${DASK_PORT} \
-    -p ${PLOTLY_PORT}:5000 \
-    -v ${PROJECT_PATH}:/workspace \
-    -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
-    -u $(id -u ${USER}):$(id -g ${USER}) \
-    --shm-size=1g \
-    --ulimit memlock=-1 \
-    --ulimit stack=67108864 \
-    -e HOME=/workspace \
-    -e TF_CPP_MIN_LOG_LEVEL=3 \
-    -w /workspace"
-
-DATE=$(date +%y%m%d)
-
 build() {
     set -e
+    DATE=$(date +%y%m%d)
 
     IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
     echo "Building ${CUCHEM_CONT_BASENAME}..."
-    docker build --no-cache --network host \
+    docker build --network host \
         -t ${CUCHEM_CONT_BASENAME}:latest \
         -t ${CUCHEM_CONT_BASENAME}:${DATE} \
         -f Dockerfile.cuchem .
 
-    IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_SERVICE_CONT}
+    IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
     echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
     docker build --no-cache --network host \
         -t ${MEGAMOLBART_CONT_BASENAME}:latest \
@@ -210,7 +117,7 @@ push() {
     local VERSION=$1
     set -x
     IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
-    IFS=':' read -ra MEGAMOLBART_BASENAME <<< ${MEGAMOLBART_SERVICE_CONT}
+    IFS=':' read -ra MEGAMOLBART_BASENAME <<< ${MEGAMOLBART_CONT}
 
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
     docker push ${CUCHEM_CONT_BASENAME}:latest
@@ -227,7 +134,7 @@ push() {
 pull() {
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
     docker pull ${CUCHEM_CONT}
-    docker pull ${MEGAMOLBART_SERVICE_CONT}
+    docker pull ${MEGAMOLBART_CONT}
     exit
 }
 
@@ -240,7 +147,7 @@ dev() {
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/megamolbart/models:/models/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
-        CONT=${MEGAMOLBART_SERVICE_CONT}
+        CONT=${MEGAMOLBART_CONT}
     else
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
@@ -252,47 +159,6 @@ dev() {
 }
 
 
-dbSetup() {
-    local DATA_DIR=$1
-
-    if [[ ! -e "${DATA_DIR}/db/chembl_27.db" ]]; then
-        echo "Downloading chembl db to ${DATA_DIR}..."
-        mkdir -p ${DATA_DIR}/db
-        if [[ ! -e "${DATA_DIR}/chembl_27_sqlite.tar.gz" ]]; then
-            wget -q --show-progress \
-                -O ${DATA_DIR}/chembl_27_sqlite.tar.gz \
-                ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
-            return_code=$?
-            if [[ $return_code -ne 0 ]]; then
-                echo 'ChEMBL database download failed. Please check network settings.'
-                rm -rf ${DATA_DIR}/chembl_27_sqlite.tar.gz
-                exit $return_code
-            fi
-        fi
-
-        wget -q --show-progress \
-            -O ${DATA_DIR}/checksums.txt \
-            ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/checksums.txt
-        echo "Unzipping chembl db to ${DATA_DIR}..."
-        if cd ${DATA_DIR}; sha256sum --check --ignore-missing --status ${DATA_DIR}/checksums.txt
-        then
-            tar -C ${DATA_DIR}/db \
-                --strip-components=2 \
-                -xf ${DATA_DIR}/chembl_27_sqlite.tar.gz chembl_27/chembl_27_sqlite/chembl_27.db
-            return_code=$?
-            if [[ $return_code -ne 0 ]]; then
-                echo 'ChEMBL database extraction faile. Please cleanup ${DATA_DIR} directory and retry.'
-                rm -rf ${DATA_DIR}/chembl_27_sqlite.tar.gz
-                exit $return_code
-            fi
-        else
-            echo "Please clean ${DATA_DIR} directory and retry."
-            exit 1
-        fi
-    fi
-}
-
-
 start() {
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
         # Executed within container or a managed env.
@@ -300,9 +166,12 @@ start() {
         cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
     else
         # run a container and start dash inside container.
-        echo "${CUCHEM_CONT} ${MEGAMOLBART_SERVICE_CONT}"
+        download_model
+        dbSetup "${DATA_PATH}"
+
+        echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
         export ADDITIONAL_PARAM="$@"
-        docker-compose --env-file .cheminf_local_environment  \
+        docker-compose --env-file .env  \
             -f setup/docker_compose.yml \
             --project-directory . \
             up
@@ -312,7 +181,7 @@ start() {
 
 
 stop() {
-    docker-compose --env-file .cheminf_local_environment  \
+    docker-compose --env-file .env  \
         -f setup/docker_compose.yml \
         --project-directory . \
         down

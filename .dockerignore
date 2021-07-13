@@ -26,4 +26,3 @@ dask-worker-space
 .cache_dir
 portal
 megamolbart/models
-setup

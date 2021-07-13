@@ -1,10 +1,11 @@
 import logging
 import pandas
 from rdkit import Chem
+from rdkit.Chem import QED, Descriptors, Lipinski
 
-from cuchem.wf.generative import MolBART, Cddd
+from cuchem.wf.generative import MolBART
 from tests.utils import _create_context
-from cuchem.decorator import LipinskiRuleOfFiveDecorator, MolecularStructureDecorator, lipinski
+from cuchem.decorator import LipinskiRuleOfFiveDecorator
 import dask.dataframe as dd
 import multiprocessing
 
@@ -24,24 +25,25 @@ def score_molecule(smiles):
 
     try:
         m = Chem.MolFromSmiles(smiles)
-        logp = Chem.Descriptors.MolLogP(m)
+        logp = Descriptors.MolLogP(m)
         lipinski_score += 1 if logp < LipinskiRuleOfFiveDecorator.MAX_LOGP else 0
 
-        wt = Chem.Descriptors.MolWt(m)
+        wt = Descriptors.MolWt(m)
         lipinski_score += 1 if wt < LipinskiRuleOfFiveDecorator.MAX_MOL_WT else 0
 
-        hdonor = Chem.Lipinski.NumHDonors(m)
+        hdonor = Lipinski.NumHDonors(m)
         lipinski_score += 1 if hdonor < LipinskiRuleOfFiveDecorator.MAX_H_DONORS else 0
 
-        hacceptor = Chem.Lipinski.NumHAcceptors(m)
+        hacceptor = Lipinski.NumHAcceptors(m)
         lipinski_score += 1 if hacceptor < LipinskiRuleOfFiveDecorator.MAX_H_DONORS else 0
 
-        rotatable_bond = Chem.Lipinski.NumRotatableBonds(m)
+        rotatable_bond = Lipinski.NumRotatableBonds(m)
         lipinski_score += 1 if rotatable_bond < LipinskiRuleOfFiveDecorator.MAX_ROTATABLE_BONDS else 0
 
-        qed = Chem.QED.qed(m)
+        qed = QED.qed(m)
     except Exception as ex:
         lipinski_score = 0
+        logger.exception(ex)
 
     return lipinski_score, qed
 
@@ -83,19 +85,18 @@ def generate():
 
         return valid_list + lipinski_scores + qed_scores
 
-
     data = pandas.read_csv('/workspace/tests/data/benchmark_approved_drugs.csv')
 
-    prop_meta = dict(zip([ i for i in range(num_to_add)],
-                        [pandas.Series([], dtype='object') for i in range(num_to_add)]))
-    prop_meta.update(dict(zip([ num_to_add + i for i in range(num_to_add)],
-                        [pandas.Series([], dtype='int8') for i in range(num_to_add)])))
-    prop_meta.update(dict(zip([ (2 * num_to_add) + i for i in range(num_to_add)],
-                        [pandas.Series([], dtype='float64') for i in range(num_to_add)])))
+    prop_meta = dict(zip([i for i in range(num_to_add)],
+                         [pandas.Series([], dtype='object') for i in range(num_to_add)]))
+    prop_meta.update(dict(zip([num_to_add + i for i in range(num_to_add)],
+                              [pandas.Series([], dtype='int8') for i in range(num_to_add)])))
+    prop_meta.update(dict(zip([(2 * num_to_add) + i for i in range(num_to_add)],
+                              [pandas.Series([], dtype='float64') for i in range(num_to_add)])))
     meta_df = pandas.DataFrame(prop_meta)
 
-    context = _create_context()
-    ddf = dd.from_pandas(data, npartitions = 4 * multiprocessing.cpu_count())
+    _create_context()
+    ddf = dd.from_pandas(data, npartitions=4 * multiprocessing.cpu_count())
     ddf = ddf.map_partitions(
         lambda dframe: dframe.apply(_generate, result_type='expand', axis=1),
         meta=meta_df)

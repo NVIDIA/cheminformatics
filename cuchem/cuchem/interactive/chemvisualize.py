@@ -699,8 +699,6 @@ class ChemVisualization(metaclass=Singleton):
                                 dcc.Dropdown(id='sl_generative_wf', multi=False,
                                              options=[{'label': 'CDDD Model',
                                                        'value': 'cuchem.wf.generative.Cddd'},
-                                                      {'label': 'MolBART Model',
-                                                       'value': 'cuchem.wf.generative.MolBART'},
                                                       {'label': 'MegatronMolBART Model',
                                                        'value': 'cuchem.wf.generative.MegatronMolBART'},
                                                       ],

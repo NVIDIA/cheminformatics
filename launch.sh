@@ -120,6 +120,7 @@ push() {
     IFS=':' read -ra MEGAMOLBART_BASENAME <<< ${MEGAMOLBART_CONT}
 
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+
     docker push ${CUCHEM_CONT_BASENAME}:latest
     docker tag ${CUCHEM_CONT_BASENAME}:latest ${CUCHEM_CONT_BASENAME}:${VERSION}
     docker push ${CUCHEM_CONT_BASENAME}:${VERSION}
@@ -162,6 +163,9 @@ dev() {
 start() {
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
         # Executed within container or a managed env.
+        if [[ -d "/workspace/common/generated" ]]; then
+            PYTHONPATH="/workspace/cuchem:/workspace/common:/workspace/common/generated/"
+        fi
         dbSetup "${DATA_MOUNT_PATH}"
         cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
     else
@@ -169,12 +173,13 @@ start() {
         download_model
         dbSetup "${DATA_PATH}"
 
-        echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
         export ADDITIONAL_PARAM="$@"
+        export CUCHEM_PATH=/workspace
+        export MEGAMOLBART_PATH=/workspace/megamolbart
         docker-compose --env-file .env  \
-            -f setup/docker_compose.yml \
-            --project-directory . \
-            up
+                -f setup/docker_compose.yml \
+                --project-directory . \
+                up
     fi
     exit
 }

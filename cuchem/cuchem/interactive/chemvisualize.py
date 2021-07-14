@@ -323,8 +323,13 @@ class ChemVisualization(metaclass=Singleton):
                 if isinstance(col_value, str) and col_value.startswith('data:image/png;base64,'):
                     td.append(html.Td(html.Img(src=col_value)))
                 else:
-                    td.append(html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level].update(
-                        {'maxWidth': '100px', 'wordWrap': 'break-word'})))
+                    td.append(html.Td(str(col_value),
+                                      style={'maxWidth': '300px',
+                                             'wordWrap': 'break-word',
+                                             'text-align': 'center',
+                                             'color': LEVEL_TO_STYLE[col_level]['color']
+                                             }
+                                      ))
 
             prop_recs.append(html.Tr(td))
 
@@ -597,7 +602,8 @@ class ChemVisualization(metaclass=Singleton):
             td.append(html.Td(smiles, style={'maxWidth': '100px', 'wordWrap': 'break-word'}))
             for key in display_properties:
                 if key in PROP_DISP_NAME:
-                    td.append(html.Td(selected_molecule[props.index(key)]))
+                    td.append(html.Td(selected_molecule[props.index(key)],
+                                      style={'fontSize': '110%', 'text-align': 'center'}))
 
             molregno = selected_molecule[0]
             if chembl_ids:

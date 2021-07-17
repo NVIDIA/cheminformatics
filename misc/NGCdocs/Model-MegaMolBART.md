@@ -26,19 +26,25 @@ Model performance was evaluated using the test split from ZINC-15. For each inpu
 4. Nearest Neighbor Correlation: the ranked correlation between pairwise distances calculated from Morgan Fingerprints (Tanimoto distance) and model embeddings (euclidean distance)
 5. Modelability: the ratio of mean squared errors from predicting molecular properties (LogP and molecular weight) using model embeddings or Morgan Fingerprints as features. The following models were tested: linear regression, SVM, Random Forest. The higher the ratio, the better the model performs on embeddings perform relative to the fingerprints.
 
-| Validity | Uniqueness | Novelty | Nearest Neighbor Correlation |
-| --- | --- | --- | --- |
-| 0.98902 | 0.31911 | 0.36019 | 0.17891 |
+>>**Validity**: 0.98902
 
-Modelability
+>>**Uniqueness**: 0.31911
 
-| Linear Regression | SVM | Random Forest |
-| --- | --- | --- |
-| 4.14656 | 3.94546 | 1.85953 |
+>>**Novelty**: 0.36019
+
+>>**Nearest Neighbor Correlation**: 0.17891
+
+>Modelability
+
+>>**Linear Regression**: 4.14656
+
+>>**SVM**: 3.94546
+
+>>**Random Forest**: 1.85953
 
 ## How to Use this Model
 
-MegaMolBART can be run on hardware with access to any NVIDIA GPU with memory greater than 8 GB. The model can also be used with NVIDIA Clara Discovery using the [supplied container]  ( **RAJESH INSERT LINK** ). The container runs a gRPC service that can generate one of the following using an input SMILES string or list of SMILES strings as the source:
+MegaMolBART can be run on hardware with access to any NVIDIA GPU with memory greater than 8 GB. The model can also be used with NVIDIA Clara Discovery using the [Mega-MolBART gRPC Service](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:megamolbart). The container runs a gRPC service that can generate one of the following using an input SMILES string or list of SMILES strings as the source:
 
 1. Embeddings from the latent space
 2. SMILES strings sampled around the region of a single input SMILES molecule

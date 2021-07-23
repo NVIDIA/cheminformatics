@@ -24,3 +24,5 @@ dask-worker-space
 .python_history
 .vscode
 .cache_dir
+portal
+megamolbart/models

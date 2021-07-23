@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package nvidia.cheminformatics.grpc;
+
+// python -m grpc_tools.protoc -I./grpc/ \
+//            --python_out=generated \
+//            --experimental_allow_proto3_optional \
+//            --grpc_python_out=generated \
+//            ./grpc/generativesampler.proto
+
+
+enum GenerativeModel {
+  CDDD = 0;
+  MegaMolBART = 1;
+  MolBART = 10000;
+}
+
+
+service GenerativeSampler {
+  rpc SmilesToEmbedding(GenerativeSpec) returns (EmbeddingList) {};
+  rpc FindSimilars(GenerativeSpec) returns (SmilesList) {};
+  rpc Interpolate(GenerativeSpec) returns (SmilesList) {};
+  rpc GetIteration(GenerativeSpec) returns (IterationVal) {};
+}
+
+
+message GenerativeSpec {
+  GenerativeModel model = 1;
+  repeated string smiles = 2;
+  optional float radius = 3;
+  optional int32 numRequested = 4;
+  optional int32 padding = 5;
+}
+
+
+message SmilesList {
+  repeated string generatedSmiles = 1;
+}
+
+message EmbeddingList{
+  repeated float embedding = 1;
+}
+
+message IterationVal{
+  int32 iteration = 1;
+}

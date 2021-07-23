@@ -1,6 +1,6 @@
 ## Model Overview
 
-MegaMolBART is a model that understands chemistry and can be used for a variety of cheminformatics applications in drug discovery. The embeddings from its encoder can be used as features for predictive models. Alternatively, the encoder and decoder can be used together to generate novel molecules by sampling the model’s latent space.
+MegaMolBART is a model that understands chemistry and can be used for a variety of cheminformatics applications in drug discovery. The embeddings from its encoder can be used as features for predictive models. Alternatively, the encoder and decoder can be used together to generate novel molecules by sampling the model's latent space.
 
 ## Model Architecture
 
@@ -44,7 +44,7 @@ Model performance was evaluated using the test split from ZINC-15. For each inpu
 
 ## How to Use this Model
 
-MegaMolBART can be run on hardware with access to any NVIDIA GPU with memory greater than 8 GB. The model can also be used with NVIDIA Clara Discovery using the [Mega-MolBART gRPC Service](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:megamolbart). The container runs a gRPC service that can generate one of the following using an input SMILES string or list of SMILES strings as the source:
+MegaMolBART can be run on hardware with access to any NVIDIA GPU with memory greater than 8 GB. The model can also be used with NVIDIA Clara Discovery using the [Mega-MolBART gRPC Service](https://ngc.nvidia.com/containers/nvidia:clara:megamolbart). The container runs a gRPC service that can generate one of the following using an input SMILES string or list of SMILES strings as the source:
 
 1. Embeddings from the latent space
 2. SMILES strings sampled around the region of a single input SMILES molecule
@@ -65,7 +65,3 @@ Outputs are either a list of SMILES strings or a 1D vector of embeddings. The fi
 1. Lewis, M. et al. BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension. Arxiv (2019).
 2. Irwin, R., Dimitriadis, S., He, J. & Bjerrum, E. Chemformer: A Pre-Trained Transformer for Computational Chemistry. (n.d.) doi:10.33774/chemrxiv-2021-v2pnn.
 3. Sterling and Irwin, J. Chem. Inf. Model, 2015 http://pubs.acs.org/doi/abs/10.1021/acs.jcim.5b00559.
-
-## License
-
-**TODO -- Abe/Rajesh, do you know which license we should be using**

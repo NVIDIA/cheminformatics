@@ -96,6 +96,41 @@
 
   - debug: var=ids
 
+- name: Install docker-compose
+  hosts: all
+  become: yes
+  tasks:
+  - name: Download docker-compose
+    get_url:
+      url: https://github.com/docker/compose/releases/download/1.29.2/docker-compose-Linux-x86_64
+      dest: /usr/local/bin/docker-compose
+      mode: '0777'
+
+- name: Install NGC CLI
+  hosts: all
+  become: yes
+  tasks:
+  - name: Setup for CLI
+    ansible.builtin.file:
+      path: /opt/ngc
+      state: directory
+      mode: '0755'
+
+  - name: Download NGC CLI
+    unarchive:
+      src: https://ngc.nvidia.com/downloads/ngccli_linux.zip
+      dest: /opt/ngc/
+      remote_src: yes
+
+  - name: Fix permissions
+    ansible.builtin.file:
+      path: /opt/ngc/ngc
+      mode: '1777'
+
+  - name: Adding the path in the Profile files
+    lineinfile: dest=/home/{{ ansible_user }}/.bash_profile line='export PATH=$PATH:/opt/ngc' insertafter='EOF' regexp='export PATH=$PATH:/opt/ngc' state=present
+    become: true
+
 - name: Restart
   hosts: all
   become: yes

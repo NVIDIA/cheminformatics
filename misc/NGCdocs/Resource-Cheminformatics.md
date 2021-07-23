@@ -1,10 +1,10 @@
 Overview
 -------------------------------------------------------------------------------
 **Cheminformatics** resource is a collection of scripts and configuration to bringing up Cheminformatices application. The application itself requires two images available at NGC:
- - [Cheminformatics](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:cheminformatics_demo)
- - [Mega-MolBART gRPC Service](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:megamolbart)
+ - [Cheminformatics](https://ngc.nvidia.com/containers/nvidia:clara:cheminformatics_demo)
+ - [Mega-MolBART gRPC Service](https://ngc.nvidia.com/containers/nvidia:clara:megamolbart)
 
-Please refer documentation at [Cheminformatics](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:cheminformatics_demo) image for features.
+Please refer documentation at [Cheminformatics](https://ngc.nvidia.com/containers/nvidia:clara:cheminformatics_demo) image for features.
 
 
 
@@ -22,7 +22,7 @@ Setup
 ## Steps
   - Please download the file and extract or execute the following command to get the resource.
     ```
-    ngc registry resource download-version "nv-drug-discovery-dev/cheminformatics:0.1"
+    ngc registry resource download-version "nvidia/clara/cheminformatics:0.1"
     ```
 
   - Execute the following commands to start the tool.

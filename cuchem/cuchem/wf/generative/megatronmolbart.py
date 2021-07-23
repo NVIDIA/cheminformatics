@@ -7,7 +7,6 @@ import grpc
 import pandas as pd
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
-from cuchemcommon.fingerprint import MorganFingerprint
 from cuchemcommon.utils.singleton import Singleton
 from cuchemcommon.workflow import BaseGenerativeWorkflow
 
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
-    def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(MorganFingerprint)) -> None:
+    def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(None)) -> None:
         super().__init__(dao)
 
         self.min_jitter_radius = 1

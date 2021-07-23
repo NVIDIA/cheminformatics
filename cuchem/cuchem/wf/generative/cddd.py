@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
 
-    def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao()) -> None:
+    def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(None)) -> None:
         super().__init__(dao)
         self.default_model_loc = download_cddd_models()
         self.dao = dao

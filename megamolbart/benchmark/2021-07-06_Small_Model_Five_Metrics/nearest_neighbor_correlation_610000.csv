@@ -1,0 +1,5 @@
+name,value,top_k,iteration,run_time,data_size
+nearest neighbor correlation,0.17891251564751073,9999,610000,654.126332,10000
+nearest neighbor correlation,0.17891251564751073,50,610000,31.319915,10000
+nearest neighbor correlation,0.17891251564751073,100,610000,31.437954,10000
+nearest neighbor correlation,0.17891251564751073,500,610000,31.401589,10000

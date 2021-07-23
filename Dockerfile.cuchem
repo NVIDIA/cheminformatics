@@ -1,0 +1,40 @@
+# Copyright 2020 NVIDIA Corporation
+FROM nvidia/cuda:11.0-base
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
+    && rm -rf /var/lib/apt/lists/*
+
+SHELL ["/bin/bash", "-c"]
+RUN  wget --quiet -O /tmp/miniconda.sh \
+    https://repo.anaconda.com/miniconda/Miniconda3-py37_4.9.2-Linux-x86_64.sh \
+    && /bin/bash /tmp/miniconda.sh -b -p /opt/conda \
+    && rm /tmp/miniconda.sh \
+    && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh
+
+ENV PATH /opt/conda/bin:$PATH
+
+# Copy conda env spec.
+COPY cuchem/conda/env.yml /tmp
+
+RUN conda env create --name cuchem -f /tmp/env.yml \
+    && rm /tmp/env.yml\
+    && conda clean -afy
+ENV PATH /opt/conda/envs/cuchem/bin:$PATH
+
+RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
+RUN echo "source activate cuchem" > /etc/bash.bashrc
+
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+# Any line that needs to be executed without refering to cache should be below
+# this line.
+# TODO: The following lines will change once the current refactor is complete
+COPY ./ /opt/nvidia/cheminfomatics
+RUN cd /opt/nvidia/cheminfomatics/common; pip install .
+RUN cd /opt/nvidia/cheminfomatics/cuchem; pip install -r requirements.txt
+
+ENV PYTHONPATH /opt/nvidia/cheminfomatics/common/generated:$PYTHONPATH
+
+ENV UCX_LOG_LEVEL error
+CMD cd /opt/nvidia/cheminfomatics; ./launch.sh start

@@ -1,0 +1,12 @@
+Steps to run benchmark:
+- Execute the following command to create megamolbart service container instance
+  > ./launch.sh dev 2
+
+- In the container shell execute this command to start grpc service in background
+  > cd megamolbart
+  > python launch.py &
+
+
+Now start benchmark scipt
+
+./benchmark.py

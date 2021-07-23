@@ -1,0 +1,18 @@
+# Commands used to publish content into NGC
+# Create a new model
+ngc registry model create \
+    --application OTHER \
+    --format 'PyTorch' \
+    --framework 'Megatron LM' \
+    --precision FP32 \
+    --short-desc 'A BART transformer language model on molecular SMILES strings' \
+    --org nv-drug-discovery-dev
+    nv-drug-discovery-dev/megamolbart
+
+
+# Create and upload a model version
+ngc registry model upload-version \
+    --gpu-model A100 \
+    --org nv-drug-discovery-dev \
+    --source megamolbart/models/ \
+    nv-drug-discovery-dev/megamolbart:0.1

@@ -41,7 +41,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                                  'level': 'info' if logp < LipinskiRuleOfFiveDecorator.MAX_LOGP else 'error'})
             except Exception as ex:
                 logger.exception(ex)
-                mol_logp.append({'value': NaN, 'level': 'info'})
+                mol_logp.append({'value': '-', 'level': 'info'})
 
             try:
                 wt = Descriptors.MolWt(m)
@@ -49,7 +49,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                                'level': 'info' if wt < LipinskiRuleOfFiveDecorator.MAX_MOL_WT else 'error'})
             except Exception as ex:
                 logger.exception(ex)
-                mol_wt.append({'value': NaN, 'level': 'info'})
+                mol_wt.append({'value': '-', 'level': 'info'})
 
             try:
                 hdonor = Lipinski.NumHDonors(m)
@@ -57,7 +57,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                                 'level': 'info' if hdonor < LipinskiRuleOfFiveDecorator.MAX_H_DONORS else 'error'})
             except Exception as ex:
                 logger.exception(ex)
-                hdonors.append({'value': NaN, 'level': 'info'})
+                hdonors.append({'value': '-', 'level': 'info'})
 
             try:
                 hacceptor = Lipinski.NumHAcceptors(m)
@@ -66,7 +66,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                      'level': 'info' if hacceptor < LipinskiRuleOfFiveDecorator.MAX_H_DONORS else 'error'})
             except Exception as ex:
                 logger.exception(ex)
-                hacceptors.append({'value': NaN, 'level': 'info'})
+                hacceptors.append({'value': '-', 'level': 'info'})
 
             try:
                 rotatable_bond = Lipinski.NumRotatableBonds(m)
@@ -75,7 +75,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                      'level': 'info' if rotatable_bond < LipinskiRuleOfFiveDecorator.MAX_ROTATABLE_BONDS else 'error'})
             except Exception as ex:
                 logger.exception(ex)
-                rotatable_bonds.append({'value': NaN, 'level': 'info'})
+                rotatable_bonds.append({'value': '-', 'level': 'info'})
 
             try:
                 qed = QED.qed(m)
@@ -83,7 +83,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                              'level': 'info' if qed < LipinskiRuleOfFiveDecorator.MAX_QED else 'error'})
             except Exception as ex:
                 logger.exception(ex)
-                qeds.append({'value': NaN, 'level': 'info'})
+                qeds.append({'value': '-', 'level': 'info'})
 
         df['Molecular Weight'] = mol_wt
         df['LogP'] = mol_logp

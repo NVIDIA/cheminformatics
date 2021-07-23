@@ -20,8 +20,8 @@ services:
       - './:/workspace'
       - "${CONTENT_PATH}/data:/data"
     user: "${UID}:${GID}"
-    working_dir: /opt/nvidia/cheminfomatics
-    command: /opt/nvidia/cheminfomatics/launch.sh start ${ADDITIONAL_PARAM}
+    working_dir: ${CUCHEM_PATH}
+    command: ./launch.sh start ${ADDITIONAL_PARAM}
     extra_hosts:
       - "megamolbart:${IP_MEGAMOLBART}"
     deploy:
@@ -43,6 +43,8 @@ services:
         - "${CONTENT_PATH}/data:/data"
         - "${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
     user: "${UID}:${GID}"
+    working_dir: ${MEGAMOLBART_PATH}
+    command: python3 launch.py
     deploy:
       resources:
         reservations:

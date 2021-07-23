@@ -4,7 +4,6 @@ Overview
  - [Cheminformatics](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:cheminformatics_demo)
  - [Mega-MolBART gRPC Service](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:megamolbart)
 
-
 Please refer documentation at [Cheminformatics](https://ngc.nvidia.com/containers/nv-drug-discovery-dev:cheminformatics_demo) image for features.
 
 

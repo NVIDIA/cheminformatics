@@ -97,6 +97,10 @@ start() {
 
     download_model
     dbSetup ${DATA_PATH}
+
+    export ADDITIONAL_PARAM="$@"
+    export CUCHEM_PATH=/opt/nvidia/cheminfomatics
+    export MEGAMOLBART_PATH=/opt/nvidia/megamolbart
     docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \

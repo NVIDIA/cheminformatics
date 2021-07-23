@@ -1,8 +1,9 @@
 # Copyright 2020 NVIDIA Corporation
 FROM nvidia/cuda:11.0-base
 
-RUN apt update && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
-    && apt install --only-upgrade libssl1.1 openssl \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
     && rm -rf /var/lib/apt/lists/*
 
 SHELL ["/bin/bash", "-c"]
@@ -25,26 +26,6 @@ ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
 
-# TODO: Replace the following lines once the PySMILES repo is available.
-RUN wget  --quiet -O /tmp/pysmilesutils-mirror.tgz \
-    http://rilango-work.nvidia.com/molbart/pysmilesutils-mirror.tgz \
-    && tar -xf /tmp/pysmilesutils-mirror.tgz -C /opt \
-    && cd /opt/pysmilesutils-mirror; pip install .
-
-# MolBART
-# TODO: Remove once MegaMolBART is complete
-RUN wget  --quiet -O /tmp/molbart-mirror.tgz \
-    http://rilango-work.nvidia.com/molbart/molbart-mirror.tgz \
-    && tar -xf /tmp/molbart-mirror.tgz -C /opt \
-    && cd /opt/molbart-mirror; pip install -r requirements.txt; pip install .
-
-# TODO: Remove once MegaMolBART is complete
-RUN mkdir -p /models/molbart \
-    && wget --quiet -O /models/molbart/mol_opt_tokeniser.pickle \
-    http://rilango-work.nvidia.com/molbart/mol_opt_tokeniser.pickle \
-    && wget --quiet -O /models/molbart/az_molbart_pretrain.ckpt \
-    http://rilango-work.nvidia.com/molbart/az_molbart_pretrain.ckpt
-
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 # Any line that needs to be executed without refering to cache should be below
 # this line.
@@ -56,7 +37,4 @@ RUN cd /opt/nvidia/cheminfomatics/cuchem; pip install -r requirements.txt
 ENV PYTHONPATH /opt/nvidia/cheminfomatics/common/generated:$PYTHONPATH
 
 ENV UCX_LOG_LEVEL error
-RUN pip install torch==1.7.0+cu110 torchvision==0.8.1+cu110 torchaudio==0.7.0 \
-    -f https://download.pytorch.org/whl/torch_stable.html
-
 CMD cd /opt/nvidia/cheminfomatics; ./launch.sh start

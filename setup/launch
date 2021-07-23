@@ -83,15 +83,16 @@ start() {
     export ADDITIONAL_PARAM="$@"
 
     if [ -z ${REGISTRY_ACCESS_TOKEN} ]; then
-        echo "Please ensure 'REGISTRY_ACCESS_TOKEN' in $LOCAL_ENV is correct and rerun this script. Please set NGC API key to REGISTRY_ACCESS_TOKEN."
+        echo "${RED}Please ensure 'REGISTRY_ACCESS_TOKEN' in $LOCAL_ENV is correct and rerun this script. Please set NGC API key to REGISTRY_ACCESS_TOKEN.${RESET}"
         exit
     else
-        echo "Attempting docker login to ${REGISTRY}."
+        echo "${YELLOW}Attempting docker login to ${REGISTRY}.${RESET}"
     fi
 
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
     if [[ $? -ne 0 ]]; then
-        echo "Docker login failed. Please check network settings and ensure 'REGISTRY_ACCESS_TOKEN' is $LOCAL_ENV is correct."
+        echo "${RED}Docker login failed. Please setup ngc('ngc config set'). "
+        echo "Please also check network settings and ensure 'REGISTRY_ACCESS_TOKEN' is $LOCAL_ENV is correct.${RESET}"
         exit 1
     fi
 

@@ -44,6 +44,7 @@ fi
 
 CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:latest}
 MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/megamolbart:latest}
+MEGAMOLBART_MODEL=${MEGAMOLBART_MODEL:=nvidia/clara/megamolbart:0.1}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 CONTENT_PATH=${CONTENT_PATH:=$(pwd)}
 DATA_MOUNT_PATH=${DATA_MOUNT_PATH:=/data}
@@ -56,6 +57,7 @@ IP_MEGAMOLBART=${IP_MEGAMOLBART:=192.168.100.2}
 if [ $write_env -eq 1 ]; then
     echo CUCHEM_CONT=${CUCHEM_CONT} >> $LOCAL_ENV
     echo MEGAMOLBART_CONT=${MEGAMOLBART_CONT} >> $LOCAL_ENV
+    echo MEGAMOLBART_MODEL=${MEGAMOLBART_MODEL} >> $LOCAL_ENV
     echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
     echo CONTENT_PATH=${CONTENT_PATH} >> $LOCAL_ENV
     echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
@@ -102,7 +104,6 @@ fi
 
 DATA_PATH="${CONTENT_PATH}/data"
 MODEL_PATH="${CONTENT_PATH}/models"
-MODEL_NAME='megamolbart:0.1'
 
 DOCKER_CMD="docker run \
     --rm \
@@ -170,10 +171,10 @@ download_model() {
     set -e
     if [[ ! -e "${MODEL_PATH}" ]]; then
         mkdir -p ${MODEL_PATH}
-        echo -e "${YELLOW}Downloading model ${MODEL_NAME} to ${MODEL_PATH}...${RESET}"
+        echo -e "${YELLOW}Downloading model ${MEGAMOLBART_MODEL} to ${MODEL_PATH}...${RESET}"
         ngc registry model download-version \
             --dest ${MODEL_PATH} \
-            "nv-drug-discovery-dev/${MODEL_NAME}"
+            "${MEGAMOLBART_MODEL}"
     fi
     set +e
 }

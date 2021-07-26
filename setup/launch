@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+#
+# Copyright (c) 2020-2021, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+LOCAL_ENV=.env
+
+usage() {
+    cat <<EOF
+
+USAGE: launch
+
+Startup script
+----------------------------------------
+
+launch [command]
+
+    valid commands:
+        start
+        stop
+        cache
+
+
+Getting Started tl;dr
+----------------------------------------
+
+    ./launch start
+
+    navigate browser to http://localhost:5000
+
+
+More Information
+----------------------------------------
+Note: This script looks for a file called $LOCAL_ENV in the
+current directory. This file should define the following environment
+variables:
+    CUCHEM_CONT
+        container image, prepended with registry. e.g.,
+        cheminformatics_demo:latest
+    MEGAMOLBART_CONT
+        container image for MegaMolBART service, prepended with registry.
+    DATA_PATH
+        path to data directory. e.g.,
+        /scratch/data/cheminformatics
+    REGISTRY_ACCESS_TOKEN
+        container registry access token. e.g.,
+        Ckj53jGK...
+    REGISTRY_USER
+        container registry username. e.g.,
+        astern
+    REGISTRY
+        container registry URL. e.g.,
+        server.com/registry:5005
+
+EOF
+    exit
+}
+
+if [ ! -x "$(command -v ngc)" ]; then
+    echo "${RED}Please install NGC CLI. https://docs.nvidia.com/dgx/ngc-registry-cli-user-guide/index.html${RESET}"
+    exit 1
+fi
+
+
+source env.sh
+
+
+start() {
+    # run a container and start dash inside container.
+    echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
+    export ADDITIONAL_PARAM="$@"
+
+    if [ -z ${REGISTRY_ACCESS_TOKEN} ]; then
+        echo "${RED}Please ensure 'REGISTRY_ACCESS_TOKEN' in $LOCAL_ENV is correct and rerun this script. Please set NGC API key to REGISTRY_ACCESS_TOKEN.${RESET}"
+        exit
+    else
+        echo "${YELLOW}Attempting docker login to ${REGISTRY}.${RESET}"
+    fi
+
+    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+    if [[ $? -ne 0 ]]; then
+        echo "${RED}Docker login failed. Please setup ngc('ngc config set'). "
+        echo "Please also check network settings and ensure 'REGISTRY_ACCESS_TOKEN' is $LOCAL_ENV is correct.${RESET}"
+        exit 1
+    fi
+
+    download_model
+    dbSetup ${DATA_PATH}
+
+    export ADDITIONAL_PARAM="$@"
+    export CUCHEM_PATH=/opt/nvidia/cheminfomatics
+    export MEGAMOLBART_PATH=/opt/nvidia/megamolbart
+    docker-compose --env-file .env  \
+        -f docker_compose.yml \
+        --project-directory . \
+        up
+}
+
+
+stop() {
+    docker-compose --env-file .env  \
+        -f docker_compose.yml \
+        --project-directory . \
+        down
+}
+
+
+cache() {
+    if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
+        set -x
+        # Executed within container or a managed env.
+        dbSetup "${DATA_MOUNT_PATH}"
+        cd ${CUCHEM_LOC}; python3 startdash.py cache $@
+    else
+        dbSetup "${DATA_PATH}"
+        # run a container and start dash inside container.
+        ${DOCKER_CMD} -it ${CUCHEM_CONT} ./launch.sh cache $@
+    fi
+    exit
+}
+
+
+case $1 in
+    start)
+        $@
+        ;;
+    stop)
+        ;&
+    cache)
+        $@
+        ;;
+    -h|--help)
+        usage
+        ;;
+    *)
+        start
+        ;;
+esac

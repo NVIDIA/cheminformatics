@@ -22,9 +22,12 @@ cddd/
 .ssh/
 .vscode-server/
 .wget-hsts
+.idea/
+.venv/
 
 __pycache__
 dask-worker-space
 .npm
 .cache_dir
 benchmark.csv
+.env

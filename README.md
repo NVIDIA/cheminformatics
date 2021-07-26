@@ -19,9 +19,9 @@ A launch script, `launch.sh`, is provided to perform all tasks.
 
 The environment can be customized for control of the container, to create your own repo, or to store the data in a custom location. However, if this is not needed, skip to [Getting Started](#getting-started) to use the defaults.
 
-To customize your local environment, edit the appropriate section of `launch.sh` or provide a `~/.cheminf_local_environment` file with the following information below.
-To generate a template for `.cheminf_local_environment`, just run `./launch.sh` with no arguments.
-If `.cheminf_local_environment` does not exist, then a template will be written for you.
+To customize your local environment, edit the appropriate section of `launch.sh` or provide a `~/.env` file with the following information below.
+To generate a template for `.env`, just run `./launch.sh` with no arguments.
+If `.env` does not exist, then a template will be written for you.
 
 ```
 CONT=nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1
@@ -46,9 +46,9 @@ Download the ChEMBL database (version 27):
 ./launch.sh dbSetup
 ```
 
-Launch the dash interactive ChEMBL exploration tool:
+Launch the interactive ChEMBL exploration tool:
 ```
-./launch.sh dash
+./launch.sh start
 ```
 
 ```
@@ -92,11 +92,11 @@ Users can generate Morgan Fingerprints and store it in HDF5 files for later use.
 ./launch.sh cache -c /data/fp
 ```
 
-It is best to create the cache at `DATA_MOUNT_PATH` property defined in `~/.cheminf_local_environment`. Default value of this property is `/data/`. This is a mounted volumne from host and available for reuse beyond the container's lifetime.
+It is best to create the cache at `DATA_MOUNT_PATH` property defined in `~/.env`. Default value of this property is `/data/`. This is a mounted volumne from host and available for reuse beyond the container's lifetime.
 
 Once generated, the cached fingerprints can be used for analysis using `-c` option.
 ```
-./launch.sh dash -c /data/fp
+./launch.sh start -c /data/fp
 ```
 
 ### Conda

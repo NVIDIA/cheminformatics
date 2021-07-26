@@ -1,0 +1,23 @@
+# Copyright 2020 NVIDIA Corporation
+ARG SOURCE_CONTAINER=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest
+FROM ${SOURCE_CONTAINER}
+
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
+    && rm -rf /var/lib/apt/lists/*
+
+ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+
+# Copy and add generated code to PYTHONPATH
+# Any line that needs to be executed without refering to cache should be below
+# this line.
+COPY common/ /tmp/common
+RUN cd /tmp/common; pip install .
+
+RUN mkdir -p /opt/nvidia/cuchem/grpc
+COPY common/generated /opt/nvidia/cuchem/grpc
+ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
+
+COPY megamolbart/ /opt/nvidia/megamolbart/
+CMD cd /opt/nvidia/megamolbart && python3 launch.py

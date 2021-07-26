@@ -52,7 +52,7 @@ Compounds of interest can be tracked throughout the analysis using their ChEMBL 
 The generative module can be used to sample novel molecules derived from the generative model's latent space that are either in the region surrounding one molecule of interest or located between two selected molecules. The second option will be explored below.
 
 1. Choose the "Generate Molecules" tab in the panel on the right.
-2. Please select one of the model in the "Select Generative Model" drop down and then select the "Interpolate between two molecules" radio button. Available models include:
+2. Please select one of the models in the "Select Generative Model" drop down and then select the "Interpolate between two molecules" radio button. Available models include:
     - CDDD Model
     - MegaMolBART Model
 3. The ChEMBL IDs `CHEMBL1191` and `CHEMBL1524273` should be in the panel below the text "Please Select Two Molecules." Choose the tickboxes next to both of these two ChEMBL IDs.

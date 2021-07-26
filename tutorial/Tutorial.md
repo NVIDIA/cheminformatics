@@ -10,13 +10,13 @@ An early step in the drug discovery process is to identify compounds (or “hits
 
 We will be utilizing the results of a virtual screen by [Tsuji](https://pubmed.ncbi.nlm.nih.gov/32374074/) in which the [ChEMBL database](https://www.ebi.ac.uk/chembl/) was screened for compounds which bind to 3-Chymotrypsin-Like Protease from SARS-CoV-2.
 
-First, the chemical neighborhood of hits identified from this screen will be explored using Clara Discovery's cheminformatics search tool. Then the generative module will utilize the latent space of the Seq2Seq model from [Winter and coworkers](https://github.com/jrwnter/cddd), called CDDD, to generate novel compounds with structures similar to the hit compound(s) that can be prioritized by the scientist for further study. The AI-generated compounds can be saved for further analysis.
+First, the chemical neighborhood of hits identified from this screen will be explored using Clara Discovery's cheminformatics search tool. Then the generative module will utilize the latent space of two seq2seq models to generate novel compounds with structures similar to the hit compound(s) that can be prioritized by the scientist for further study. The AI-generated compounds can be saved for further analysis.
 
 ## Setup and Data Preprocessing
 
-To begin, follow the "Getting Started" steps in the [README](https://github.com/nvidia/cheminformatics#getting-started) of the NVIDIA Clara Discovery [repo](https://github.com/nvidia/cheminformatics). This will pull the Clara Discovery Cheminformatics container from NGC, download the ChEMBL database, and then featurize the compounds using Morgan Fingerprints. Finally, the Dash UI will be launched and can be loaded in a browser.
+To begin, follow the "Getting Started" steps in the [README](https://github.com/nvidia/cheminformatics#getting-started) of the NVIDIA Clara Discovery [repo](https://github.com/nvidia/cheminformatics). This will pull the Clara Discovery Cheminformatics container from NGC, download the ChEMBL database, and then featurize the compounds using Morgan Fingerprints. Finally, the Dash UI will launch and can be loaded in a browser.
 
-The Morgan Fingerprints are processed according to the selected workflow in the panel. This tutorial will focus on the default workflow, which uses RAPIDS (PCA and UMAP) for dimensionality reduction and K-Means for cluster assignment.
+The Morgan Fingerprints are processed according to the selected workflow in the panel. This tutorial will focus on the default workflow, which uses RAPIDS -- PCA and UMAP for dimensionality reduction and K-Means for cluster assignment.
 
 The Dash UI contains a subset of the compounds from ChEMBL processed according to the workflow and then displayed in the plot. They are colored according to their cluster assignment.
 
@@ -53,8 +53,8 @@ The generative module can be used to sample novel molecules derived from the gen
 
 1. Choose the "Generate Molecules" tab in the panel on the right.
 2. Please select one of the models in the "Select Generative Model" drop down and then select the "Interpolate between two molecules" radio button. Available models include:
-    - CDDD Model
-    - MegaMolBART Model
+    - CDDD Model, from [Winter and coworkers](https://github.com/jrwnter/cddd)
+    - MegaMolBART Model, developed jointly by AstraZeneca and NVIDIA
 3. The ChEMBL IDs `CHEMBL1191` and `CHEMBL1524273` should be in the panel below the text "Please Select Two Molecules." Choose the tickboxes next to both of these two ChEMBL IDs.
 3. Set the number of molecules to generate to 5.
 4. Press "Generate" and wait for the molecule generation to complete. The model weights model may need time to download the first time this function is executed.

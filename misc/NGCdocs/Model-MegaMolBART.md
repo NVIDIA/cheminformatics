@@ -44,7 +44,7 @@ Model performance was evaluated using the test split from ZINC-15. For each inpu
 
 ## How to Use this Model
 
-MegaMolBART can be run on hardware with access to any NVIDIA GPU with memory greater than 8 GB. The model can also be used with NVIDIA Clara Discovery using the [Mega-MolBART gRPC Service](https://ngc.nvidia.com/containers/nvidia:clara:megamolbart). The container runs a gRPC service that can generate one of the following using an input SMILES string or list of SMILES strings as the source:
+MegaMolBART can be run on hardware with access to any NVIDIA GPU with memory greater than 8 GB. The model can also be used with NVIDIA Clara Discovery using the [MegaMolBART gRPC Service](https://ngc.nvidia.com/containers/nvidia:clara:megamolbart). The container runs a gRPC service that can generate one of the following using an input SMILES string or list of SMILES strings as the source:
 
 1. Embeddings from the latent space
 2. SMILES strings sampled around the region of a single input SMILES molecule
@@ -60,8 +60,15 @@ Inputs to the model are expected to be valid SMILES strings of maximum character
 
 Outputs are either a list of SMILES strings or a 1D vector of embeddings. The first two values contained in the embedding vector correspond to its dimension. These values must be extracted and used to reshape the vector if the original form is desired.
 
+## Limitations
+No known limitations to this model.
+
 ## References
 
 1. Lewis, M. et al. BART: Denoising Sequence-to-Sequence Pre-training for Natural Language Generation, Translation, and Comprehension. Arxiv (2019).
 2. Irwin, R., Dimitriadis, S., He, J. & Bjerrum, E. Chemformer: A Pre-Trained Transformer for Computational Chemistry. (n.d.) doi:10.33774/chemrxiv-2021-v2pnn.
 3. Sterling and Irwin, J. Chem. Inf. Model, 2015 http://pubs.acs.org/doi/abs/10.1021/acs.jcim.5b00559.
+
+## License
+### Apache License 2.0
+A permissive license whose main conditions require preservation of copyright and license notices. Contributors provide an express grant of patent rights. Licensed works, modifications, and larger works may be distributed under different terms and without source code.

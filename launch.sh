@@ -146,11 +146,12 @@ dev() {
     local CONT=${CUCHEM_CONT}
 
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/megamolbart/models:/models/megamolbart/"
+        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:/workspace/megamolbart:/opt/MolBART/megatron_molbart/"
         CONT=${MEGAMOLBART_CONT}
     else
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 

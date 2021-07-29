@@ -1,82 +1,57 @@
 <template>
-  <div style="height: 100vh; width: 100vw">
-    <baklava-editor :plugin="viewPlugin" />
-  </div>
+  <v-layout column fill-height text-xs-center>
+    <v-card>
+      <v-toolbar cards flat>
+        <v-card-title>
+          Pipeline
+        </v-card-title>
+        <v-spacer></v-spacer>
+        <v-btn style="margin-right: 6px;">Cancel</v-btn>
+
+        <v-btn
+          color="red"
+          class="primary ma-2 white--text"
+        >
+          Save
+          <v-icon right dark>mdi-delete</v-icon>
+        </v-btn>
+
+      </v-toolbar>
+
+      <v-form
+        ref="form"
+        v-model="form"
+        class="pa-4 pt-6">
+
+        <v-text-field
+          v-model="name"
+          filled
+          label="Name"
+        ></v-text-field>
+        <v-textarea
+          v-model="description"
+          auto-grow
+          filled
+          label="Description"
+          rows="2"
+        ></v-textarea>
+
+      </v-form>
+    </v-card>
+
+    <baklava-editor :plugin="viewPlugin" ondrop='alert("test");'/>
+  </v-layout>
 </template>
 
 <script>
 import Vue from 'vue'
-import { Editor, Node } from '@baklavajs/core'
+import { Editor } from '@baklavajs/core'
 import { ViewPlugin } from '@baklavajs/plugin-renderer-vue'
 import { OptionPlugin } from '@baklavajs/plugin-options-vue'
 import { Engine } from '@baklavajs/plugin-engine'
 
-import PrepareProtineSideBar from '../../components/sidebar/PrepareProtineSideBar'
-
-export class PrepareProtine extends Node {
-  constructor () {
-    super()
-    this.type = 'PrepareProtine'
-    this.name = 'Prepare Protine'
-
-    this.addInputInterface('protein-file', 'InputOption')
-    this.addOption('Command',
-      'ButtonOption',
-      'bash',
-      PrepareProtineSideBar.name)
-    this.addOutputInterface('protein-receptor-file')
-  }
-}
-
-export class PrepareLigand extends Node {
-  constructor () {
-    super()
-    this.type = 'PrepareLigand'
-    this.name = 'Prepare Ligand'
-
-    this.addInputInterface('SMILES', 'InputOption')
-    this.addOutputInterface('ligands-dir')
-    this.addOutputInterface('library-file')
-  }
-}
-
-export class GeneratePose extends Node {
-  constructor () {
-    super()
-    this.type = 'GeneratePose'
-    this.name = 'Generate Pose'
-
-    this.addInputInterface('protein-receptor-file', 'InputOption')
-    this.addInputInterface('ligands-dir', 'InputOption')
-
-    this.addOutputInterface('docked-dir')
-  }
-}
-
-export class ScorePose extends Node {
-  constructor () {
-    super()
-    this.type = 'ScorePose'
-    this.name = 'Score Pose'
-
-    this.addInputInterface('library-file', 'InputOption')
-    this.addInputInterface('docked-dir', 'InputOption')
-
-    this.addOutputInterface('score-stats')
-    this.addOutputInterface('score-file')
-  }
-}
-
-export class GenerateReport extends Node {
-  constructor () {
-    super()
-    this.type = 'GenerateReport'
-    this.name = 'Generate Report'
-
-    this.addInputInterface('score-file', 'InputOption')
-    this.addOutputInterface('viz-result')
-  }
-}
+import { PrepareProtine, PrepareLigand, GeneratePose, ScorePose, GenerateReport } from '../../components/pipeline/Nodes.ts'
+import PrepareProtineSideBar from '../../components/pipeline/PrepareProtineSideBar'
 
 export default Vue.extend({
   name: 'Workflow',
@@ -86,7 +61,14 @@ export default Vue.extend({
       editor: new Editor(),
       viewPlugin: new ViewPlugin(),
       engine: new Engine(true),
-      value: ''
+      value: '',
+      rules: {
+        email: v => !!(v || '').match(/@/) || 'Please enter a valid email',
+        length: len => v => (v || '').length >= len || `Invalid character length, required ${len}`,
+        password: v => !!(v || '').match(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*(_|[^\w])).+$/) ||
+          'Password must contain an upper case letter, a numeric character, and a special character',
+        required: v => !!v || 'This field is required'
+      }
     }
   },
   created () {
@@ -102,17 +84,6 @@ export default Vue.extend({
     this.editor.registerNodeType('GeneratePose', GeneratePose)
     this.editor.registerNodeType('ScorePose', ScorePose)
     this.editor.registerNodeType('GenerateReport', GenerateReport)
-
-    // this.addNodeWithCoordinates(PrepareProtine, 100, 140)
-    // this.addNodeWithCoordinates(PrepareLigand, 400, 140)
-    // this.addNodeWithCoordinates(GeneratePose, 700, 140)
-    // this.addNodeWithCoordinates(ScorePose, 1000, 140)
-    // this.addNodeWithCoordinates(GenerateReport, 100, 440)
-    // this.editor.addConnection(
-    //   node1.getInterface("Result"),
-    //   node2.getInterface("Value")
-    // );
-    this.engine.calculate()
   },
 
   methods: {

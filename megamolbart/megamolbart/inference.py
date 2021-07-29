@@ -192,8 +192,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                                                    k=k)
                 mol_strs = sum(mol_strs, [])  # flatten list
 
-                # TODO: add back sanitization and validity checking once model is trained
-                logger.warn('WARNING: MOLECULE VALIDATION AND SANITIZATION CURRENTLY DISABLED')
                 for smiles in mol_strs:
                     if sanitize:
                         mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)

@@ -174,9 +174,9 @@ start() {
         download_model
         dbSetup "${DATA_PATH}"
 
-        export ADDITIONAL_PARAM="$@"
         export CUCHEM_PATH=/workspace
         export MEGAMOLBART_PATH=/workspace/megamolbart
+        export CUCHEM_UI_START_CMD="./launch.sh start $@"
         docker-compose --env-file .env  \
                 -f setup/docker_compose.yml \
                 --project-directory . \

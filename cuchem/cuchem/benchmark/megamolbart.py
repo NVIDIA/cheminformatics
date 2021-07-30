@@ -1,24 +1,22 @@
 #!/usr/bin/env python3
 
-import logging
 import os
 import sys
-from datetime import datetime
+import time
+import logging
+import argparse
 
-import generativesampler_pb2_grpc
-import grpc
 import pandas as pd
 import torch
 import grpc
 import generativesampler_pb2_grpc
+
 from datetime import datetime
-import os
-import logging
-import argparse
 from cuml.ensemble.randomforestregressor import RandomForestRegressor
 from cuml import LinearRegression, ElasticNet
 from cuml.svm import SVR
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # TODO add this path to the PYTHONPATH variable in the Dockerfile
@@ -35,6 +33,12 @@ def parse_args():
                         default='/workspace/megamolbart/benchmark',
                         type=str,
                         help='Output directory for CSV files')
+
+    parser.add_argument('-u', '--url',
+                        dest='service_url',
+                        default='localhost:50051',
+                        type=str,
+                        help='MegaMolbart service URL.')
 
     parser.add_argument('-l', '--max_seq_len',
                         dest='max_seq_len',
@@ -107,10 +111,22 @@ convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)
 if __name__ == '__main__':
 
     with torch.no_grad():
-        with grpc.insecure_channel('localhost:50051') as channel:
-            stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
-            func = stub.FindSimilars
-            iteration = get_model_iteration(stub)
+        with grpc.insecure_channel('megamolbart:50051') as channel:
+            retry_count = 0
+            while retry_count < 30:
+                try:
+                    # Wait for upto 5 min for the server to be up
+                    stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
+                    stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
+                    func = stub.FindSimilars
+                    iteration = get_model_iteration(stub)
+                    break
+                except Exception as e:
+                    logging.warning(f'Service not available. Retrying {retry_count}...')
+                    time.sleep(10)
+                    retry_count += 1
+                    continue
+            logging.info(f'Service found after {retry_count} retries.')
 
             for metric in metric_list:
                 logger.info(f'METRIC: {metric}')

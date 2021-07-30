@@ -2,6 +2,7 @@ version: "3.9"
 
 networks:
   cuchemNet:
+    name: cuchemNet${RUN_ID}
     driver: bridge
     ipam:
       config:
@@ -9,19 +10,20 @@ networks:
 
 services:
   cuchemUI:
+    container_name: cuchemUI${RUN_ID}
     image: "${CUCHEM_CONT}"
     hostname: cuchemUI
     networks:
       cuchemNet:
         ipv4_address: ${IP_CUCHEM_UI}
     ports:
-      - "5000:5000"
+      - "${PLOTLY_PORT}:5000"
     volumes:
       - './:/workspace'
       - "${CONTENT_PATH}/data:/data"
     user: "${UID}:${GID}"
     working_dir: ${CUCHEM_PATH}
-    command: ./launch.sh start ${ADDITIONAL_PARAM}
+    command: ${CUCHEM_UI_START_CMD}
     extra_hosts:
       - "megamolbart:${IP_MEGAMOLBART}"
     deploy:
@@ -29,10 +31,10 @@ services:
         reservations:
           devices:
           - driver: nvidia
-            count: 1
             capabilities: [gpu]
 
   megamolbart:
+    container_name: megamolbart${RUN_ID}
     image: "${MEGAMOLBART_CONT}"
     hostname: 'megamolbart'
     networks:
@@ -50,5 +52,4 @@ services:
         reservations:
           devices:
           - driver: nvidia
-            count: 1
             capabilities: [gpu]

@@ -10,7 +10,7 @@ Here, we implement clustering on molecular similarity. We support multiple metho
  - Compute Morgan circular fingerprints, [Sparse Random Projection](https://docs.rapids.ai/api/cuml/stable/api.html?highlight=sparserandomprojection#cuml.random_projection.SparseRandomProjection) and cluster using k-means.
  - Generate new molecules either by exploring the latent space between two molecules or sampling around a molecule
 
-![tutorial/assets/screenshot](screenshot.png "Screenshot of cheminformatics dashboard")
+![screenshot](tutorial/assets/screenshot.png "Screenshot of cheminformatics dashboard")
 
 ### Preparing the Environment (optional)
 A launch script, `launch.sh`, is provided to perform all tasks.

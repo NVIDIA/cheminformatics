@@ -26,6 +26,8 @@ ENV PATH /opt/conda/envs/cuchem/bin:$PATH
 RUN source activate cuchem && python3 -m ipykernel install --user --name=cuchem
 RUN echo "source activate cuchem" > /etc/bash.bashrc
 
+RUN pip install torch torchvision torchaudio
+
 ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 # Any line that needs to be executed without refering to cache should be below
 # this line.

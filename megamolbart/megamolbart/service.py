@@ -11,7 +11,12 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
 
     def __init__(self, *args, **kwargs):
         decoder_max_seq_len = kwargs['decoder_max_seq_len'] if 'decoder_max_seq_len' in kwargs else None
-        self.megamolbart = MegaMolBART(decoder_max_seq_len=decoder_max_seq_len)
+        vocab_path = kwargs['vocab_path'] if 'vocab_path' in kwargs else None
+        checkpoints_dir = kwargs['checkpoints_dir'] if 'checkpoints_dir' in kwargs else None
+
+        self.megamolbart = MegaMolBART(decoder_max_seq_len=decoder_max_seq_len,
+                                       vocab_path=vocab_path,
+                                       checkpoints_dir=checkpoints_dir)
 
         try:
             iteration = int(self.megamolbart.iteration)

@@ -48,6 +48,7 @@ def parse_args():
 
     args = parser.parse_args(sys.argv[1:])
 
+    os.makedirs(args.output_dir, exist_ok=True)
     return args
 
 

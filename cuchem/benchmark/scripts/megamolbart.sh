@@ -3,7 +3,7 @@
 ID=100
 ACTION="up"
 GPU_ID="0"
-CHECKPOINT_DIR=""
+CHECKPOINT_DIR="/models/megamolbart/checkpoints"
 
 while [[ $# -gt 0 ]]; do
   key="$1"
@@ -45,8 +45,9 @@ export MEGAMOLBART_CMD="bash -c 'CUDA_VISIBLE_DEVICES=${GPU_ID} python3 launch.p
 export CUCHEM_PATH=/workspace
 export MEGAMOLBART_PATH=/workspace/megamolbart
 
-docker-compose --env-file ../../../.env  \
-    -f ../../../setup/docker_compose.yml \
-    --project-directory ../../../ \
-    --project-name "megamolbart${RUN_ID}" \
-    ${ACTION}
+docker-compose \
+  --env-file ../../../.env  \
+  -f ../../../setup/docker_compose.yml \
+  --project-directory ../../../ \
+  --project-name "megamolbart${RUN_ID}" \
+  ${ACTION}

@@ -80,7 +80,6 @@ source env.sh
 start() {
     # run a container and start dash inside container.
     echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
-    export ADDITIONAL_PARAM="$@"
 
     if [ -z ${REGISTRY_ACCESS_TOKEN} ]; then
         echo "${RED}Please ensure 'REGISTRY_ACCESS_TOKEN' in $LOCAL_ENV is correct and rerun this script. Please set NGC API key to REGISTRY_ACCESS_TOKEN.${RESET}"
@@ -99,9 +98,9 @@ start() {
     download_model
     dbSetup ${DATA_PATH}
 
-    export ADDITIONAL_PARAM="$@"
     export CUCHEM_PATH=/opt/nvidia/cheminfomatics
     export MEGAMOLBART_PATH=/opt/nvidia/megamolbart
+    export CUCHEM_UI_START_CMD="./launch.sh start $@"
     docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \

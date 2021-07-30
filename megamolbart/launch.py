@@ -23,7 +23,7 @@ import generativesampler_pb2_grpc
 
 from concurrent import futures
 from megamolbart.service import GenerativeSampler
-from util import DEFAULT_MAX_SEQ_LEN
+from util import (DEFAULT_MAX_SEQ_LEN, DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR)
 
 logging.basicConfig(level=logging.INFO)
 
@@ -55,6 +55,15 @@ class Launcher(object):
                             default=False,
                             help='Show debug message')
 
+        parser.add_argument('-v', '--vocab',
+                            dest='vocab',
+                            default=DEFAULT_VOCAB_PATH,
+                            help='Path to vocab file')
+        parser.add_argument('-c', '--checkpoints_dir',
+                            dest='checkpoints_dir',
+                            default=CHECKPOINTS_DIR,
+                            help='Path to Checkpoints dir.')
+
         args = parser.parse_args(sys.argv[1:])
 
         if args.debug:
@@ -63,7 +72,11 @@ class Launcher(object):
         logger.info(f'Maximum decoded sequence length is set to {args.max_decode_length}')
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(GenerativeSampler(decoder_max_seq_len=args.max_decode_length), server)
+        generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(
+            GenerativeSampler(decoder_max_seq_len=args.max_decode_length,
+                              vocab_path=args.vocab,
+                              checkpoints_dir=args.checkpoints_dir),
+            server)
         server.add_insecure_port(f'[::]:{args.port}')
         server.start()
         server.wait_for_termination()

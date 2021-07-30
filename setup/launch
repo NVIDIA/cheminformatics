@@ -98,9 +98,10 @@ start() {
     download_model
     dbSetup ${DATA_PATH}
 
+    export CUCHEM_UI_START_CMD="./launch.sh start $@"
+    export MEGAMOLBART_CMD="python3 launch.py"
     export CUCHEM_PATH=/opt/nvidia/cheminfomatics
     export MEGAMOLBART_PATH=/opt/nvidia/megamolbart
-    export CUCHEM_UI_START_CMD="./launch.sh start $@"
     docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \

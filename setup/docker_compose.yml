@@ -46,7 +46,7 @@ services:
         - "${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
     user: "${UID}:${GID}"
     working_dir: ${MEGAMOLBART_PATH}
-    command: python3 launch.py
+    command: ${MEGAMOLBART_CMD}
     deploy:
       resources:
         reservations:

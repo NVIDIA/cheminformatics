@@ -1,7 +1,12 @@
-from job_task import Job_Task
+from job_task import JobTask
 from dataclasses import dataclass
 from datetime import date, datetime
+from sqlalchemy.orm import registry
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON
 
+mapper_registry = registry()
+
+@mapper_registry.mapped
 @dataclass
 class Job:
     """

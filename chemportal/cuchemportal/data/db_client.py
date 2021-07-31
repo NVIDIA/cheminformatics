@@ -1,10 +1,11 @@
-import sqlalchemy as sa
-from sqlalchemy import engine
+from os import pipe
+
+import sqlalchemy
+from pipeline import Pipeline
+from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import MetaData, Table
-import pandas as pd
 from typing import Any, Union, Optional
-import logger
+import logging
 
 class DBClient:
     """
@@ -12,8 +13,8 @@ class DBClient:
     CRUD capabilities for cuchemportal pipelines
     database
     """
-    def __init__(self, connection_string: Optional[str], 
-                connection_config: Optional[dict], pool_count: Optional[int] = 20):
+    def __init__(self, connection_string: Optional[str] = None, 
+                connection_config: Optional[dict] = None, pool_count: Optional[int] = 20):
         """
         Builds a DataBase client and connects to database
 
@@ -22,8 +23,7 @@ class DBClient:
         """
         # Allowing option to simply pass SqlAlchemy connection string
         if connection_string is not None:
-            self.engine = sa.create_engine(connection_string, 
-                        pool_size = pool_count, max_overflow = 0)
+            self.engine = create_engine(connection_string)
         # Otherwise obtaining values as parameters
         else:
             # Obtaining credentials from config and building connection string
@@ -36,16 +36,16 @@ class DBClient:
                                      "{3}".format(dbuser, dbpass, dbhost, dbname))
 
             # Creating engine, pooling so as to manage connections
-            self.engine = sa.create_engine(self.connection_str, 
-                        pool_size =  pool_count, max_overflow = 0)
+            self.engine = create_engine(self.connection_str)
 
-        # Building connection and session objects
-        self.connection = self.engine.connect()
-        self.session = sessionmaker(bind=engine)
+        # Building and instantiating session object
+        self.Session = sessionmaker(bind=self.engine)
+
+        self.metadata = MetaData(bind=self.engine)
 
         # Displaying basic metadata
-        logger.info("Database accessed")
-        logger.debug(self.engine.table_names)
+        logging.info("Database accessed")
+        logging.debug(self.engine.table_names)
 
 
     def insert_all(self, *entries: Any) -> bool:
@@ -57,14 +57,15 @@ class DBClient:
         # Todo: Return array of all inserted objects and make a singular version of this method
         return entries
 
-    def insert(self, entry: Any) -> bool:
-        """Inserts a list of entries into table"""
+    def insert(self, record, session: Session) -> bool:
+        """Inserts a pipeline entry  into table"""
 
         # Adding all entries to session and comitting them
-        self.session.add(entry)
-        self.session.commit()
+
+        session.add(record)
+
         # Todo: Return array of all inserted objects and make a singular version of this method
-        return entry
+        return record
 
     def query_all(self, *queries: Any) -> str:
         """Obtains all instances in table of each of a list of queries """
@@ -99,13 +100,11 @@ class DBClient:
         updated = self.session.query(item_to_change).first().update({attribute_to_update: new_value})
         return updated
 
-    def delete(self, *queries: list) -> bool:
+    def delete_pipeline(self, pipeline_id: int) -> bool:
         """Deletes every item that matches all queries in a list of queries """
-        for query in queries:
-            # Obtaining all corresponding values, deleting and committing
-            to_delete = self.session.query(query).all()
-            self.session.delete(to_delete)
-            self.session.commit(to_delete)
+        # Obtaining all corresponding values, deleting and committing
+        table = self.metadata.tables["pipelines"]
+        table.delete(pipeline_id)
 
         # boolean validation
         return True 

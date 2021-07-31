@@ -1,38 +1,32 @@
 from job import Job
 from os import pipe
-from job_manager import Job_Manager
-from pipeline import Pipelinel
+from job_manager import JobManager
+from pipeline import Pipeline
 from data.db_client import DBClient
 from copy import deepcopy
 import json
 
 
-class Pipeline_Manager:
+class PipelineManager:
     """A workhorse class which runs the Pipeline end to end"""
-
     def __init__(self):
-        # Todo: build a connection string from DB json config here
+        # Todo: build a context object
         self.connection_str: str = ("mysql+pymysql://" 
-                                     "{0}:{1}@{2}"
+                                     "{0}:{1}@{2}/"
                                      "{3}".format("root", 
-                                     "cuchem_database#321", 
+                                     "chemportal_database#321", 
                                      "gpasternak-dt.nvidia.com", 
                                      "cuchem_db"))
         self.db_client = DBClient(connection_string=self.connection_str) # TODO: add a valid database connection
-        self.manager = Job_Manager()
-        self._id = 0  # Building class variable counter
+        self.manager = JobManager()
 
-    def create(self, pipeline_name: str, pipeline_config: dict) -> bool:
+    def create(self, ppln: Pipeline) -> bool:
         """Given Configuration, uses pipeline setter method to create pipeline"""
-        # Incrementing id 
-        self._id +=1
-
-        # Building a Pipeline and setting config 
-        ppln = Pipeline() # Todo: autoread into Task and Job Dataclasses
-        ppln.config = pipeline_config
 
         # Adding Pipeline to dict of Pipelines
-        self.db_client.insert_pipeline(pipeline = ppln)
+        with self.db_client.Session() as sess:
+            self.db_client.insert(record=ppln, session=sess)
+            sess.commit()
 
     def update(new_config: str) -> bool:
         """Receives an updated pipeline from the UI and precedes to reset config"""
@@ -75,6 +69,7 @@ class Pipeline_Manager:
         pass
 
 if __name__ == "__main__":
-    mgr = Pipeline_Manager()
-    config = json.load("cuchemportal/data/configurations/portal_config.json")
+    mgr = PipelineManager()
+    with open("data/configurations/portal_config.json", 'r') as jfile:
+        config = json.load(jfile)
     mgr.create("p1", config)

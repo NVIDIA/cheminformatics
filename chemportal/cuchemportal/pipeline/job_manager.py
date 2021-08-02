@@ -1,6 +1,6 @@
-from job_task import JobTask 
-from data.db_client import DBClient
-from job import Job
+from cuchemportal.pipeline.job_task import JobTask 
+from cuchemportal.data.db_client import DBClient
+from cuchemportal.pipeline.job import Job
 
 
 class JobManager:

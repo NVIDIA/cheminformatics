@@ -1,6 +1,6 @@
 from sqlalchemy.sql.sqltypes import Boolean, Date
-from job_task import JobTask
-from data.configuration_tester import ConfigurationTester
+from cuchemportal.pipeline.job_task import JobTask
+from cuchemportal.data.configuration_tester import ConfigurationTester
 import copy
 from typing import Union, Optional
 import json
@@ -20,7 +20,7 @@ class Pipeline:
     ui_config = Column(JSON)
     user = Column(String)
     time_created = Column(DateTime)
-    time_deleted = Column(DateTime)
+    last_updated = Column(DateTime)
 
     
     """A State storing object representing a pipeline """
@@ -29,7 +29,7 @@ class Pipeline:
         self.is_published: bool = False 
         self.input_artifacts: dict = input_artifacts
         self.attributes = (["id", "name", "definition", 
-                        "is_published", "ui_config", "user", "time_created", "time_deleted"])
+                        "is_published", "ui_config", "user", "time_created", "last_updated"])
 
     @property
     def config(self):
@@ -52,15 +52,15 @@ class Pipeline:
 
         # Running test suite to validate input so that config not used unless is valid
         ConfigurationTester.run_pipeline_creation_tests(new_config)
-        self._initialize_attrs()
+        self._initialize_attrs(new_config)
         self._config = new_config
 
-    def _initialize_attrs(self):
+    def _initialize_attrs(self, new_config: dict):
         """A setter for all attributes which are present in the config"""
         for attribute in self.attributes:
             # Setting all attributes which are present in the config
-            if attribute in self.config:
-                setattr(self, attribute, self.config[attribute])
+            if attribute in new_config:
+                setattr(self, attribute, new_config[attribute])
         
     @config.getter
     def config(self) -> dict:

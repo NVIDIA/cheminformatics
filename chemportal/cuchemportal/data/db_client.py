@@ -1,7 +1,7 @@
 from os import pipe
 
 import sqlalchemy
-from pipeline import Pipeline
+from cuchemportal.pipeline.pipeline import Pipeline
 from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import Session, sessionmaker
 from typing import Any, Union, Optional
@@ -67,23 +67,18 @@ class DBClient:
         # Todo: Return array of all inserted objects and make a singular version of this method
         return record
 
-    def query_all(self, *queries: Any) -> str:
+    def query_id(self, id: int, object_class: Any, session: Session) -> str:
         """Obtains all instances in table of each of a list of queries """
-        query_result = ""
 
-        # Appending all results for every query
-        for query in queries:
-            query_result += self.session.query(query).all() + "\n"
+        # Returning first matching pipeline
+        query_result = session.query(object_class.id == id).first()
         
         return query_result
 
-    def query_first(self, *queries: Any) -> str:
+    def query_range(self, object_class: Any, start_idx: int, end_idx: int, session: Session) -> str:
         """Obtains first instance in table of each of a list of queries """
-        query_result = ""
-
-        # Appending first result from every query
-        for query in queries:
-            query_result += self.session.query(query).first() + "\n"
+         # Returning all pipelines in [start,end)
+        query_result = session.query(object_class.id >= start_idx and object_class.id < end_idx).all()
         
         return query_result
 
@@ -94,7 +89,7 @@ class DBClient:
         self.session.query(items_to_change).all().update({attribute_to_update: new_value})
         return True
 
-    def update_first(self, item_to_change: Any, attribute_to_update: Any, new_value: Any) -> bool:
+    def update_record(self, item_to_change: Any, attribute_to_update: Any, new_value: Any) -> bool:
         """Updates the first database item corresponding to a query""" 
         # Updating the first results which is returned by the query
         updated = self.session.query(item_to_change).first().update({attribute_to_update: new_value})

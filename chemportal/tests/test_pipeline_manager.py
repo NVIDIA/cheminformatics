@@ -1,11 +1,11 @@
-from pipeline.pipeline import Pipeline
-from pipeline.pipeline_manager import PipelineManager
+from cuchemportal.pipeline.pipeline import Pipeline
+from cuchemportal.pipeline.pipeline_manager import PipelineManager
 import json
 
 # Building a Pipeline and setting config 
 def test_pipeline_insert():
         mgr = PipelineManager()
-        with open("data/configurations/portal_config.json", 'r') as jfile:
+        with open("cuchemportal/data/configurations/portal_config.json", 'r') as jfile:
             config = json.load(jfile)
 
         ppln = Pipeline() # Todo: autoread into Task and Job Dataclasses

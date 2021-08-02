@@ -1,8 +1,8 @@
-from job import Job
+from cuchemportal.pipeline.job import Job
 from os import pipe
-from job_manager import JobManager
-from pipeline import Pipeline
-from data.db_client import DBClient
+from cuchemportal.pipeline.job_manager import JobManager
+from cuchemportal.pipeline.pipeline import Pipeline
+from cuchemportal.data.db_client import DBClient
 from copy import deepcopy
 import json
 
@@ -20,17 +20,36 @@ class PipelineManager:
         self.db_client = DBClient(connection_string=self.connection_str) # TODO: add a valid database connection
         self.manager = JobManager()
 
-    def create(self, ppln: Pipeline) -> bool:
+    def create(self, ppln: Pipeline):
         """Given Configuration, uses pipeline setter method to create pipeline"""
 
         # Adding Pipeline to dict of Pipelines
         with self.db_client.Session() as sess:
-            self.db_client.insert(record=ppln, session=sess)
+            record = self.db_client.insert(record=ppln, session=sess)
             sess.commit()
+        return record
 
-    def update(new_config: str) -> bool:
+    def update(self, previous_id: int, new_config: str) -> bool:
         """Receives an updated pipeline from the UI and precedes to reset config"""
-        pass  # This is an identical API as create_pipeline, but here for CRUD consistency
+        pass
+
+    def fetch_by_id(self, pipeline_id: int) -> Pipeline:
+        """Given a pipeline id, returns a pipeline object as configured in the database"""
+        with self.db_client.Session() as sess:
+            # Using DB Clients query id API - to be changed to more general query API is possible
+            pipeline = self.db_client.query_id(id = pipeline_id, session=sess)
+        # Returning autoconverted pipeline
+        return pipeline
+
+    def fetch_all(self, start_index:int, end_index: int):
+        """Fetches all Pipelines in the interval [start,end)"""
+        with self.db_client.Session() as sess:
+            # Using DB Clients query id API - to be changed to more general query API is possible
+            pipelines = self.db_client.query_range(start_idx = start_index, 
+                                                end_idx = end_index,
+                                                session=sess)
+        # Returning autoconverted pipeline
+        return pipelines
 
     # Todo: add is_deleted column to Pipeline and mark pipelines as deleted
     def delete(self, pipeline_id: int):

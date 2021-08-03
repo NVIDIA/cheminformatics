@@ -78,7 +78,8 @@ class DBClient:
     def query_range(self, db_table: Any, start_idx: int, end_idx: int, session: Session):
         """Obtains first instance in table of each of a list of queries """
          # Returning all pipelines in [start,end)
-        query_result = session.query(db_table).filter(db_table.id >= start_idx and db_table.id < end_idx).all()
+        query_result = session.query(db_table).filter((db_table.id >= start_idx)
+                        & (db_table.id < end_idx)).all()
         
         return query_result
 
@@ -103,6 +104,6 @@ class DBClient:
     def delete(self, db_table: Any, id: int, session: Session):
         """Deletes every item that matches all queries in a list of queries """
         # Obtaining all corresponding values, deleting and committing
-        item = self.session.query(db_table).filter(db_table.id == id).one()
+        item = session.query(db_table).filter(db_table.id == id).first()
         session.delete(item)
         return item

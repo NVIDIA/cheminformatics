@@ -17,6 +17,7 @@ class Pipeline:
     name = Column(String)
     definition = Column(JSON)
     is_published = Column(Boolean)
+    is_deleted = Column(Boolean)
     ui_config = Column(JSON)
     user = Column(String)
     time_created = Column(DateTime)

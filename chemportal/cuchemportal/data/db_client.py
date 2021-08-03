@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import Session, sessionmaker
 from typing import Any, Union, Optional
 import logging
+logger = logging.getLogger("db_logger")
 
 class DBClient:
     """
@@ -44,8 +45,8 @@ class DBClient:
         self.metadata = MetaData(bind=self.engine)
 
         # Displaying basic metadata
-        logging.info("Database accessed")
-        logging.debug(self.engine.table_names)
+        logger.info("Database accessed")
+        logger.debug(self.engine.table_names)
 
 
     def insert_all(self, *entries: Any):
@@ -67,7 +68,7 @@ class DBClient:
         # Todo: Return array of all inserted objects and make a singular version of this method
         return record
 
-    def query_id(self, id: int, db_table: Any, session: Session):
+    def query_by_id(self, id: int, db_table: Any, session: Session):
         """Obtains all instances in table of each of a list of queries """
 
         # Returning first matching pipeline
@@ -75,11 +76,10 @@ class DBClient:
         
         return query_result
 
-    def query_range(self, db_table: Any, start_idx: int, end_idx: int, session: Session):
+    def query_range(self, db_table: Any, start_idx: int, n_rows: int, session: Session):
         """Obtains first instance in table of each of a list of queries """
          # Returning all pipelines in [start,end)
-        query_result = session.query(db_table).filter((db_table.id >= start_idx)
-                        & (db_table.id < end_idx)).all()
+        query_result = session.query(db_table).filter((db_table.id >= start_idx)).limit(n_rows)
         
         return query_result
 
@@ -95,9 +95,7 @@ class DBClient:
                     setattr(updatable, attribute, new_config[attribute])
         # Preserving atomicity if integrity error found
         except IntegrityError as e:
-            logging.debug("rolling back")
-            session.rollback()
-            logging.error("Transaction failed")
+            raise e
 
         return updatable
 
@@ -105,5 +103,5 @@ class DBClient:
         """Deletes every item that matches all queries in a list of queries """
         # Obtaining all corresponding values, deleting and committing
         item = session.query(db_table).filter(db_table.id == id).first()
-        session.delete(item)
+        setattr(item, "is_deleted", 1)
         return item

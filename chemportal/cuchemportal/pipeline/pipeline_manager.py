@@ -29,15 +29,21 @@ class PipelineManager:
             sess.commit()
         return record
 
-    def update(self, previous_id: int, new_config: str) -> bool:
+    def update(self, previous_id: int, new_conf: dict) -> bool:
         """Receives an updated pipeline from the UI and precedes to reset config"""
-        pass
+        with self.db_client.Session() as sess:
+            # Using DB Clients query id API - to be changed to more general query API is possible
+            pipeline = self.db_client.update_record(db_table = Pipeline, id = previous_id,new_config=new_conf, session=sess)
+            sess.commit()
+        # Returning autoconverted pipeline
+        return pipeline
 
     def fetch_by_id(self, pipeline_id: int) -> Pipeline:
         """Given a pipeline id, returns a pipeline object as configured in the database"""
         with self.db_client.Session() as sess:
             # Using DB Clients query id API - to be changed to more general query API is possible
             pipeline = self.db_client.query_id(id = pipeline_id, session=sess)
+            sess.commit()
         # Returning autoconverted pipeline
         return pipeline
 
@@ -45,16 +51,19 @@ class PipelineManager:
         """Fetches all Pipelines in the interval [start,end)"""
         with self.db_client.Session() as sess:
             # Using DB Clients query id API - to be changed to more general query API is possible
-            pipelines = self.db_client.query_range(start_idx = start_index, 
+            pipelines = self.db_client.query_range(db_table = Pipeline, start_idx = start_index, 
                                                 end_idx = end_index,
                                                 session=sess)
+            sess.commit()
         # Returning autoconverted pipeline
         return pipelines
 
     # Todo: add is_deleted column to Pipeline and mark pipelines as deleted
     def delete(self, pipeline_id: int):
         """Deletes Pipeline Object"""
-        self.db_client.delete_pipeline(id = pipeline_id)
+        with self.db_client.Session as sess:
+            self.db_client.delete(db_table = Pipeline, id = pipeline_id, session=sess)
+            sess.commit()
 
     #def clone_pipeline(self, pipeline_id: int):
         #"""Clones a Pipeline Object"""
@@ -65,11 +74,6 @@ class PipelineManager:
     def publish(self, pipeline_id: int):
         """Publishes a pipeline"""
         self.pipelines[pipeline_id].publish()
-        
-    def get_task(self,pipeline_id: int, task_name: str):
-        """Given pipeline id and Task name return"""
-        # Obtaining Pipeline and calling its get task method
-        return self.db_client.query_first("pipeline_id")
 
     def _jobify():
         """Creates jobs in DAG-like fashion using compute graph"""

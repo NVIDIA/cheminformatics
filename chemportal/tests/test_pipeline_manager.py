@@ -15,3 +15,24 @@ def test_pipeline_insert():
         record = mgr.create(ppln)
         assert record is not None 
 
+def test_pipeline_update():
+    
+    mgr = PipelineManager()
+    with open("cuchemportal/data/configurations/portal_second_config.json", 'r') as jfile:
+        config = json.load(jfile)
+
+    config["name"] = "cuchem_pipelines_3"
+    config["id"] = 12
+    config["definition"] = {"c":  {"a":"b"}}
+    ppln = Pipeline() # Todo: autoread into Task and Job Dataclasses
+    ppln.config = config
+    record = mgr.update(26, ppln.config)
+    assert record is not None 
+
+
+def test_pipeline_fetch():
+    assert True
+
+def test_pipeline_fetch_all():
+    assert True
+

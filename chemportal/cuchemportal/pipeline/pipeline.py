@@ -70,8 +70,13 @@ class Pipeline:
         self.is_published = True
 
     def __str__(self):
-        """Returns Pipeline id"""
-        return "Pipeline #" + str(self._config["id"])
+        """Returns Pipeline id if initialized"""
+        if hasattr(self, "config"):
+            return "Pipeline #" + str(self._config["id"])
+        elif hasattr(self, "id"):
+            return "Pipeline #" + str(self.id)
+        else:
+            return "uninitialized pipeline"
 
     @property
     def tasks(self):

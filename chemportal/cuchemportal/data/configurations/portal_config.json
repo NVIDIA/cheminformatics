@@ -1,5 +1,5 @@
 {
-  "id": 24, 
+  "id": 26, 
   "tasks":
   {
   "name": "preprocess",
@@ -41,7 +41,7 @@
       "y": 40
     }
   },
-  "name": "generate_proteins",
+  "name": "generate_proteins2",
   "display_name": "generating_proteins",
   "implementation_spec":
     {

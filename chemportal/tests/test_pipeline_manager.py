@@ -22,7 +22,7 @@ def test_pipeline_update():
         config = json.load(jfile)
 
     config["name"] = "cuchem_pipelines_3"
-    config["id"] = 12
+    config["id"] = 26
     config["definition"] = {"c":  {"a":"b"}}
     ppln = Pipeline() # Todo: autoread into Task and Job Dataclasses
     ppln.config = config
@@ -31,8 +31,18 @@ def test_pipeline_update():
 
 
 def test_pipeline_fetch():
-    assert True
+    mgr = PipelineManager()
+    record = mgr.fetch_by_id(12)
+    print(record)
+    assert record is not None 
 
 def test_pipeline_fetch_all():
-    assert True
+    mgr = PipelineManager()
+    record = mgr.fetch_all(0, 26)
+    print(record)
+    assert record is not None 
 
+def test_pipeline_delete():
+    mgr = PipelineManager()
+    deleted = mgr.delete(26)
+    assert deleted is not None

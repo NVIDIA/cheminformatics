@@ -42,8 +42,7 @@ class PipelineManager:
         """Given a pipeline id, returns a pipeline object as configured in the database"""
         with self.db_client.Session() as sess:
             # Using DB Clients query id API - to be changed to more general query API is possible
-            pipeline = self.db_client.query_id(id = pipeline_id, session=sess)
-            sess.commit()
+            pipeline = self.db_client.query_id(db_table = Pipeline, id = pipeline_id, session=sess)
         # Returning autoconverted pipeline
         return pipeline
 
@@ -61,9 +60,11 @@ class PipelineManager:
     # Todo: add is_deleted column to Pipeline and mark pipelines as deleted
     def delete(self, pipeline_id: int):
         """Deletes Pipeline Object"""
-        with self.db_client.Session as sess:
-            self.db_client.delete(db_table = Pipeline, id = pipeline_id, session=sess)
+        with self.db_client.Session() as sess:
+            deleted = self.db_client.delete(db_table = Pipeline, id = pipeline_id, session=sess)
             sess.commit()
+        return deleted
+
 
     #def clone_pipeline(self, pipeline_id: int):
         #"""Clones a Pipeline Object"""

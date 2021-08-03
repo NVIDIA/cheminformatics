@@ -1,6 +1,6 @@
 from os import pipe
 
-import sqlalchemy
+from sqlalchemy.exc import IntegrityError
 from cuchemportal.pipeline.pipeline import Pipeline
 from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import Session, sessionmaker
@@ -48,7 +48,7 @@ class DBClient:
         logging.debug(self.engine.table_names)
 
 
-    def insert_all(self, *entries: Any) -> bool:
+    def insert_all(self, *entries: Any):
         """Inserts a list of entries into table"""
 
         # Adding all entries to session and comitting them
@@ -57,7 +57,7 @@ class DBClient:
         # Todo: Return array of all inserted objects and make a singular version of this method
         return entries
 
-    def insert(self, record, session: Session) -> bool:
+    def insert(self, record, session: Session):
         """Inserts a pipeline entry  into table"""
 
         # Adding all entries to session and comitting them
@@ -67,39 +67,42 @@ class DBClient:
         # Todo: Return array of all inserted objects and make a singular version of this method
         return record
 
-    def query_id(self, id: int, object_class: Any, session: Session) -> str:
+    def query_id(self, id: int, db_table: Any, session: Session):
         """Obtains all instances in table of each of a list of queries """
 
         # Returning first matching pipeline
-        query_result = session.query(object_class.id == id).first()
+        query_result = session.query(db_table).filter(db_table.id == id).first()
         
         return query_result
 
-    def query_range(self, object_class: Any, start_idx: int, end_idx: int, session: Session) -> str:
+    def query_range(self, db_table: Any, start_idx: int, end_idx: int, session: Session):
         """Obtains first instance in table of each of a list of queries """
          # Returning all pipelines in [start,end)
-        query_result = session.query(object_class.id >= start_idx and object_class.id < end_idx).all()
+        query_result = session.query(db_table).filter(db_table.id >= start_idx and db_table.id < end_idx).all()
         
         return query_result
 
     # TODO: fix update methods
-    def update_all(self, items_to_change: Any, attribute_to_update: Any, new_value: Any) -> bool:
+    def update_record(self, db_table: Any, id: int, new_config: dict, session: Session):
         """Updates all given database items corresponding to a query""" 
-        # Updating all results which are returned by the query
-        self.session.query(items_to_change).all().update({attribute_to_update: new_value})
-        return True
+        # Obtaining first value of exact same id (unique so should be only value)
+        updatable = session.query(db_table).filter(db_table.id == id).first()
+        try:
+            for attribute in new_config.keys():
+                # Updating only known attributes on object and mapping back to db
+                if hasattr(updatable, attribute):
+                    setattr(updatable, attribute, new_config[attribute])
+        # Preserving atomicity if integrity error found
+        except IntegrityError as e:
+            logging.debug("rolling back")
+            session.rollback()
+            logging.error("Transaction failed")
 
-    def update_record(self, item_to_change: Any, attribute_to_update: Any, new_value: Any) -> bool:
-        """Updates the first database item corresponding to a query""" 
-        # Updating the first results which is returned by the query
-        updated = self.session.query(item_to_change).first().update({attribute_to_update: new_value})
-        return updated
+        return updatable
 
-    def delete_pipeline(self, pipeline_id: int) -> bool:
+    def delete(self, db_table: Any, id: int, session: Session):
         """Deletes every item that matches all queries in a list of queries """
         # Obtaining all corresponding values, deleting and committing
-        table = self.metadata.tables["pipelines"]
-        table.delete(pipeline_id)
-
-        # boolean validation
-        return True 
+        item = self.session.query(db_table).filter(db_table.id == id).one()
+        session.delete(item)
+        return item

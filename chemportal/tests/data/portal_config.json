@@ -5,9 +5,8 @@
   "name": "preprocess",
   "display_name": "preprocessing_molecueles",
   "time_created": "2021-08-02T11:22Z",
-  "implementation_spec":
+  "config":
     {
-      "name": "preprocessing_implementation",
       "type": "Preprocessing",
       "input_spec":
       {
@@ -43,9 +42,8 @@
   },
   "name": "generate_proteins2",
   "display_name": "generating_proteins",
-  "implementation_spec":
+  "config":
     {
-      "name": "proteing_generation_implementation",
       "type": "generative",
       "input_spec":
       {

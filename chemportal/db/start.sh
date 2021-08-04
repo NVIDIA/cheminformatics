@@ -2,8 +2,8 @@
 
 BASE_DIR=$(dirname $0)
 
-docker stop pef_db
-docker rm pef_db
+docker stop cuchem_db
+docker rm cuchem_db
 
 docker build ${BASE_DIR} -t cuchem_db_img
 docker run --name cuchem_db \

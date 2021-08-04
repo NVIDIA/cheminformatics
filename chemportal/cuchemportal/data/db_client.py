@@ -6,6 +6,7 @@ from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import Session, sessionmaker
 from typing import Any, Union, Optional
 import logging
+from datetime import datetime
 logger = logging.getLogger("db_logger")
 
 class DBClient:
@@ -93,6 +94,7 @@ class DBClient:
                 # Updating only known attributes on object and mapping back to db
                 if hasattr(updatable, attribute):
                     setattr(updatable, attribute, new_config[attribute])
+            setattr(updatable, "last_updated", datetime.now())
         # Preserving atomicity if integrity error found
         except IntegrityError as e:
             raise e
@@ -104,4 +106,5 @@ class DBClient:
         # Obtaining all corresponding values, deleting and committing
         item = session.query(db_table).filter(db_table.id == id).first()
         setattr(item, "is_deleted", 1)
+        setattr(item, "last_updated", datetime.now())
         return item

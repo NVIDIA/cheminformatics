@@ -9,13 +9,11 @@
         <v-btn style="margin-right: 6px;">Cancel</v-btn>
 
         <v-btn
-          color="red"
           class="primary ma-2 white--text"
-        >
+          @click='save()'>
           Save
           <v-icon right dark>mdi-delete</v-icon>
         </v-btn>
-
       </v-toolbar>
 
       <v-form
@@ -26,15 +24,15 @@
         <v-text-field
           v-model="name"
           filled
-          label="Name"
-        ></v-text-field>
+          label="Name">
+        </v-text-field>
         <v-textarea
           v-model="description"
           auto-grow
           filled
           label="Description"
-          rows="2"
-        ></v-textarea>
+          rows="2">
+        </v-textarea>
 
       </v-form>
     </v-card>
@@ -50,8 +48,12 @@ import { ViewPlugin } from '@baklavajs/plugin-renderer-vue'
 import { OptionPlugin } from '@baklavajs/plugin-options-vue'
 import { Engine } from '@baklavajs/plugin-engine'
 
-import { PrepareProtine, PrepareLigand, GeneratePose, ScorePose, GenerateReport } from '../../components/pipeline/Nodes.ts'
-import PrepareProtineSideBar from '../../components/pipeline/PrepareProtineSideBar'
+import { PrepareProtine, PrepareLigand, GeneratePose, ScorePose, GenerateReport, GenerateMolecules }
+  from '../../components/nodes/Domain.ts'
+import { Loop } from '../../components/nodes/ControlFlow.ts'
+import PrepareProtineSideBar from '../../components/nodes/sidebar/PrepareProtineSideBar'
+import LoopNewInput from '../../components/nodes/sidebar/LoopNewInput.vue'
+import LoopExpression from '../../components/nodes/sidebar/LoopExpression.vue'
 
 export default Vue.extend({
   name: 'Workflow',
@@ -78,12 +80,16 @@ export default Vue.extend({
 
     this.viewPlugin.enableMinimap = false
     this.viewPlugin.registerOption('PrepareProtineSideBar', PrepareProtineSideBar)
+    this.viewPlugin.registerOption('LoopNewInput', LoopNewInput)
+    this.viewPlugin.registerOption('LoopExpression', LoopExpression)
 
+    this.editor.registerNodeType('GenerateMolecules', GenerateMolecules)
     this.editor.registerNodeType('PrepareProtine', PrepareProtine)
     this.editor.registerNodeType('PrepareLigand', PrepareLigand)
     this.editor.registerNodeType('GeneratePose', GeneratePose)
     this.editor.registerNodeType('ScorePose', ScorePose)
     this.editor.registerNodeType('GenerateReport', GenerateReport)
+    this.editor.registerNodeType('Loop', Loop)
   },
 
   methods: {
@@ -94,6 +100,10 @@ export default Vue.extend({
       n.position.x = x
       n.position.y = y
       return n
+    },
+
+    save () {
+      console.log(this.editor.save())
     }
   }
 })

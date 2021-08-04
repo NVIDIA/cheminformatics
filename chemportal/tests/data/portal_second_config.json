@@ -1,0 +1,85 @@
+{
+    "id": 36, 
+    "tasks":
+    {
+    "name": "preprocess_secondary",
+    "display_name": "preprocessing_molecules",
+    "time_created": "2021-08-02T11:22Z",
+    "ui_config":
+    {
+        "color": "green"
+    },
+    "implementation_spec":
+      {
+        "name": "preprocessing_implementation",
+        "type": "Preprocessing",
+        "input_spec":
+        {
+          "name": "data_file",
+          "type": "FILE", 
+          "value": "~/Documents/datafile2.txt"
+        },
+        "output_spec":
+        {
+          "name": "preprocessed_data_artifact",
+          "type": "list[double]",
+          "value":
+          {
+            "result": [0.1, 0.3, 0.9, 0.7, -2.2, 2.3, -0.75]
+          },
+          "connected_task": "generate_proteins"
+        },
+        "runtime_values":
+        {
+          "standardize": "true"
+        }, 
+        "platform_config":
+        {
+  
+        }
+      },
+    "task_ui_attributes":
+      {
+        "display_color": "green",
+        "x" : 100,
+        "y": 40
+      }
+    },
+    "name": "generate_proteins",
+    "display_name": "generating_proteins",
+    "implementation_spec":
+      {
+        "name": "proteing_generation_implementation",
+        "type": "generative",
+        "input_spec":
+        {
+          "name": "preprocessed_data",
+          "type": "FILE", 
+          "value": "~/Documents/preprocessed_data.txt"
+  
+        },
+        "output_spec":
+        {
+          "name": "protein_generation_artifact",
+          "type": "list[String]",
+          "value":
+          {
+            "result": ["C1B23D22", "D24C36FA2"]
+          },
+          "connected_task": "NULL"
+        },
+        "runtime_values":
+        {
+        }, 
+        "platform_config":
+        {
+  
+        }
+      },
+    "task_ui_attributes":
+      {
+        "display_color": "green",
+        "x": 20,
+        "y": 30
+      }
+    }

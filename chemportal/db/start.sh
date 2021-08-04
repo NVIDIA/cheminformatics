@@ -2,11 +2,11 @@
 
 BASE_DIR=$(dirname $0)
 
-docker stop pef_db
-docker rm pef_db
+docker stop cuchem_db
+docker rm cuchem_db
 
-docker build ${BASE_DIR} -t pef_db_img
-docker run --name pef_db \
+docker build ${BASE_DIR} -t cuchem_db_img
+docker run --name cuchem_db \
   -p 3306:3306 \
   -d pef_db_img
 

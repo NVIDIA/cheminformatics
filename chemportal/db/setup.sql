@@ -18,14 +18,17 @@ USE `cuchem_db` ;
 -- Table `cuchem_db`.`pipelines`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `cuchem_db`.`pipelines` (
-  `pipeline_id` INT NOT NULL,
-  `pipeline_name` VARCHAR(45) NOT NULL,
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(45) NOT NULL,
   `pipeline_user` VARCHAR(45) NOT NULL,
   `is_published` TINYINT NOT NULL,
-  `pipeline_config` TEXT NULL,
-  `pipeline_resources` TEXT NULL,
-  PRIMARY KEY (`pipeline_id`),
-  UNIQUE INDEX `pipeline_id_UNIQUE` (`pipeline_id` ASC) VISIBLE)
+  `definition` JSON NULL,
+  `ui_resources` JSON NULL,
+  `time_created` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `is_deleted` TINYINT NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `pipeline_id_UNIQUE` (`id` ASC) VISIBLE)
 ENGINE = InnoDB;
 
 
@@ -33,17 +36,18 @@ ENGINE = InnoDB;
 -- Table `cuchem_db`.`jobs`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `cuchem_db`.`jobs` (
-  `job_id` INT NOT NULL,
+  `id` INT NOT NULL AUTO_INCREMENT,
   `pipeline_id` INT NOT NULL,
-  `job_status` ENUM("successful", "in-progress", "errored") NOT NULL,
-  `time_started` DATETIME NOT NULL,
-  `time_finished` DATETIME NULL,
+  `status` ENUM("successful", "in-progress", "errored") NOT NULL,
+  `time_started` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
   `job_configuration` TEXT NULL,
-  PRIMARY KEY (`job_id`),
+  PRIMARY KEY (`id`),
   INDEX `pipeline_id_idx` (`pipeline_id` ASC) VISIBLE,
+  UNIQUE INDEX `id_UNIQUE` (`id` ASC) VISIBLE,
   CONSTRAINT `fk_pipeline_pipelineid`
     FOREIGN KEY (`pipeline_id`)
-    REFERENCES `cuchem_db`.`pipelines` (`pipeline_id`)
+    REFERENCES `cuchem_db`.`pipelines` (`id`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
@@ -53,40 +57,42 @@ ENGINE = InnoDB;
 -- Table `cuchem_db`.`job_tasks`
 -- -----------------------------------------------------
 CREATE TABLE IF NOT EXISTS `cuchem_db`.`job_tasks` (
-  `task_id` INT NOT NULL,
+  `id` INT NOT NULL AUTO_INCREMENT,
   `job_id` INT NOT NULL,
   `task_name` VARCHAR(45) NOT NULL,
-  `task_status` ENUM("In-progess", "successful", "failed") NOT NULL,
-  `time_started` DATETIME NOT NULL,
-  `time_finished` DATETIME NULL,
-  `task_config` TEXT NULL,
+  `status` ENUM("In-progess", "successful", "failed") NOT NULL,
+  `time_started` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `last_updated` DATETIME NULL DEFAULT CURRENT_TIMESTAMP,
+  `config` JSON NULL,
   `exit_code` INT NULL,
   `exit_message` TEXT NULL,
-  PRIMARY KEY (`task_id`),
+  PRIMARY KEY (`id`),
   INDEX `job_id_idx` (`job_id` ASC) VISIBLE,
+  UNIQUE INDEX `id_UNIQUE` (`id` ASC) VISIBLE,
   CONSTRAINT `fk_job_tasks_jobid`
     FOREIGN KEY (`job_id`)
-    REFERENCES `cuchem_db`.`jobs` (`job_id`)
+    REFERENCES `cuchem_db`.`jobs` (`id`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
 
 -- -----------------------------------------------------
--- Table `cuchem_db`.`job_artifacts`
+-- Table `cuchem_db`.`task_artifacts`
 -- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `cuchem_db`.`job_artifacts` (
-  `artifact_id` INT NOT NULL,
-  `job_id` INT NOT NULL,
-  `artifact_name` VARCHAR(45) NOT NULL,
-  `artifact_type` ENUM("computation") NOT NULL,
+CREATE TABLE IF NOT EXISTS `cuchem_db`.`task_artifacts` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `task_id` INT NOT NULL,
+  `name` VARCHAR(45) NOT NULL,
+  `type` ENUM("computation") NOT NULL,
   `is_input` TINYINT NOT NULL,
   `artifact_value` TEXT NULL,
-  PRIMARY KEY (`artifact_id`),
-  INDEX `job_id_idx` (`job_id` ASC) VISIBLE,
-  CONSTRAINT `fk_job_artifacts_job_id`
-    FOREIGN KEY (`job_id`)
-    REFERENCES `cuchem_db`.`jobs` (`job_id`)
+  PRIMARY KEY (`id`),
+  INDEX `fk_job_artifacts_job_id_idx` (`task_id` ASC) VISIBLE,
+  UNIQUE INDEX `artifact_id_UNIQUE` (`id` ASC) VISIBLE,
+  CONSTRAINT `fk_task_artifacts_job_id`
+    FOREIGN KEY (`task_id`)
+    REFERENCES `cuchem_db`.`job_tasks` (`id`)
     ON DELETE NO ACTION
     ON UPDATE NO ACTION);
 

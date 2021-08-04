@@ -1,4 +1,5 @@
 import logging
+import torch
 
 import generativesampler_pb2
 import generativesampler_pb2_grpc
@@ -28,12 +29,26 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
 
         embedding, pad_mask = self.megamolbart.smiles2embedding(smile_str,
                                                                 pad_length=spec.padding)
-        embedding = embedding.squeeze()
-        shape = list(embedding.shape)
-        assert len(shape) == 2
+        dim = embedding.shape
+        embedding = embedding.flatten().tolist()
+        return generativesampler_pb2.EmbeddingList(embedding=embedding,
+                                                   dim=dim,
+                                                   pad_mask=pad_mask)
 
-        embedding = shape + embedding.flatten().tolist()
-        return generativesampler_pb2.EmbeddingList(embedding=embedding)
+    def EmbeddingToSmiles(self, embedding_spec, context):
+        '''
+        Converts input embedding to SMILES.
+        @param transform_spec: Input spec with embedding and mask.
+        '''
+        embedding = torch.FloatTensor(list(embedding_spec.embedding))
+        pad_mask = torch.BoolTensor(list(embedding_spec.pad_mask))
+        dim = tuple(embedding_spec.dim)
+
+        embedding = torch.reshape(embedding, dim).cuda()
+        pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
+
+        generated_mols = self.megamolbart.inverse_transform(embedding, pad_mask)
+        return generativesampler_pb2.SmilesList(generatedSmiles=generated_mols)
 
     def FindSimilars(self, spec, context):
 

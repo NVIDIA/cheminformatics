@@ -19,6 +19,11 @@ class GenerativeSamplerStub(object):
                 request_serializer=generativesampler__pb2.GenerativeSpec.SerializeToString,
                 response_deserializer=generativesampler__pb2.EmbeddingList.FromString,
                 )
+        self.EmbeddingToSmiles = channel.unary_unary(
+                '/nvidia.cheminformatics.grpc.GenerativeSampler/EmbeddingToSmiles',
+                request_serializer=generativesampler__pb2.EmbeddingList.SerializeToString,
+                response_deserializer=generativesampler__pb2.SmilesList.FromString,
+                )
         self.FindSimilars = channel.unary_unary(
                 '/nvidia.cheminformatics.grpc.GenerativeSampler/FindSimilars',
                 request_serializer=generativesampler__pb2.GenerativeSpec.SerializeToString,
@@ -40,6 +45,12 @@ class GenerativeSamplerServicer(object):
     """Missing associated documentation comment in .proto file."""
 
     def SmilesToEmbedding(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def EmbeddingToSmiles(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -70,6 +81,11 @@ def add_GenerativeSamplerServicer_to_server(servicer, server):
                     servicer.SmilesToEmbedding,
                     request_deserializer=generativesampler__pb2.GenerativeSpec.FromString,
                     response_serializer=generativesampler__pb2.EmbeddingList.SerializeToString,
+            ),
+            'EmbeddingToSmiles': grpc.unary_unary_rpc_method_handler(
+                    servicer.EmbeddingToSmiles,
+                    request_deserializer=generativesampler__pb2.EmbeddingList.FromString,
+                    response_serializer=generativesampler__pb2.SmilesList.SerializeToString,
             ),
             'FindSimilars': grpc.unary_unary_rpc_method_handler(
                     servicer.FindSimilars,
@@ -110,6 +126,23 @@ class GenerativeSampler(object):
         return grpc.experimental.unary_unary(request, target, '/nvidia.cheminformatics.grpc.GenerativeSampler/SmilesToEmbedding',
             generativesampler__pb2.GenerativeSpec.SerializeToString,
             generativesampler__pb2.EmbeddingList.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def EmbeddingToSmiles(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/nvidia.cheminformatics.grpc.GenerativeSampler/EmbeddingToSmiles',
+            generativesampler__pb2.EmbeddingList.SerializeToString,
+            generativesampler__pb2.SmilesList.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

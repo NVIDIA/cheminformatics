@@ -42,6 +42,7 @@ def test_dataframe_similar():
 
         result = stub.FindSimilars(spec)
 
+
 def test_dataframe_interpolate():
     sys.argv = [sys.argv[0]]
     with similarity(generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server,
@@ -55,3 +56,18 @@ def test_dataframe_interpolate():
             numPoints=10)
 
         result = stub.Interpolate(spec)
+
+
+def test_transform():
+    sys.argv = [sys.argv[0]]
+    with similarity(generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server,
+                    GenerativeSampler,
+                    generativesampler_pb2_grpc.GenerativeSamplerStub) as stub:
+
+        spec = generativesampler_pb2.GenerativeSpec(
+            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
+            smiles=['CC(=O)Nc1ccc(O)'])
+
+        result = stub.SmilesToEmbedding(spec)
+        result = stub.EmbeddingToSmiles(result)
+        logger.info(result)

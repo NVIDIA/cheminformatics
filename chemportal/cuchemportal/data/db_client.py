@@ -1,10 +1,13 @@
-import sqlalchemy as sa
-from sqlalchemy import engine
+from os import pipe
+
+from sqlalchemy.exc import IntegrityError
+from cuchemportal.pipeline.pipeline import Pipeline
+from sqlalchemy import create_engine, MetaData, Table
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy import MetaData, Table
-import pandas as pd
 from typing import Any, Union, Optional
-import logger
+import logging
+from datetime import datetime
+logger = logging.getLogger("db_logger")
 
 class DBClient:
     """
@@ -12,8 +15,8 @@ class DBClient:
     CRUD capabilities for cuchemportal pipelines
     database
     """
-    def __init__(self, connection_string: Optional[str], 
-                connection_config: Optional[dict], pool_count: Optional[int] = 20):
+    def __init__(self, connection_string: Optional[str] = None, 
+                connection_config: Optional[dict] = None, pool_count: Optional[int] = 20):
         """
         Builds a DataBase client and connects to database
 
@@ -22,8 +25,7 @@ class DBClient:
         """
         # Allowing option to simply pass SqlAlchemy connection string
         if connection_string is not None:
-            self.engine = sa.create_engine(connection_string, 
-                        pool_size = pool_count, max_overflow = 0)
+            self.engine = create_engine(connection_string)
         # Otherwise obtaining values as parameters
         else:
             # Obtaining credentials from config and building connection string
@@ -36,19 +38,19 @@ class DBClient:
                                      "{3}".format(dbuser, dbpass, dbhost, dbname))
 
             # Creating engine, pooling so as to manage connections
-            self.engine = sa.create_engine(self.connection_str, 
-                        pool_size =  pool_count, max_overflow = 0)
+            self.engine = create_engine(self.connection_str)
 
-        # Building connection and session objects
-        self.connection = self.engine.connect()
-        self.session = sessionmaker(bind=engine)
+        # Building and instantiating session object
+        self.Session = sessionmaker(bind=self.engine)
+
+        self.metadata = MetaData(bind=self.engine)
 
         # Displaying basic metadata
         logger.info("Database accessed")
         logger.debug(self.engine.table_names)
 
 
-    def insert_all(self, *entries: Any) -> bool:
+    def insert_all(self, *entries: Any):
         """Inserts a list of entries into table"""
 
         # Adding all entries to session and comitting them
@@ -57,55 +59,52 @@ class DBClient:
         # Todo: Return array of all inserted objects and make a singular version of this method
         return entries
 
-    def insert(self, entry: Any) -> bool:
-        """Inserts a list of entries into table"""
+    def insert(self, record, session: Session):
+        """Inserts a pipeline entry  into table"""
 
         # Adding all entries to session and comitting them
-        self.session.add(entry)
-        self.session.commit()
+
+        session.add(record)
+
         # Todo: Return array of all inserted objects and make a singular version of this method
-        return entry
+        return record
 
-    def query_all(self, *queries: Any) -> str:
+    def query_by_id(self, id: int, db_table: Any, session: Session):
         """Obtains all instances in table of each of a list of queries """
-        query_result = ""
 
-        # Appending all results for every query
-        for query in queries:
-            query_result += self.session.query(query).all() + "\n"
+        # Returning first matching pipeline
+        query_result = session.query(db_table).filter(db_table.id == id).first()
         
         return query_result
 
-    def query_first(self, *queries: Any) -> str:
+    def query_range(self, db_table: Any, start_idx: int, n_rows: int, session: Session):
         """Obtains first instance in table of each of a list of queries """
-        query_result = ""
-
-        # Appending first result from every query
-        for query in queries:
-            query_result += self.session.query(query).first() + "\n"
+         # Returning all pipelines in [start,end)
+        query_result = session.query(db_table).filter((db_table.id >= start_idx)).limit(n_rows)
         
         return query_result
 
     # TODO: fix update methods
-    def update_all(self, items_to_change: Any, attribute_to_update: Any, new_value: Any) -> bool:
+    def update_record(self, db_table: Any, id: int, new_config: dict, session: Session):
         """Updates all given database items corresponding to a query""" 
-        # Updating all results which are returned by the query
-        self.session.query(items_to_change).all().update({attribute_to_update: new_value})
-        return True
+        # Obtaining first value of exact same id (unique so should be only value)
+        updatable = session.query(db_table).filter(db_table.id == id).first()
+        try:
+            for attribute in new_config.keys():
+                # Updating only known attributes on object and mapping back to db
+                if hasattr(updatable, attribute):
+                    setattr(updatable, attribute, new_config[attribute])
+            setattr(updatable, "last_updated", datetime.now())
+        # Preserving atomicity if integrity error found
+        except IntegrityError as e:
+            raise e
 
-    def update_first(self, item_to_change: Any, attribute_to_update: Any, new_value: Any) -> bool:
-        """Updates the first database item corresponding to a query""" 
-        # Updating the first results which is returned by the query
-        updated = self.session.query(item_to_change).first().update({attribute_to_update: new_value})
-        return updated
+        return updatable
 
-    def delete(self, *queries: list) -> bool:
+    def delete(self, db_table: Any, id: int, session: Session):
         """Deletes every item that matches all queries in a list of queries """
-        for query in queries:
-            # Obtaining all corresponding values, deleting and committing
-            to_delete = self.session.query(query).all()
-            self.session.delete(to_delete)
-            self.session.commit(to_delete)
-
-        # boolean validation
-        return True 
+        # Obtaining all corresponding values, deleting and committing
+        item = session.query(db_table).filter(db_table.id == id).first()
+        setattr(item, "is_deleted", 1)
+        setattr(item, "last_updated", datetime.now())
+        return item

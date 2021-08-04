@@ -139,13 +139,49 @@
   - name: Rebooting machine
     reboot:
 
+- name: NGC Megamolbart Resources
+  hosts: all
+  become: yes
+  tasks:
+  - name: Create directory
+    ansible.builtin.file:
+      path: /opt/megamolbart
+      state: directory
+      owner: "{{ ansible_user }}"
+      mode: '0755'
+
+  - name: Download NGC resource
+    unarchive:
+      src: https://api.ngc.nvidia.com/v2/resources/nvidia/clara/cheminformatics/versions/0.1/zip
+      dest: /opt/megamolbart
+      remote_src: yes
+
+  - name: Fix permissions
+    ansible.builtin.file:
+      path: /opt/megamolbart/launch
+      mode: '1777'
+
 - name: Start App
   hosts: all
   become: yes
-
   tasks:
-  - name: Start Cheminfo container
-    command: docker run --name cheminfo --gpus all -d -v /tmp/:/data -p 5000:5000 nvcr.io/nvidia/clara/cheminformatics_demo:0.0.1
+  - name: Create .env file
+    command: ./launch stop
+    args:
+      chdir: /opt/megamolbart/
+    environment:
+      PATH: '/opt/ngc:{{ ansible_env.PATH }} '
 
-  - name: Progress
-    command: docker logs -f cheminfo
+  - name: Set NGC API token
+    ansible.builtin.lineinfile:
+      path: /opt/megamolbart/.env
+      regexp: '^REGISTRY_ACCESS_TOKEN='
+      line: REGISTRY_ACCESS_TOKEN={{ NGC_KEY }}
+
+  - name: Start application
+    command: ./launch
+    args:
+      chdir: /opt/megamolbart/
+    environment:
+      PATH: '/opt/ngc:{{ ansible_env.PATH }}'
+    register: command_output_full

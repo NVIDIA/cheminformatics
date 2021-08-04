@@ -174,7 +174,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         torch.cuda.empty_cache()
         return embedding, pad_mask
 
-    def inverse_transform(self, embeddings, model, mem_pad_mask, k=1, sanitize=True):
+    def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=False):
         mem_pad_mask = mem_pad_mask.clone()
         smiles_interp_list = []
 
@@ -182,25 +182,24 @@ class MegaMolBART(BaseGenerativeWorkflow):
         with torch.no_grad():
             for memory in embeddings.permute(1, 0, 2):
 
-                decode_fn = partial(model._decode_fn,
+                decode_fn = partial(self.model._decode_fn,
                                     mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
                                     memory=memory)
 
-                mol_strs, log_lhs = model.sampler.beam_decode(decode_fn,
-                                                              batch_size=batch_size,
-                                                              device='cuda',
-                                                              k=k)
+                mol_strs, log_lhs = self.model.sampler.beam_decode(decode_fn,
+                                                                   batch_size=batch_size,
+                                                                   device='cuda',
+                                                                   k=k)
                 mol_strs = sum(mol_strs, [])  # flatten list
 
-                # TODO: add back sanitization and validity checking once model is trained
-                logger.warn('WARNING: MOLECULE VALIDATION AND SANITIZATION CURRENTLY DISABLED')
                 for smiles in mol_strs:
-                    # mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
-                    # if mol:
-                    #     sanitized_smiles = Chem.MolToSmiles(mol)
-                    #     if sanitized_smiles not in smiles_interp_list:
-                    #         smiles_interp_list.append(sanitized_smiles)
-                    #         break
+                    if sanitize:
+                        mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
+                        if mol:
+                            sanitized_smiles = Chem.MolToSmiles(mol)
+                            if sanitized_smiles not in smiles_interp_list:
+                                smiles_interp_list.append(sanitized_smiles)
+                                break
                     smiles_interp_list.append(smiles)
 
         return smiles_interp_list
@@ -233,7 +232,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()  # dims: batch, tokens, embedding
         combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
 
-        return self.inverse_transform(interpolated_emb, self.model, k=k, mem_pad_mask=combined_mask,
+        return self.inverse_transform(interpolated_emb,
+                                      combined_mask,
+                                      k=k,
                                       sanitize=True), combined_mask
 
     def find_similars_smiles_list(self,
@@ -248,8 +249,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         neighboring_embeddings = self.addjitter(embedding, distance, cnt=num_requested)
 
-        generated_mols = self.inverse_transform(embeddings=neighboring_embeddings, model=self.model,
-                                                k=1, mem_pad_mask=pad_mask.bool().cuda(), sanitize=True)
+        generated_mols = self.inverse_transform(neighboring_embeddings,
+                                                pad_mask.bool().cuda(),
+                                                k=1, sanitize=True)
 
         generated_mols = [smiles] + generated_mols
         return generated_mols, neighboring_embeddings, pad_mask

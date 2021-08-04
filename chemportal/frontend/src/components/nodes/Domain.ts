@@ -1,5 +1,19 @@
 import { Node } from '@baklavajs/core'
-import PrepareProtineSideBar from './PrepareProtineSideBar.vue'
+
+export class GenerateMolecules extends Node {
+  public type = 'GenerateMolecules'
+  public name = this.type;
+
+  constructor () {
+    super()
+
+    this.addInputInterface('smiles', 'InputOption')
+    this.addOption('Generative Model', 'SelectOption', 'MegaMolBART', undefined,
+      { items: ['MegaMolBART', 'CDDD'] })
+
+    this.addOutputInterface('generated-smiles')
+  }
+}
 
 export class PrepareProtine extends Node {
   public type = 'PrepareProtine'
@@ -9,10 +23,7 @@ export class PrepareProtine extends Node {
     super()
 
     this.addInputInterface('protein-file', 'InputOption')
-    this.addOption('Command',
-      'ButtonOption',
-      'bash',
-      PrepareProtineSideBar.name)
+
     this.addOutputInterface('protein-receptor-file')
   }
 }
@@ -25,6 +36,7 @@ export class PrepareLigand extends Node {
     super()
 
     this.addInputInterface('SMILES', 'InputOption')
+
     this.addOutputInterface('ligands-dir')
     this.addOutputInterface('library-file')
   }
@@ -51,8 +63,8 @@ export class ScorePose extends Node {
   constructor () {
     super()
 
-    this.addInputInterface('library-file', 'InputOption')
     this.addInputInterface('docked-dir', 'InputOption')
+    this.addInputInterface('library-file', 'InputOption')
 
     this.addOutputInterface('score-stats')
     this.addOutputInterface('score-file')

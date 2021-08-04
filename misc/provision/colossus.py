@@ -50,7 +50,7 @@ class Colossus():
         input_data = {"startTime": start_date.isoformat(),
                       "endTime": end_date.isoformat(),
                       "gpuTypeList": [gpu_type],
-                      "poolNameList": [poolname]}
+                      "poolNameList": ['general', poolname]}
 
         headers = {'authorization':
                    'Bearer ' + Colossus.authentication_token['authToken']}

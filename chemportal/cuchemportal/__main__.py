@@ -15,42 +15,26 @@
 # limitations under the License.
 
 import os
-from argparse import ArgumentParser
+import hydra
 from waitress import serve
 from .api import app
 from .logger import initialize_log
+from cuchemportal.context import Context
+
 
 logger = initialize_log(os.path.join('/var/log', 'cuChemPortal.log'), 'cuChemPortal')
 
 
-def init_arg_parser():
-    """
-    Constructs command-line argument parser definition.
-    """
-    parser = ArgumentParser(description='cuChem Portal')
-
-    parser.add_argument('-c', '--configFile',
-                        dest='configFile',
-                        nargs='+',
-                        type=str,
-                        required=False,
-                        help='Application configuration file')
-    return parser
-
-
-def main():
+@hydra.main(config_path="/etc/nvidia/cuChem", config_name="portalConfig")
+def main(cfg):
     """
     Entry point to pipeline executor or the UI renderer.
     """
     logger.info('cuChem Portal')
-    arg_parser = init_arg_parser()
-    args = arg_parser.parse_args()
 
-    config_file = '/etc/nvidia/cuChem/portalConfig.yaml'
-    if hasattr(args, 'configFile') and args.configFile is not None:
-        config_file = args.configFile
+    context = Context()
+    context.db_config = cfg.db
 
-    logger.info(config_file)
     serve(app, host='0.0.0.0', port=5000)
 
 

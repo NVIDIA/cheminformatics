@@ -4,7 +4,21 @@ FROM nvidia/cuda:11.0-base
 RUN apt-get update \
     && apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release \
     && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+RUN echo \
+  "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y docker-ce docker-ce-cli containerd.io
+RUN curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+RUN chmod +x /usr/local/bin/docker-compose
 
 SHELL ["/bin/bash", "-c"]
 RUN  wget --quiet -O /tmp/miniconda.sh \
@@ -35,8 +49,9 @@ ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
 COPY ./ /opt/nvidia/cheminfomatics
 RUN cd /opt/nvidia/cheminfomatics/common; pip install .
 RUN cd /opt/nvidia/cheminfomatics/cuchem; pip install -r requirements.txt
+RUN cd /opt/nvidia/cheminfomatics/chemportal; pip install -r requirements.txt
 
 ENV PYTHONPATH /opt/nvidia/cheminfomatics/common/generated:$PYTHONPATH
-
 ENV UCX_LOG_LEVEL error
+
 CMD cd /opt/nvidia/cheminfomatics; ./launch.sh start

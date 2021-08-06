@@ -9,6 +9,7 @@
         <v-btn style="margin-right: 6px;">Cancel</v-btn>
 
         <v-btn
+          :disabled="!formValid"
           class="primary ma-2 white--text"
           @click='save()'>
           Save
@@ -18,18 +19,18 @@
 
       <v-form
         ref="form"
-        v-model="form"
+        v-model="formValid"
         class="pa-4 pt-6">
 
         <v-text-field
-          v-model="name"
-          filled
+          v-model="pipeline.name"
+          :rules="rules.required"
           label="Name">
         </v-text-field>
         <v-textarea
-          v-model="description"
+          v-model="pipeline.description"
+          :rules="rules.required"
           auto-grow
-          filled
           label="Description"
           rows="2">
         </v-textarea>
@@ -55,21 +56,29 @@ import PrepareProtineSideBar from '../../components/nodes/sidebar/PrepareProtine
 import LoopNewInput from '../../components/nodes/sidebar/LoopNewInput.vue'
 import LoopExpression from '../../components/nodes/sidebar/LoopExpression.vue'
 
+import CommonView from '../../mixin/CommonView'
+
 export default Vue.extend({
   name: 'Workflow',
   components: { },
+  mixins: [CommonView],
   data () {
     return {
       editor: new Editor(),
       viewPlugin: new ViewPlugin(),
       engine: new Engine(true),
-      value: '',
+      formValid: false,
+      pipeline: {
+        name: null,
+        description: null
+      },
+
       rules: {
-        email: v => !!(v || '').match(/@/) || 'Please enter a valid email',
-        length: len => v => (v || '').length >= len || `Invalid character length, required ${len}`,
-        password: v => !!(v || '').match(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*(_|[^\w])).+$/) ||
-          'Password must contain an upper case letter, a numeric character, and a special character',
-        required: v => !!v || 'This field is required'
+        email: [v => !!(v || '').match(/@/) || 'Please enter a valid email'],
+        length: [len => v => (v || '').length >= len || `Invalid character length, required ${len}`],
+        password: [v => !!(v || '').match(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*(_|[^\w])).+$/) ||
+          'Password must contain an upper case letter, a numeric character, and a special character'],
+        required: [v => !!v || 'Required value']
       }
     }
   },
@@ -103,7 +112,10 @@ export default Vue.extend({
     },
 
     save () {
-      console.log(this.editor.save())
+      this.$store.commit('pipeline/save', {
+        onFailure: this.showError,
+        pipeline: this.pipeline
+      })
     }
   }
 })

@@ -114,7 +114,6 @@ DOCKER_CMD="docker run \
     -p ${PLOTLY_PORT}:5000 \
     -v ${PROJECT_PATH}:/workspace \
     -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
-    -u $(id -u ${USER}):$(id -g ${USER}) \
     --shm-size=1g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \

@@ -32,4 +32,5 @@ dask-worker-space
 benchmark.csv
 .env
 chemportal/frontend/node_modules/
+chemportal/outputs/
 

@@ -1,36 +1,50 @@
-from sqlalchemy.sql.sqltypes import Boolean, Date
-from cuchemportal.pipeline.job_task import JobTask
-from cuchemportal.data.configuration_tester import ConfigurationTester
-import copy
-from typing import Union, Optional
 import json
+import logging
+from datetime import datetime
+from typing import Optional
+
+from sqlalchemy.sql.sqltypes import Boolean
 from sqlalchemy.orm import registry
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, JSON, Boolean, DateTime
+from sqlalchemy import Column, Integer, String, JSON, Boolean, DateTime
+
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from cuchemportal.data.configuration_tester import ConfigurationTester
+from cuchemportal.data import BaseModel
 
 mapper_registry = registry()
 
-@mapper_registry.mapped
-class Pipeline:
+logger = logging.getLogger(__name__)
 
+
+@mapper_registry.mapped
+class Pipeline(BaseModel):
     __tablename__ = "pipelines"
+
     id = Column(Integer, primary_key=True)
     name = Column(String)
+    description = Column(String)
     definition = Column(JSON)
+    ui_config = Column(JSON)
     is_published = Column(Boolean)
     is_deleted = Column(Boolean)
-    ui_config = Column(JSON)
-    user = Column(String)
-    time_created = Column(DateTime)
-    last_updated = Column(DateTime)
+    created_at = Column(DateTime)
+    updated_at = Column(DateTime)
+    create_by = Column(String)
+    updated_by = Column(String)
 
-    
     """A State storing object representing a pipeline """
     def __init__(self, input_artifacts: dict = None):
         self._config: dict = None
-        self.is_published: bool = False 
+        self.is_published: bool = False
+        self.is_deleted: bool = False
+        self.created_at = datetime.now()
+        self.updated_at = datetime.now()
         self.input_artifacts: dict = input_artifacts
-        self.attributes = (["id", "name", "definition", 
-                        "is_published", "ui_config", "user", "time_created", "last_updated"])
+
+        # TODO: Do we really need this?
+        self.attributes = (["id", "name", "description", "definition",
+                            "ui_config", "is_published", "is_deleted",
+                            "created_at", "updated_at" "create_by", "updated_by"])
 
     @property
     def config(self):
@@ -62,7 +76,7 @@ class Pipeline:
             # Setting all attributes which are present in the config
             if attribute in new_config:
                 setattr(self, attribute, new_config[attribute])
-        
+
     @config.getter
     def config(self) -> dict:
         return self._config
@@ -70,14 +84,14 @@ class Pipeline:
     def publish(self):
         self.is_published = True
 
-    def __str__(self):
-        """Returns Pipeline id if initialized"""
-        if hasattr(self, "config"):
-            return "Pipeline #" + str(self._config["id"])
-        elif hasattr(self, "id"):
-            return "Pipeline #" + str(self.id)
-        else:
-            return "uninitialized pipeline"
+    # def __str__(self):
+    #     """Returns Pipeline id if initialized"""
+    #     if hasattr(self, "config"):
+    #         return "Pipeline #" + str(self._config["id"])
+    #     elif hasattr(self, "id"):
+    #         return "Pipeline #" + str(self.id)
+    #     else:
+    #         return "uninitialized pipeline"
 
     @property
     def tasks(self):
@@ -85,4 +99,11 @@ class Pipeline:
 
     def get_input_artifacts(self) -> dict:
         return self.input_artifacts
-    
+
+
+class PipelineSchema(SQLAlchemyAutoSchema):
+    class Meta:
+        model = Pipeline
+
+pipeline_schema = PipelineSchema()
+pipelines_schema = PipelineSchema(many=True)

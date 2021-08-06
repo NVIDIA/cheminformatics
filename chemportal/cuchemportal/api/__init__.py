@@ -15,13 +15,15 @@
 import os
 import logging
 
-from flask import Blueprint, Flask, send_file, json
+from cuchemportal import app, api_bp
+
+from flask import send_file, json
 from flask.globals import current_app
-from sqlalchemy.ext.declarative import DeclarativeMeta
 from flask.helpers import safe_join
 
-logger = logging.getLogger(__name__)
+from sqlalchemy.ext.declarative import DeclarativeMeta
 
+logger = logging.getLogger(__name__)
 
 class AlchemyEncoder(json.JSONEncoder):
 
@@ -47,10 +49,6 @@ class AlchemyEncoder(json.JSONEncoder):
         return json.JSONEncoder.encode(self, obj)
 
 
-api_bp = Blueprint('api_bp', __name__, url_prefix='/api')
-
-app = Flask(__name__, static_folder='../../public/')
-app.register_blueprint(api_bp)
 app.json_encoder = AlchemyEncoder
 
 
@@ -93,4 +91,4 @@ def add_header(response):
         'Content-Type,Authorization'
     return response
 
-from .workflow import *
+from .pipeline import *

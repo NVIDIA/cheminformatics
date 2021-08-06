@@ -33,6 +33,21 @@
     <v-main>
       <router-view />
     </v-main>
+
+    <v-snackbar
+      v-model="$store.state.message.show"
+      :bottom="false"
+      :left="false"
+      :multi-line="true"
+      :timeout="6000"
+      :vertical="false"
+      :color="$store.state.message.level"
+    >
+      {{ $store.state.message.text }}
+      <v-btn color="pink" text @click="$store.state.message.show = false">Close</v-btn>
+    </v-snackbar>
+    {{$store.state.message.text}}
+
   </v-app>
 </template>
 

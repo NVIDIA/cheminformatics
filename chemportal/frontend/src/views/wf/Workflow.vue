@@ -6,7 +6,11 @@
           Pipeline
         </v-card-title>
         <v-spacer></v-spacer>
-        <v-btn style="margin-right: 6px;">Cancel</v-btn>
+        <v-btn
+          class='ma-2'
+          @click="$router.push('/wf/list')">
+          Cancel
+        </v-btn>
 
         <v-btn
           :disabled="!formValid"
@@ -34,7 +38,6 @@
           label="Description"
           rows="2">
         </v-textarea>
-
       </v-form>
     </v-card>
 
@@ -72,7 +75,7 @@ export default Vue.extend({
         name: null,
         description: null
       },
-
+      editMode: false,
       rules: {
         email: [v => !!(v || '').match(/@/) || 'Please enter a valid email'],
         length: [len => v => (v || '').length >= len || `Invalid character length, required ${len}`],
@@ -101,7 +104,33 @@ export default Vue.extend({
     this.editor.registerNodeType('Loop', Loop)
   },
 
+  mounted () {
+    var pipelineId = this.$route.params.id
+    if (pipelineId !== undefined) {
+      this.editMode = true
+      this.fetch(pipelineId)
+    }
+  },
+
   methods: {
+    fetch (pipelineId) {
+      this.$store.dispatch('pipeline/fetch', pipelineId).then(response => {
+        this.pipeline = response.data.data
+      }).catch(error => {
+        console.log(error)
+        this.showError(pipelineId, error)
+      })
+    },
+
+    save () {
+      this.$store.dispatch('pipeline/save', this.pipeline).then(response => {
+        this.showMsg(this.pipeline, 'Pipeline "' + this.pipeline.name + '" saved ', 'info')
+        this.$router.push('/wf/list')
+      }).catch(error => {
+        console.log(error)
+        this.showError(this.pipeline, error)
+      })
+    },
 
     addNodeWithCoordinates (NodeType, x, y) {
       const n = new NodeType()
@@ -109,13 +138,6 @@ export default Vue.extend({
       n.position.x = x
       n.position.y = y
       return n
-    },
-
-    save () {
-      this.$store.commit('pipeline/save', {
-        onFailure: this.showError,
-        pipeline: this.pipeline
-      })
     }
   }
 })

@@ -17,7 +17,7 @@ def create_pipeline(name=None):
     ppln = Pipeline()
     ppln.config = config
     ppln.name = name
-    ppln.create_by = 'TESTER'
+    ppln.created_by = 'TESTER'
     ppln.updated_by = 'TESTER'
     ppln.definition = {"a": "b"}
 

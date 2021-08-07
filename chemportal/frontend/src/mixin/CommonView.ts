@@ -5,6 +5,14 @@ export default {
       this.busy = false
     },
 
+    showMsg (obj, msg, type) {
+      this.$store.state.message.show = true
+      this.$store.state.message.text = msg
+      this.$store.state.message.level = type
+
+      this.resetBusy()
+    },
+
     showError (obj, error) {
       let errorMsg = 'Unexpected error'
       // Best effort to get error message
@@ -17,10 +25,7 @@ export default {
         errorMsg = error.response.data.error_msg
       }
 
-      this.$store.state.message.show = true
-      this.$store.state.message.text = errorMsg
-      this.$store.state.message.level = 'error'
-
+      this.showMsg(obj, errorMsg, 'error')
       this.resetBusy()
     }
   }

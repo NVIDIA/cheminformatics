@@ -141,7 +141,6 @@ pull() {
 
 
 dev() {
-    set -x
     local CONTAINER_OPTION=$1
     local CONT=${CUCHEM_CONT}
 
@@ -155,7 +154,7 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace/chemportal/"
     fi
 
     ${DOCKER_CMD} -it ${CONT} bash

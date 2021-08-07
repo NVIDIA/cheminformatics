@@ -25,15 +25,13 @@ class PipelineManager(metaclass=Singleton):
             sess.commit()
         return ppln_id
 
-    def update(self, previous_id: int, new_conf: dict):
+    def update(self, ppln:Pipeline):
         """Receives an updated pipeline from the UI and precedes to reset config"""
         with self.context.db_client.Session() as sess:
             try:
-            # Using DB Clients query id API - to be changed to more general query API is possible
-                pipeline = self.context.db_client.update_record(db_table = Pipeline,
-                                                                id = previous_id,
-                                                                new_config=new_conf,
-                                                                session=sess)
+                pipeline = self.context.db_client.update(db_table=Pipeline,
+                                                         record=ppln,
+                                                         session=sess)
                 sess.commit()
             except IntegrityError as e:
                 # Rolling back and throwing error
@@ -54,9 +52,10 @@ class PipelineManager(metaclass=Singleton):
         """Fetches all Pipelines in the interval [start,end)"""
         with self.context.db_client.Session() as sess:
             # Using DB Clients query id API - to be changed to more general query API is possible
-            pipelines = self.context.db_client.query_range(db_table = Pipeline, start_idx = start_index,
-                                                n_rows = num_rows,
-                                                session=sess)
+            pipelines = self.context.db_client.query_range(db_table = Pipeline,
+                                                           start_idx = start_index,
+                                                           n_rows = num_rows,
+                                                           session=sess)
         # Returning autoconverted pipeline
         return pipelines
 

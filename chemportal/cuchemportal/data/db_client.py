@@ -35,16 +35,6 @@ class DBClient:
         logger.info("Database connected")
         logger.debug(self.engine.table_names())
 
-
-    def insert_all(self, *entries: Any):
-        """Inserts a list of entries into table"""
-
-        # Adding all entries to session and comitting them
-        self.session.add_all(entries)
-        self.session.commit()
-        # Todo: Return array of all inserted objects and make a singular version of this method
-        return entries
-
     def insert(self, record, session: Session):
         """Inserts a pipeline entry  into table"""
         # Adding record to session
@@ -63,26 +53,21 @@ class DBClient:
     def query_range(self, db_table: Any, start_idx: int, n_rows: int, session: Session):
         """Obtains first instance in table of each of a list of queries """
          # Returning all pipelines in [start,end)
-        query_result = session.query(db_table).offset(start_idx).limit(n_rows).all()
+        return session.query(db_table).filter(db_table.is_deleted == 0).offset(start_idx).limit(n_rows).all()
 
-        return query_result
-
-    # TODO: fix update methods
-    def update_record(self, db_table: Any, id: int, new_config: dict, session: Session):
+    def update(self, db_table: Any, record, session: Session):
         """Updates all given database items corresponding to a query"""
         # Obtaining first value of exact same id (unique so should be only value)
-        updatable = session.query(db_table).filter(db_table.id == id).first()
-        try:
-            for attribute in new_config.keys():
-                # Updating only known attributes on object and mapping back to db
-                if hasattr(updatable, attribute):
-                    setattr(updatable, attribute, new_config[attribute])
-            setattr(updatable, "updated_at", datetime.now())
-        # Preserving atomicity if integrity error found
-        except IntegrityError as e:
-            raise e
+        updatable = session.query(db_table).filter(db_table.id == record.id).first()
 
-        return updatable
+        setattr(record, "updated_at", datetime.now())
+        for attribute in updatable.__table__.columns:
+            # Updating only known attributes on object and mapping back to db
+            if hasattr(updatable, attribute.name):
+                setattr(updatable, attribute.name, getattr(record, attribute.name))
+        # setattr(updatable, "updated_at", datetime.now())
+
+        return record
 
     def delete(self, db_table: Any, id: int, session: Session):
         """Deletes every item that matches all queries in a list of queries """

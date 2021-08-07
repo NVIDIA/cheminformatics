@@ -9,15 +9,17 @@ const routes: Array<RouteConfig> = [
     path: '/',
     name: 'Home',
     component: Home
-  },
-  {
+  }, {
     path: '/wf/list',
     name: 'WfList',
     component: () => import('../views/wf/List.vue')
-  },
-  {
+  }, {
     path: '/wf/workflow',
-    name: 'Workflow',
+    name: 'NewWorkflow',
+    component: () => import('../views/wf/Workflow.vue')
+  }, {
+    path: '/wf/workflow/:id',
+    name: 'EditWorkflow',
     component: () => import('../views/wf/Workflow.vue')
   }
 ]

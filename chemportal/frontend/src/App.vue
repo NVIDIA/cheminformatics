@@ -26,7 +26,7 @@
         :to="'/wf/list'"
         style="text-decoration: none; color: inherit !important"
       >
-        <span style="padding: 12px">Workflows</span>
+        <span style="padding: 12px">Pipelines</span>
       </router-link>
     </v-app-bar>
 
@@ -46,7 +46,6 @@
       {{ $store.state.message.text }}
       <v-btn color="pink" text @click="$store.state.message.show = false">Close</v-btn>
     </v-snackbar>
-    {{$store.state.message.text}}
 
   </v-app>
 </template>

@@ -1,5 +1,10 @@
 # Setting up development environment
 
+Please make sure to rebuild all containers if new dependencies were added. Command to re-build all containers:
+```
+cd .. && ./launch.sh build
+```
+
 - Start container in dev mode
    ```
    cd .. && ./launch.sh dev

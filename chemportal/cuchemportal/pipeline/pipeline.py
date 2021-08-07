@@ -29,7 +29,7 @@ class Pipeline(BaseModel):
     is_deleted = Column(Boolean)
     created_at = Column(DateTime)
     updated_at = Column(DateTime)
-    create_by = Column(String)
+    created_by = Column(String)
     updated_by = Column(String)
 
     """A State storing object representing a pipeline """
@@ -44,7 +44,7 @@ class Pipeline(BaseModel):
         # TODO: Do we really need this?
         self.attributes = (["id", "name", "description", "definition",
                             "ui_config", "is_published", "is_deleted",
-                            "created_at", "updated_at" "create_by", "updated_by"])
+                            "created_at", "updated_at" "created_by", "updated_by"])
 
     @property
     def config(self):

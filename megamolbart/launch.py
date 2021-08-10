@@ -30,6 +30,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('megamolbart')
 formatter = logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
+from util import (REGEX, DEFAULT_CHEM_TOKEN_START, DEFAULT_MAX_SEQ_LEN,
+                  DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR,
+                  DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS)
+
 
 class Launcher(object):
     """
@@ -64,6 +68,24 @@ class Launcher(object):
                             default=CHECKPOINTS_DIR,
                             help='Path to Checkpoints dir.')
 
+        parser.add_argument('--num_layers',
+                            dest='num_layers',
+                            type=int,
+                            default=DEFAULT_NUM_LAYERS,
+                            help='Number hidden layers in the model')
+
+        parser.add_argument('--hidden_size',
+                            dest='hidden_size',
+                            type=int,
+                            default=DEFAULT_D_MODEL,
+                            help='Hidden size of the model')
+
+        parser.add_argument('--num_attention_heads',
+                            dest='num_attention_heads',
+                            type=int,
+                            default=DEFAULT_NUM_HEADS,
+                            help='Maximum length of decoded sequence')
+
         args = parser.parse_args(sys.argv[1:])
 
         if args.debug:
@@ -75,7 +97,10 @@ class Launcher(object):
         generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(
             GenerativeSampler(decoder_max_seq_len=args.max_decode_length,
                               vocab_path=args.vocab,
-                              checkpoints_dir=args.checkpoints_dir),
+                              checkpoints_dir=args.checkpoints_dir,
+                              num_layers=args.num_layers,
+                              hidden_size=args.hidden_size,
+                              num_attention_heads=args.num_attention_heads),
             server)
         server.add_insecure_port(f'[::]:{args.port}')
         server.start()

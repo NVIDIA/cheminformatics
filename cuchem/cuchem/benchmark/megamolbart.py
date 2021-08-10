@@ -40,6 +40,12 @@ def parse_args():
                         type=str,
                         help='MegaMolbart service URL.')
 
+    parser.add_argument('-s', '--input_size',
+                        dest='input_size',
+                        default=None,
+                        type=int,
+                        help='Number of molecules tobe used. Must be less then 20k.')
+
     parser.add_argument('-l', '--max_seq_len',
                         dest='max_seq_len',
                         type=int,
@@ -57,7 +63,7 @@ OUTPUT_DIR = args.output_dir
 DEFAULT_MAX_SEQ_LEN = args.max_seq_len # TODO: Import from MegaMolBART codebase?
 
 num_samples = 10
-radius_list = [0.01, 0.1, 0.5] # TODO calculate radius and automate this
+radius_list = [1, 2, 5] # TODO calculate radius and automate this
 top_k_list = [None, 50, 100, 500] # TODO decide on top k value
 
 # Metrics
@@ -66,7 +72,8 @@ unique = Unique()
 novelty = Novelty()
 nn = NearestNeighborCorrelation()
 modelability = Modelability()
-metric_list = [nn, modelability, validity, unique, novelty]
+#metric_list = [nn, modelability, validity, unique, novelty]
+metric_list = [validity]
 
 # ML models
 rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0)
@@ -89,8 +96,9 @@ model_dict = {'random forest': [rf_estimator, rf_param_dict],
 # Datasets
 smiles_dataset = ZINC15_TestSplit_20K_Samples(max_len=DEFAULT_MAX_SEQ_LEN)
 fingerprint_dataset = ZINC15_TestSplit_20K_Fingerprints()
-smiles_dataset.load()
+smiles_dataset.load(max_rows=args.input_size)
 fingerprint_dataset.load(smiles_dataset.data.index)
+
 n_data = len(smiles_dataset.data)
 assert (fingerprint_dataset.data.index == smiles_dataset.data.index)
 
@@ -117,7 +125,6 @@ if __name__ == '__main__':
             while retry_count < 30:
                 try:
                     # Wait for upto 5 min for the server to be up
-                    stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
                     stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
                     func = stub.FindSimilars
                     iteration = get_model_iteration(stub)

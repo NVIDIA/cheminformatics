@@ -17,7 +17,10 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
 
         self.megamolbart = MegaMolBART(decoder_max_seq_len=decoder_max_seq_len,
                                        vocab_path=vocab_path,
-                                       checkpoints_dir=checkpoints_dir)
+                                       checkpoints_dir=checkpoints_dir,
+                                       num_layers=kwargs['num_layers'],
+                                       hidden_size=kwargs['hidden_size'],
+                                       num_attention_heads=kwargs['num_attention_heads'])
 
         try:
             iteration = int(self.megamolbart.iteration)

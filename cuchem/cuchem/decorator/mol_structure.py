@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 class MolecularStructureDecorator(BaseMolPropertyDecorator):
 
+    ERROR_VALUE = 'Error interpreting SMILES using RDKit'
+
     def decorate(self,
                  df: Union[cudf.DataFrame, pandas.DataFrame],
                  smile_cols: int = 0):
@@ -35,7 +37,7 @@ class MolecularStructureDecorator(BaseMolPropertyDecorator):
             except Exception as ex:
                 logger.exception(ex)
                 mol_struct.append(
-                    {'value': 'Error interpreing SMILES using RDKIT',
+                    {'value': MolecularStructureDecorator.ERROR_VALUE,
                      'level': 'error'})
 
         df['Chemical Structure'] = mol_struct

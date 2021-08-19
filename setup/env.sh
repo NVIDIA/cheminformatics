@@ -42,8 +42,8 @@ else
     write_env=1
 fi
 
-CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:latest}
-MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/megamolbart:latest}
+CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.1.1}
+MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/megamolbart:0.1.1}
 MEGAMOLBART_MODEL=${MEGAMOLBART_MODEL:=nvidia/clara/megamolbart:0.1}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 CONTENT_PATH=${CONTENT_PATH:=$(pwd)}

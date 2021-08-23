@@ -35,6 +35,15 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
             smiles = df.iat[idx, smile_cols]
             m = Chem.MolFromSmiles(smiles)
 
+            if m is None:
+                mol_logp.append({'value': '-', 'level': 'info'})
+                mol_wt.append({'value': '-', 'level': 'info'})
+                hdonors.append({'value': '-', 'level': 'info'})
+                hacceptors.append({'value': '-', 'level': 'info'})
+                rotatable_bonds.append({'value': '-', 'level': 'info'})
+                qeds.append({'value': '-', 'level': 'info'})
+                continue
+
             try:
                 logp = Descriptors.MolLogP(m)
                 mol_logp.append({'value': round(logp, 2),

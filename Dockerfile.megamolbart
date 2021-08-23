@@ -1,17 +1,39 @@
 # Copyright 2020 NVIDIA Corporation
-ARG SOURCE_CONTAINER=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest
-FROM ${SOURCE_CONTAINER}
+FROM nvcr.io/nvidia/pytorch:20.11-py3
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux vim libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-ADD "https://www.random.org/cgi-bin/randbyte?nbytes=10&format=h" skipcache
+ENV UCX_LOG_LEVEL error
+ENV PATH /opt/conda/bin:$PATH
+ENV CUDA_HOME /usr/local/cuda
+SHELL ["/bin/bash", "-c"]
+RUN echo "source activate base" > /etc/bash.bashrc
+
+## Environment setup
+COPY megamolbart/conda/env.yml /tmp/.
+RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
+
+## Apex
+RUN cd /tmp && git clone https://github.com/NVIDIA/apex
+RUN cd /tmp/apex/ \
+    && /opt/conda/bin/python3 -m pip install -v \
+        --disable-pip-version-check --no-cache-dir \
+        --global-option="--cpp_ext" --global-option="--cuda_ext" ./
+
+## PySMILES -- requirements handled by conda environment
+RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
+    && cd /opt/pysmilesutils; pip install .
+
+## MegaMolBART and Megatron code
+RUN git clone https://github.com/MolecularAI/MolBART.git --branch megatron-molbart-with-zinc /opt/MolBART \
+    && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
+    && cd /opt/MolBART; pip install .
+ENV PYTHONPATH /opt/MolBART/megatron_molbart:/opt/MolBART
 
 # Copy and add generated code to PYTHONPATH
-# Any line that needs to be executed without refering to cache should be below
-# this line.
 COPY common/ /tmp/common
 RUN cd /tmp/common; pip install .
 

@@ -1,12 +1,12 @@
-# What Is Mega-MolBART gRPC service?
-[Mega-MolBART](https://ngc.nvidia.com/models/nvidia/clara:megamolbart) is a model trained on SMILES string and this container deploys Mega-MolBART model for infrencing. The container bring up a gRPC service available in port 500051.
+# What Is MegaMolBART gRPC service?
+[MegaMolBART](https://ngc.nvidia.com/models/nvidia/clara:megamolbart) is a model trained on SMILES string and this container deploys MegaMolBART model for infrencing. The container bring up a gRPC service available in port 500051.
 
 # Getting Started
-**Mega-MolBART gRPC service** is currently used with [Cheminformatics Demo](https://ngc.nvidia.com/containers/nvidia/clara:cheminformatics_demo) application (also available as a container.) Please refer [Cheminformatics](https://ngc.nvidia.com/resources/nvidia/clara:cheminformatics) resource for bringing up the complete suite.
+**MegaMolBART gRPC service** is currently used with [Cheminformatics Demo](https://ngc.nvidia.com/containers/nvidia/clara:cheminformatics_demo) application (also available as a container.) Please refer [Cheminformatics](https://ngc.nvidia.com/resources/nvidia/clara:cheminformatics) resource for bringing up the complete suite.
 
-Please following these steps to start **Mega-MolBART gRPC service** in stand-alone mode.
+Please following these steps to start **MegaMolBART gRPC service** in stand-alone mode.
 
-- Download [Mega-MolBART](https://ngc.nvidia.com/models/nvidia/clara:megamolbart) model or execute the following command to do so
+- Download [MegaMolBART](https://ngc.nvidia.com/models/nvidia/clara:megamolbart) model or execute the following command to do so
 
  ```
  ngc registry model download-version "nvidia/clara/megamolbart:0.1"
@@ -38,7 +38,7 @@ Please use the following command to generate language specific stubs.
 
 ```
 python -m grpc_tools.protoc -I./grpc/ \
- --<>_out=generated \
+ --<<LANGUAGE>>_out=generated \
  --experimental_allow_proto3_optional \
  --grpc_python_out=generated \
  ./grpc/generativesampler.proto

@@ -198,7 +198,8 @@ class ChemVisualization(metaclass=Singleton):
         self.app.callback(
             [Output('table_generated_molecules', 'children'),
              Output('show_generated_mol', 'children'),
-             Output('interpolation_error', 'children'), ],
+             Output('interpolation_error', 'children'),
+             Output('msg_generated_molecules', 'children')],
             [Input("bt_generate", "n_clicks"), ],
             [State('sl_generative_wf', 'value'),
              State('ckl_candidate_mol_id', 'value'),
@@ -248,9 +249,9 @@ class ChemVisualization(metaclass=Singleton):
         comp_id, event_type = self._fetch_event_data()
 
         if comp_id == 'show_selected_mol' and event_type == 'children':
-            return {'display': 'none'}, {'display': 'block'}
+            return {'display': 'none'}, {'display': 'block', 'width': '100%'}
         elif comp_id == 'show_generated_mol' and event_type == 'children':
-            return {'display': 'block'}, {'display': 'none'}
+            return {'display': 'block', 'width': '100%'}, {'display': 'none'}
         return dash.no_update, dash.no_update
 
     @report_ui_error(3)
@@ -297,6 +298,7 @@ class ChemVisualization(metaclass=Singleton):
             table_headers.append(html.Th(column, style={'fontSize': '150%', 'text-align': 'center'}))
 
         prop_recs = [html.Tr(table_headers, style={'background': 'lightgray'})]
+        invalid_mol_cnt = 0
         for row_idx in range(self.genreated_df.shape[0]):
             td = []
 
@@ -304,7 +306,8 @@ class ChemVisualization(metaclass=Singleton):
                 col_pos = columns.index('Chemical Structure')
                 col_data = self.genreated_df.iat[row_idx, col_pos]
 
-                if 'value' in col_data and col_data['value'] == 'Error interpreting SMILES using RDKit':
+                if 'value' in col_data and col_data['value'] == MolecularStructureDecorator.ERROR_VALUE:
+                    invalid_mol_cnt += 1
                     continue
             except ValueError:
                 pass
@@ -331,10 +334,17 @@ class ChemVisualization(metaclass=Singleton):
                                              }
                                       ))
 
-            prop_recs.append(html.Tr(td))
+            prop_recs.append(html.Tr(td, style={'fontSize': '125%'}))
 
-        return html.Table(prop_recs, style={'width': '100%', 'margin': 12,
-                                            'border': '1px solid lightgray'}), show_generated_mol, dash.no_update
+        msg_generated_molecules = ''
+        if invalid_mol_cnt > 0:
+            msg_generated_molecules =  f'{invalid_mol_cnt} invalid molecules were created, which were eliminated from the result.'
+
+        return html.Table(prop_recs, style={'width': '100%',
+                                            'border': '1px solid lightgray'}), \
+               show_generated_mol, \
+               dash.no_update, \
+               msg_generated_molecules
 
     def handle_ckl_selection(self, ckl_candidate_mol_id, rd_generation_type):
         selection_msg = '**Please Select Two Molecules**'
@@ -599,11 +609,11 @@ class ChemVisualization(metaclass=Singleton):
                          base64.b64encode(drawer.GetDrawingText()).decode("utf-8")
 
             td.append(html.Td(html.Img(src=img_binary)))
-            td.append(html.Td(smiles, style={'maxWidth': '100px', 'wordWrap': 'break-word'}))
+            td.append(html.Td(smiles, style={'wordWrap': 'break-word'}))
             for key in display_properties:
                 if key in PROP_DISP_NAME:
                     td.append(html.Td(selected_molecule[props.index(key)],
-                                      style={'fontSize': '110%', 'text-align': 'center'}))
+                                      style={'text-align': 'center'}))
 
             molregno = selected_molecule[0]
             if chembl_ids:
@@ -624,12 +634,13 @@ class ChemVisualization(metaclass=Singleton):
                                'chemblId': selected_chembl_id,
                                'molregno': str(molregno)
                                },
+                           style={'margin-right': '6px'},
                            n_clicks=0)
             ))
 
-            prop_recs.append(html.Tr(td))
+            prop_recs.append(html.Tr(td, style={'fontSize': '125%'}))
 
-        return html.Table(prop_recs, style={'width': '100%', 'margin': 12, 'border': '1px solid lightgray'}), all_props
+        return html.Table(prop_recs, style={'width': '100%', 'border': '1px solid lightgray'}), all_props
 
     def constuct_layout(self):
         # TODO: avoid calling self.cluster_wf.df_embedding
@@ -763,53 +774,51 @@ class ChemVisualization(metaclass=Singleton):
                 ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
             ]),
 
-            html.Div(id='section_generated_molecules', children=[
-                html.A(
-                    'Export to SDF',
-                    id='download-link',
-                    download="rawdata.sdf",
-                    href="/cheminfo/downloadSDF",
-                    target="_blank",
-                    n_clicks=0,
-                    style={'marginLeft': 10, 'fontSize': '150%'}
-                ),
-                html.Div(id='table_generated_molecules', children=[
-                ])
-            ], style={'display': 'none'}),
+            html.Div(className='row', children=[
+                html.Div(id='section_generated_molecules', children=[
+                        html.Div(className='row', children=[
+                            html.A('Export to SDF',
+                                id='download-link',
+                                download="rawdata.sdf",
+                                href="/cheminfo/downloadSDF",
+                                target="_blank",
+                                n_clicks=0,
+                                style={'fontSize': '150%'}
+                        ),
+                        html.Div(id='msg_generated_molecules', children=[],
+                                style={'color': 'red', 'fontWeight': 'bold', 'marginLeft': 12, 'fontSize': '150%'}),
+                    ], style={'marginLeft': 0, 'marginBottom': 18, }),
+                    html.Div(id='table_generated_molecules', children=[], style={'width': '100%'})
+                ], style={'display': 'none', 'width': '100%'}),
 
-            html.Div(id='section_selected_molecules', children=[
-                html.Div(className='row', children=[
-                    html.Div(id='section_display_properties', children=[
-                        html.Label([
-                            "Select Molecular Properties",
-                            dcc.Dropdown(id='sl_mol_props', multi=True,
-                                         options=[
-                                             {'label': 'alogp', 'value': 'alogp'}],
-                                         value=['alogp']),
-                        ], style={'marginLeft': 30})],
-                             className='nine columns',
-                             ),
-                    html.Div(children=[
-                        dbc.Button("<", id="bt_page_prev",
-                                   style={"height": "25px"}),
-                        html.Span(children=1, id='current_page',
-                                  style={"paddingLeft": "6px"}),
-                        html.Span(children=' of 1', id='total_page',
-                                  style={"paddingRight": "6px"}),
-                        dbc.Button(">", id="bt_page_next",
-                                   style={"height": "25px"})
-                    ],
-                        className='three columns',
-                        style={'verticalAlign': 'text-bottom', 'text-align': 'right'}
-                    ),
-                ]),
-
-                html.Div(children=[
-                    html.Div(id='tb_selected_molecules', children=[],
-                             style={'verticalAlign': 'text-top'}
-                             ),
-                ])
-            ], style={'display': 'none'}),
+                html.Div(id='section_selected_molecules', children=[
+                    html.Div(className='row', children=[
+                        html.Div(id='section_display_properties', children=[
+                            html.Label([
+                                "Select Molecular Properties",
+                                dcc.Dropdown(id='sl_mol_props', multi=True,
+                                            options=[
+                                                {'label': 'alogp', 'value': 'alogp'}],
+                                            value=['alogp']),
+                            ])],
+                            className='nine columns'),
+                        html.Div(children=[
+                            dbc.Button("<", id="bt_page_prev",
+                                    style={"height": "25px"}),
+                            html.Span(children=1, id='current_page',
+                                    style={"paddingLeft": "6px"}),
+                            html.Span(children=' of 1', id='total_page',
+                                    style={"paddingRight": "6px"}),
+                            dbc.Button(">", id="bt_page_next",
+                                    style={"height": "25px"})
+                            ],
+                            className='three columns',
+                            style={'verticalAlign': 'text-bottom', 'text-align': 'right'}
+                        ),
+                    ], style={'margin': 12}),
+                    html.Div(id='tb_selected_molecules', children=[], style={'width': '100%'})
+                ], style={'display': 'none', 'width': '100%'}),
+            ], style={'margin': 12}),
 
             html.Div(id='refresh_main_fig', style={'display': 'none'}),
             html.Div(id='northstar_cluster', style={'display': 'none'}),

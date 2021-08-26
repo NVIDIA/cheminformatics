@@ -1,0 +1,63 @@
+CC_VERSION:
+  - 5
+  - 7
+  - 9
+
+CUDA_VER:
+  - 9.0
+  - 9.2
+  - 10.0
+  - 10.1
+  - 10.2
+  - 11.0
+  - 11.1
+
+LINUX_VERSION:
+  - ubuntu16.04
+  - ubuntu18.04
+  - ubuntu20.04
+  - centos7
+  # - centos8
+
+PYTHON_VERSION:
+  - 3.6
+  - 3.7
+  - 3.8
+
+exclude:
+  - CUDA_VER: 9.0
+    LINUX_VERSION: ubuntu18.04
+  - CUDA_VER: 9.0
+    LINUX_VERSION: ubuntu20.04
+  - CUDA_VER: 9.2
+    LINUX_VERSION: ubuntu20.04
+  - CUDA_VER: 10.0
+    LINUX_VERSION: ubuntu20.04
+  - CUDA_VER: 10.1
+    LINUX_VERSION: ubuntu20.04
+  - CUDA_VER: 10.2
+    LINUX_VERSION: ubuntu20.04
+  # - CUDA_VER: 9.0
+  #   LINUX_VERSION: centos8
+  # - CUDA_VER: 9.2
+  #   LINUX_VERSION: centos8
+  # - CUDA_VER: 10.0
+  #   LINUX_VERSION: centos8
+  - LINUX_VERSION: ubuntu16.04
+    CC_VERSION: 7
+  - LINUX_VERSION: ubuntu18.04
+    CC_VERSION: 5
+  - LINUX_VERSION: ubuntu20.04
+    CC_VERSION: 5
+  - LINUX_VERSION: centos7
+    CC_VERSION: 5
+  # - LINUX_VERSION: centos8
+  #   CC_VERSION: 5
+  - LINUX_VERSION: ubuntu16.04
+    CC_VERSION: 9
+  - LINUX_VERSION: ubuntu18.04
+    CC_VERSION: 9
+  - LINUX_VERSION: centos7
+    CC_VERSION: 9
+  # - LINUX_VERSION: centos8
+    # CC_VERSION: 9

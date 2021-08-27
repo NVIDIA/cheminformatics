@@ -34,7 +34,8 @@ class BaseSampleMetric():
                               force_unique,
                               sanitize):
         # Check db for results from a previous run
-        generated_smiles = self.benchmark_data.fetch_sampling_data(smiles,
+        generated_smiles = self.benchmark_data.fetch_sampling_data(self.inferrer.__class__.__name__,
+                                                                   smiles,
                                                                    num_samples,
                                                                    scaled_radius,
                                                                    force_unique,
@@ -54,7 +55,8 @@ class BaseSampleMetric():
             embeddings_dim = result['embeddings_dim'].to_list()
 
             # insert generated smiles into a database for use later.
-            self.benchmark_data.insert_sampling_data(smiles,
+            self.benchmark_data.insert_sampling_data(self.inferrer.__class__.__name__,
+                                                     smiles,
                                                      num_samples,
                                                      scaled_radius,
                                                      force_unique,
@@ -120,7 +122,8 @@ class BaseEmbeddingMetric():
         num_samples = 1
 
         # Check db for results from a previous run
-        generated_smiles = self.benchmark_data.fetch_n_sampling_data(smiles,
+        generated_smiles = self.benchmark_data.fetch_n_sampling_data(self.inferrer.__class__.__name__,
+                                                                     smiles,
                                                                      num_samples,
                                                                      scaled_radius,
                                                                      force_unique,
@@ -144,15 +147,15 @@ class BaseEmbeddingMetric():
 
     def sample(self, smiles, max_len, zero_padded_vals, average_tokens):
 
-        smiles, embedding, dim = self._find_embedding(smiles, 1, False, True, max_len)
+        _, embedding, dim = self._find_embedding(smiles, 1, False, True, max_len)
 
         embedding = cupy.array(embedding)
         embedding = embedding.reshape(dim)
 
-        if zero_padded_vals:
+        if zero_padded_vals and len(dim) > 2:
             embedding[len(smiles):, :] = 0.0
 
-        if average_tokens:
+        if average_tokens and len(dim) > 2:
             embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
             assert embedding.shape[0] == dim[-1]
         else:
@@ -196,7 +199,7 @@ class Validity(BaseSampleMetric):
         super().__init__(inferrer)
 
     def variations(self, cfg, model_dict=None):
-        return cfg.metric.validity.radius_list
+        return cfg.metric.validity.radius
 
     def sample(self, smiles, num_samples, radius):
         generated_smiles = self._find_similars_smiles(smiles,
@@ -214,7 +217,7 @@ class Unique(BaseSampleMetric):
         super().__init__(inferrer)
 
     def variations(self, cfg, model_dict=None):
-        return cfg.metric.unique.radius_list
+        return cfg.metric.unique.radius
 
     def sample(self, smiles, num_samples, radius):
         generated_smiles = self._find_similars_smiles(smiles,
@@ -234,7 +237,7 @@ class Novelty(BaseSampleMetric):
         super().__init__(inferrer)
 
     def variations(self, cfg, model_dict=None):
-        return cfg.metric.novelty.radius_list
+        return cfg.metric.novelty.radius
 
     def smiles_in_train(self, smiles):
         in_train = self.training_data.is_known_smiles(smiles)
@@ -260,7 +263,7 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         super().__init__(inferrer)
 
     def variations(self, cfg, model_dict=None):
-        return cfg.metric.nearestNeighborCorrelation.top_k_list
+        return cfg.metric.nearestNeighborCorrelation.top_k
 
     def _calculate_metric(self, embeddings, fingerprints, top_k=None):
         embeddings_dist = pairwise_distances(embeddings)

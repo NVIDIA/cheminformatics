@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import logging
 import hydra
@@ -9,7 +10,8 @@ from cuml.ensemble.randomforestregressor import RandomForestRegressor
 from cuml import LinearRegression, ElasticNet
 from cuml.svm import SVR
 
-from cuchem.wf.generative.megatronmolbart import MegatronMolBART
+from cuchem.wf.generative import MegatronMolBART
+from cuchem.wf.generative import Cddd
 from cuchem.datasets.loaders import ZINC15_TestSplit_20K_Samples, ZINC15_TestSplit_20K_Fingerprints
 from cuchem.metrics.model import Validity, Unique, Novelty, NearestNeighborCorrelation, Modelability
 
@@ -53,10 +55,13 @@ def main(cfg):
     seq_len = int(cfg.samplingSpec.seq_len) # Import from MegaMolBART codebase?
     sample_size = int(cfg.samplingSpec.sample_size)
 
-    # radius_list = [1, 2, 5] # TODO calculate radius and automate this
-    # top_k_list = [None, 50, 100, 500] # TODO decide on top k value
-
-    inferrer = MegatronMolBART()
+    if cfg.model.name == 'MegaMolBART':
+        inferrer = MegatronMolBART()
+    elif cfg.model.name == 'CDDD':
+        inferrer = Cddd()
+    else:
+        logger.error(f'Model {cfg.model.name} not supported')
+        sys.exit(1)
 
     # Metrics
     metric_list = []

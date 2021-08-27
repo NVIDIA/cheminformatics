@@ -3,6 +3,8 @@ from typing import List
 
 import numpy as np
 import pandas as pd
+from rdkit import Chem
+
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
 from cuchemcommon.fingerprint import Embeddings
@@ -22,6 +24,21 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         self.cddd_embeddings = Embeddings(model_dir=self.default_model_loc)
         self.min_jitter_radius = 0.5
 
+    def inverse_transform(self, embeddings, sanitize):
+        mol_strs = self.cddd_embeddings.inverse_transform(embeddings)
+        smiles_interp_list = []
+        for smiles in mol_strs:
+            if sanitize:
+                mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
+                if mol:
+                    sanitized_smiles = Chem.MolToSmiles(mol)
+                    smiles_interp_list.append(sanitized_smiles)
+                else:
+                    smiles_interp_list.append(smiles)
+            else:
+                smiles_interp_list.append(smiles)
+        return smiles_interp_list
+
     def smiles_to_embedding(self, smiles: str, padding: int):
         embedding = self.cddd_embeddings.func.seq_to_emb(smiles).squeeze()
         return embedding
@@ -36,6 +53,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                   smiles: str,
                                   num_requested: int = 10,
                                   scaled_radius=None,
+                                  sanitize=False,
                                   force_unique=False):
 
         radius = self._compute_radius(scaled_radius)
@@ -45,17 +63,21 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         neighboring_embeddings = np.concatenate([embedding.reshape(1, embedding.shape[0]),
                                                  embeddings])
         embeddings = [embedding] + embeddings
-        return self.cddd_embeddings.inverse_transform(neighboring_embeddings), embeddings
+        generated_mols = self.inverse_transform(neighboring_embeddings, sanitize)
+
+        return generated_mols, embeddings
 
     def find_similars_smiles(self,
                              smiles: str,
                              num_requested: int = 10,
                              scaled_radius=None,
+                             sanitize=False,
                              force_unique=False):
         generated_mols, neighboring_embeddings = self.find_similars_smiles_list(smiles,
                                                                                 num_requested=num_requested,
                                                                                 scaled_radius=scaled_radius,
-                                                                                force_unique=force_unique)
+                                                                                force_unique=force_unique,
+                                                                                sanitize=sanitize)
         dims = []
         for neighboring_embedding in neighboring_embeddings:
             dims.append(neighboring_embedding.shape)
@@ -64,7 +86,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                      'embeddings': neighboring_embeddings,
                                      'embeddings_dim': dims,
                                      'Generated': [True for i in range(len(generated_mols))]})
-        generated_df.iat[0, 2] = False
+        generated_df.iat[0, 3] = False
 
         if force_unique:
             generated_df = self.compute_unique_smiles(generated_df,
@@ -76,7 +98,8 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                            smiles: List,
                            num_points: int = 10,
                            scaled_radius=None,
-                           force_unique=False):
+                           force_unique=False,
+                           sanitize=False):
 
         num_points = int(num_points) + 2
         if len(smiles) < 2:
@@ -94,7 +117,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                                     axis=0,
                                                     arr=input_embeddings,
                                                     num_points=num_points)
-            generated_mols = self.cddd_embeddings.inverse_transform(interp_embeddings)
+            generated_mols = self.inverse_transform(interp_embeddings, sanitize)
             interp_embeddings = interp_embeddings.tolist()
 
             dims = []
@@ -110,8 +133,8 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                       'Generated': [True for i in range(num_points)]})
 
             # Mark the source and desinations as not generated
-            interp_df.iat[0, 2] = False
-            interp_df.iat[-1, 2] = False
+            interp_df.iat[0, 3] = False
+            interp_df.iat[-1, 3] = False
 
             if force_unique:
                 interp_df = self.compute_unique_smiles(interp_df,

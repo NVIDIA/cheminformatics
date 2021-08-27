@@ -198,7 +198,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         return smiles_interp_list
 
-    def interpolate_molecules(self, smiles1, smiles2, num_interp, tokenizer, k=1):
+    def interpolate_molecules(self, smiles1, smiles2, num_interp, tokenizer, k=1, sanitize=False):
         """Interpolate between two molecules in embedding space.
 
         Params
@@ -235,7 +235,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         generated_mols = self.inverse_transform(embeddings,
                                       combined_mask,
                                       k=k,
-                                      sanitize=True)
+                                      sanitize=sanitize)
         generated_mols = [smiles1] + generated_mols + [smiles2]
         embeddings = [embedding1] + embeddings + [embedding2]
         dims = [embedding1.shape] + dims + [embedding2.shape]
@@ -245,7 +245,8 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   smiles: str,
                                   num_requested: int = 10,
                                   scaled_radius=None,
-                                  force_unique=False):
+                                  force_unique=False,
+                                  sanitize=False):
         distance = self._compute_radius(scaled_radius)
         logger.info(f'Computing with distance {distance}...')
 
@@ -255,7 +256,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         generated_mols = self.inverse_transform(neighboring_embeddings,
                                                 pad_mask.bool().cuda(),
-                                                k=1, sanitize=True)
+                                                k=1, sanitize=sanitize)
         if force_unique:
             generated_mols = list(set(generated_mols))
 
@@ -267,7 +268,8 @@ class MegaMolBART(BaseGenerativeWorkflow):
                              smiles: str,
                              num_requested: int = 10,
                              scaled_radius=None,
-                             force_unique=False):
+                             force_unique=False,
+                             sanitize=False):
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
@@ -300,7 +302,8 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                 smiles: List,
                                 num_points: int = 10,
                                 scaled_radius=None,
-                                force_unique=False):
+                                force_unique=False,
+                                sanitize=False):
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')
@@ -313,7 +316,8 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                            smiles[idx + 1],
                                            num_points,
                                            self.tokenizer,
-                                           k=k)
+                                           k=k,
+                                           sanitize=sanitize)
 
             # Rest of the applications and libraries use RAPIDS and cuPY libraries.
             # For interoperability, we need to convert the embeddings to cupy.

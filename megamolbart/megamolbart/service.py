@@ -68,6 +68,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
                 smile_str,
                 num_requested=spec.numRequested,
                 scaled_radius=spec.radius,
+                sanitize=spec.sanitize,
                 force_unique=False)
 
         embeddings = []
@@ -85,6 +86,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
             spec.smiles,
             num_points=spec.numRequested,
             scaled_radius=spec.radius,
+            sanitize=spec.sanitize,
             force_unique=False)
         return SmilesList(generatedSmiles=generated_smiles)
 

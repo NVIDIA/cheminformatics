@@ -79,7 +79,7 @@ class BaseGenerativeWorkflow:
                   radius=None,
                   cnt=1,
                   shape=None):
-        radius = radius if radius else self.radius_scale
+        radius = radius if radius else self.min_jitter_radius
         return add_jitter(embedding, radius, cnt, shape)
 
     def compute_unique_smiles(self,

@@ -59,6 +59,7 @@ class BenchmarkData(object, metaclass=Singleton):
 
 
     def insert_sampling_data(self,
+                             model_name,
                              smiles,
                              num_samples,
                              scaled_radius,
@@ -76,11 +77,11 @@ class BenchmarkData(object, metaclass=Singleton):
         cursor = self.conn.cursor()
         id = cursor.execute(
             '''
-            INSERT INTO smiles(smiles, num_samples, scaled_radius,
+            INSERT INTO smiles(model_name, smiles, num_samples, scaled_radius,
                                 force_unique, sanitize)
-            VALUES(?,?,?,?,?)
+            VALUES(?, ?,?,?,?,?)
             ''',
-            [smiles, num_samples, scaled_radius, force_unique, sanitize]).lastrowid
+            [model_name, smiles, num_samples, scaled_radius, force_unique, sanitize]).lastrowid
 
         for i in range(len(generated_smiles)):
             gsmiles = generated_smiles[i]
@@ -98,6 +99,7 @@ class BenchmarkData(object, metaclass=Singleton):
 
 
     def fetch_sampling_data(self,
+                            model_name,
                             smiles,
                             num_samples,
                             scaled_radius,
@@ -113,13 +115,14 @@ class BenchmarkData(object, metaclass=Singleton):
         cursor.execute(
             '''
             SELECT id FROM smiles
-            WHERE smiles=?
+            WHERE model_name=?
+                  AND smiles=?
                   AND num_samples=?
                   AND scaled_radius=?
                   AND force_unique=?
                   AND sanitize=?
             ''',
-            [smiles, num_samples, scaled_radius, force_unique, sanitize])
+            [model_name, smiles, num_samples, scaled_radius, force_unique, sanitize])
         id = cursor.fetchone()
 
         if not id:
@@ -132,6 +135,7 @@ class BenchmarkData(object, metaclass=Singleton):
         return generated_smiles
 
     def fetch_n_sampling_data(self,
+                              model_name,
                               smiles,
                               num_samples,
                               scaled_radius,
@@ -147,12 +151,13 @@ class BenchmarkData(object, metaclass=Singleton):
         cursor.execute(
             '''
             SELECT id FROM smiles
-            WHERE smiles=?
+            WHERE model_name=?
+                  AND smiles=?
                   AND scaled_radius=?
                   AND force_unique=?
                   AND sanitize=?
             ''',
-            [smiles, scaled_radius, force_unique, sanitize])
+            [model_name, smiles, scaled_radius, force_unique, sanitize])
         id = cursor.fetchone()
 
         if not id:

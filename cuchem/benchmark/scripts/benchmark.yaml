@@ -5,23 +5,23 @@ model:
 
 metric:
   validity:
-    enabled: false
-    radius_list:
+    enabled: true
+    radius:
       - 1
-      # - 2
-      # - 5
+      - 2
+      - 5
 
   unique:
-    enabled: false
-    radius_list: ${metric.validity.radius_list}
+    enabled: true
+    radius: ${metric.validity.radius}
 
   novelty:
     enabled: false
-    radius_list: ${metric.validity.radius_list}
+    radius: ${metric.validity.radius}
 
   nearestNeighborCorrelation:
-    enabled: false
-    top_k_list:
+    enabled: true
+    top_k:
       - 50
       - 100
       - 500
@@ -30,7 +30,7 @@ metric:
     enabled: true
 
 samplingSpec:
-  input_size: 1000
+  input_size: 20000
   seq_len: 512
   sample_size: 10
 

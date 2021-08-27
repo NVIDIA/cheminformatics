@@ -19,7 +19,7 @@ services:
     ports:
       - "${PLOTLY_PORT}:5000"
     volumes:
-      - './:/workspace'
+      - "${WORKSPACE_DIR}/:/workspace"
       - "${CONTENT_PATH}/data:/data"
     user: "${UID}:${GID}"
     working_dir: ${CUCHEM_PATH}

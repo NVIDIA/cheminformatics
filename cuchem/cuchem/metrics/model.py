@@ -1,212 +1,268 @@
 #!/usr/bin/env python3
 
 import logging
-import os
+import pickle
 
 import cupy
-import generativesampler_pb2
 import numpy as np
 import pandas as pd
 
-from rdkit import Chem
 from cuml.metrics import pairwise_distances
 from sklearn.model_selection import ParameterGrid, KFold
 from cuml.metrics.regression import mean_squared_error
 from cuchem.utils.metrics import spearmanr
 from cuchem.utils.distance import tanimoto_calculate
-from cuchem.utils.dataset import ZINC_TRIE_DIR, generate_trie_filename
-from functools import lru_cache
+from cuchem.benchmark.data import BenchmarkData, TrainingData
 
 
 logger = logging.getLogger(__name__)
 
 
-def sanitized_smiles(smiles):
-    """Ensure SMILES are valid and sanitized, otherwise fill with NaN."""
-    mol = Chem.MolFromSmiles(smiles, sanitize=True)
-    if mol:
-        sanitized_smiles = Chem.MolToSmiles(mol)
-        return sanitized_smiles
-    else:
-        return np.NaN
-
-
-def get_model_iteration(stub):
-    """Get Model iteration"""
-    spec = generativesampler_pb2.GenerativeSpec(
-        model=generativesampler_pb2.GenerativeModel.MegaMolBART,
-        smiles="CCC",  # all are dummy vars for this calculation
-        radius=0.0001,
-        numRequested=1,
-        padding=0)
-
-    result = stub.GetIteration(spec)
-    return result.iteration
-
-
 class BaseSampleMetric():
+    name = None
+
     """Base class for metrics based on sampling for a single SMILES string"""
-    def __init__(self):
-        self.name = None
+    def __init__(self, inferrer):
+        self.inferrer = inferrer
+        self.benchmark_data = BenchmarkData()
+        self.training_data = TrainingData()
+
+    def _find_similars_smiles(self,
+                              smiles,
+                              num_samples,
+                              scaled_radius,
+                              force_unique,
+                              sanitize):
+        # Check db for results from a previous run
+        generated_smiles = self.benchmark_data.fetch_sampling_data(smiles,
+                                                                   num_samples,
+                                                                   scaled_radius,
+                                                                   force_unique,
+                                                                   sanitize)
+        if not generated_smiles:
+            # Generate new samples and update the database
+            result = self.inferrer.find_similars_smiles(smiles,
+                                                        num_samples,
+                                                        scaled_radius=scaled_radius,
+                                                        force_unique=force_unique,
+                                                        sanitize=sanitize)
+            # Result from sampler includes the input SMILES. Removing it.
+            # result = result[result.Generated == True]
+            generated_smiles = result['SMILES'].to_list()
+
+            embeddings = result['embeddings'].to_list()
+            embeddings_dim = result['embeddings_dim'].to_list()
+
+            # insert generated smiles into a database for use later.
+            self.benchmark_data.insert_sampling_data(smiles,
+                                                     num_samples,
+                                                     scaled_radius,
+                                                     force_unique,
+                                                     sanitize,
+                                                     generated_smiles,
+                                                     embeddings,
+                                                     embeddings_dim)
+        return generated_smiles
+
+
+    def _calculate_metric(self, metric_array, num_samples):
+        total_samples = len(metric_array) * num_samples
+        return np.nansum(metric_array) / float(total_samples)
+
+    def variations(self, cfg, model_dict=None):
+        return NotImplemented
 
     def sample(self):
         return NotImplemented
 
-    def calculate_metric(self, metric_array, num_samples):
-        total_samples = len(metric_array) * num_samples
-        return np.nansum(metric_array) / float(total_samples)
-
-    def sample_many(self, smiles_dataset, num_samples, func, radius):
+    def sample_many(self, smiles_dataset, num_samples, radius):
         metric_result = list()
+
         for index in range(len(smiles_dataset.data)):
             smiles = smiles_dataset.data.iloc[index]
-            logger.info(f'SMILES: {smiles}')
-            result = self.sample(smiles, num_samples, func, radius)
+            logger.debug(f'Sampling around {smiles}...')
+            result = self.sample(smiles, num_samples, radius)
             metric_result.append(result)
+
         return np.array(metric_result)
 
-    def calculate(self, smiles, num_samples, func, radius):
-        metric_array = self.sample_many(smiles, num_samples, func, radius)
-        metric = self.calculate_metric(metric_array, num_samples)
-        return pd.Series({'name': self.name, 'value': metric, 'radius': radius, 'num_samples': num_samples})
+    def calculate(self, **kwargs):
+        smiles_dataset = kwargs['smiles_dataset']
+        num_samples = kwargs['num_samples']
+        radius = kwargs['radius']
+
+        metric_array = self.sample_many(smiles_dataset, num_samples, radius)
+        metric = self._calculate_metric(metric_array, num_samples)
+
+        return pd.Series({'name': self.__class__.name,
+                          'value': metric,
+                          'radius': radius,
+                          'num_samples': num_samples})
 
 
 class BaseEmbeddingMetric():
+    name = None
+
     """Base class for metrics based on embedding datasets"""
-    def __init__(self):
-        self.name = None
+    def __init__(self, inferrer):
+        self.inferrer = inferrer
+        self.benchmark_data = BenchmarkData()
 
-    def sample(self, smiles, max_len, stub, zero_padded_vals, average_tokens):
+    def variations(self, cfg):
+        return NotImplemented
 
-        spec = generativesampler_pb2.GenerativeSpec(
-                model=generativesampler_pb2.GenerativeModel.MegaMolBART,
-                smiles=smiles,
-                radius=0.0001,  # dummy var for this calculation
-                numRequested=1,  # dummy var for this calculation
-                padding=max_len)
+    def _find_embedding(self,
+                        smiles,
+                        scaled_radius,
+                        force_unique,
+                        sanitize,
+                        max_len):
+        num_samples = 1
 
-        result = stub.SmilesToEmbedding(spec)
-        shape = [int(x) for x in result.embedding[:2]]
-        assert shape[0] == max_len
-        embedding = cupy.array(result.embedding[2:])
+        # Check db for results from a previous run
+        generated_smiles = self.benchmark_data.fetch_n_sampling_data(smiles,
+                                                                     num_samples,
+                                                                     scaled_radius,
+                                                                     force_unique,
+                                                                     sanitize)
+        if not generated_smiles:
+            # Generate new samples and update the database
+            generated_smiles = self.inferrer.smiles_to_embedding(smiles,
+                                                                 max_len,
+                                                                 scaled_radius=scaled_radius,
+                                                                 num_samples=num_samples)
+        else:
+            temp = generated_smiles[0]
+            embedding = pickle.loads(temp[1])
 
-        embedding = embedding.reshape(shape)
+            generated_smiles = []
+            generated_smiles.append(temp[0])
+            generated_smiles.append(embedding)
+            generated_smiles.append(pickle.loads(temp[2]))
+
+        return generated_smiles[0], generated_smiles[1], generated_smiles[2]
+
+    def sample(self, smiles, max_len, zero_padded_vals, average_tokens):
+
+        smiles, embedding, dim = self._find_embedding(smiles, 1, False, True, max_len)
+
+        embedding = cupy.array(embedding)
+        embedding = embedding.reshape(dim)
+
         if zero_padded_vals:
             embedding[len(smiles):, :] = 0.0
 
         if average_tokens:
             embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
-            assert embedding.shape[0] == shape[-1]
+            assert embedding.shape[0] == dim[-1]
         else:
             embedding = embedding.flatten()
+
         return embedding
 
-    def calculate_metric(self):
+    def _calculate_metric(self):
         raise NotImplementedError
 
-    @lru_cache(maxsize=None)
-    def sample_many(self, smiles_dataset, stub, zero_padded_vals=True, average_tokens=False):
+    def sample_many(self, smiles_dataset, zero_padded_vals=True, average_tokens=False):
         # Calculate pairwise distances for embeddings
         embeddings = []
+        max_len = 0
         for smiles in smiles_dataset.data.to_pandas():
-            embedding = self.sample(smiles, smiles_dataset.max_len, stub, zero_padded_vals, average_tokens)
-            embeddings.append(embedding)
+            embedding = self.sample(smiles, smiles_dataset.max_len, zero_padded_vals, average_tokens)
+            max_len = max(max_len, embedding.shape[0])
+            embeddings.append(cupy.array(embedding))
+
+        if max_len > 0:
+            embeddings_resized = []
+            for embedding in embeddings:
+                n_pad = max_len - embedding.shape[0]
+                if n_pad <= 0:
+                    embeddings_resized.append(embedding)
+                    continue
+                embedding = cupy.resize(embedding, max_len)
+                embeddings_resized.append(embedding)
+            embeddings = embeddings_resized
 
         return cupy.asarray(embeddings)
 
-    def calculate(self):
+    def calculate(self, **kwargs):
         raise NotImplementedError
 
 
 class Validity(BaseSampleMetric):
-    def __init__(self):
-        self.name = 'validity'
+    name = 'validity'
 
-    def sample(self, smiles, num_samples, func, radius):
-        spec = generativesampler_pb2.GenerativeSpec(
-            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
-            smiles=smiles,
-            radius=radius,
-            numRequested=num_samples)
+    def __init__(self, inferrer):
+        super().__init__(inferrer)
 
-        result = func(spec)
-        result = result.generatedSmiles[1:]
+    def variations(self, cfg, model_dict=None):
+        return cfg.metric.validity.radius_list
 
-        if isinstance(smiles, list):
-            result = result[:-1]
-        assert len(result) == num_samples
-        result = len(pd.Series([sanitized_smiles(x) for x in result]).dropna())
-        return result
+    def sample(self, smiles, num_samples, radius):
+        generated_smiles = self._find_similars_smiles(smiles,
+                                                      num_samples,
+                                                      scaled_radius=radius,
+                                                      force_unique=False,
+                                                      sanitize=True)
+        return len(generated_smiles)
 
 
 class Unique(BaseSampleMetric):
-    def __init__(self):
-        self.name = 'uniqueness'
+    name = 'uniqueness'
 
-    def sample(self, smiles, num_samples, func, radius):
-        spec = generativesampler_pb2.GenerativeSpec(
-            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
-            smiles=smiles,
-            radius=radius,
-            numRequested=num_samples)
+    def __init__(self, inferrer):
+        super().__init__(inferrer)
 
-        result = func(spec)
-        result = result.generatedSmiles[1:]
+    def variations(self, cfg, model_dict=None):
+        return cfg.metric.unique.radius_list
 
-        if isinstance(smiles, list):
-            result = result[:-1]
-        assert len(result) == num_samples
-        result = len(pd.Series([sanitized_smiles(x) for x in result]).dropna().unique())
-        return result
+    def sample(self, smiles, num_samples, radius):
+        generated_smiles = self._find_similars_smiles(smiles,
+                                                      num_samples,
+                                                      scaled_radius=radius,
+                                                      force_unique=False,
+                                                      sanitize=True)
+        # Get the unquie ones
+        generated_smiles = set(generated_smiles)
+        return len(generated_smiles)
 
 
 class Novelty(BaseSampleMetric):
-    def __init__(self):
-        self.name = 'novelty'
+    name = 'novelty'
+
+    def __init__(self, inferrer):
+        super().__init__(inferrer)
+
+    def variations(self, cfg, model_dict=None):
+        return cfg.metric.novelty.radius_list
 
     def smiles_in_train(self, smiles):
-        """Determine if smiles was in training dataset"""
-        in_train = False
-
-        filename = generate_trie_filename(smiles)
-        trie_path = os.path.join(ZINC_TRIE_DIR, 'train', filename)
-        if os.path.exists(trie_path):
-            with open(trie_path, 'r') as fh:
-                smiles_list = fh.readlines()
-            smiles_list = [x.strip() for x in smiles_list]
-            in_train = smiles in smiles_list
-        else:
-            logger.warn(f'Trie file {filename} not found.')
-            in_train = False
-
+        in_train = self.training_data.is_known_smiles(smiles)
         return in_train
 
-    def sample(self, smiles, num_samples, func, radius):
-        spec = generativesampler_pb2.GenerativeSpec(
-            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
-            smiles=smiles,
-            radius=radius,
-            numRequested=num_samples)
+    def sample(self, smiles, num_samples, radius):
+        generated_smiles = self._find_similars_smiles(smiles,
+                                                      num_samples,
+                                                      scaled_radius=radius,
+                                                      force_unique=False,
+                                                      sanitize=True)
 
-        result = func(spec)
-        result = result.generatedSmiles[1:]
-
-        if isinstance(smiles, list):
-            result = result[:-1]
-        assert len(result) == num_samples
-
-        result = pd.Series([sanitized_smiles(x) for x in result]).dropna()
-        result = sum([self.smiles_in_train(x) for x in result])
+        result = sum([self.smiles_in_train(x) for x in generated_smiles])
         return result
 
 
 class NearestNeighborCorrelation(BaseEmbeddingMetric):
     """Sperman's Rho for correlation of pairwise Tanimoto distances vs Euclidean distance from embeddings"""
 
-    def __init__(self):
-        self.name = 'nearest neighbor correlation'
+    name = 'nearest neighbor correlation'
 
-    def calculate_metric(self, embeddings, fingerprints, top_k=None):
+    def __init__(self, inferrer):
+        super().__init__(inferrer)
+
+    def variations(self, cfg, model_dict=None):
+        return cfg.metric.nearestNeighborCorrelation.top_k_list
+
+    def _calculate_metric(self, embeddings, fingerprints, top_k=None):
         embeddings_dist = pairwise_distances(embeddings)
         del embeddings
 
@@ -216,14 +272,20 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         corr = spearmanr(fingerprints_dist, embeddings_dist, top_k)
         return corr
 
-    def calculate(self, smiles_dataset, fingerprint_dataset, stub, top_k=None):
-        embeddings = self.sample_many(smiles_dataset, stub, zero_padded_vals=True, average_tokens=False)
+    def calculate(self, **kwargs):
+        smiles_dataset = kwargs['smiles_dataset']
+        fingerprint_dataset = kwargs['fingerprint_dataset']
+        top_k = kwargs['top_k']
+
+        embeddings = self.sample_many(smiles_dataset,
+                                      zero_padded_vals=True,
+                                      average_tokens=False)
 
         # Calculate pairwise distances for fingerprints
         fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
         fingerprints = cupy.asarray(fingerprints, order='C')
 
-        metric = self.calculate_metric(embeddings, fingerprints, top_k)
+        metric = self._calculate_metric(embeddings, fingerprints, top_k)
         metric = cupy.nanmean(metric)
         top_k = embeddings.shape[0] - 1 if not top_k else top_k
         return pd.Series({'name': self.name, 'value': metric, 'top_k':top_k})
@@ -231,14 +293,18 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
 class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
+    name = 'modelability'
 
-    def __init__(self):
-        self.name = 'modelability'
+    def __init__(self, inferrer):
+        super().__init__(inferrer)
         self.embeddings = None
+
+    def variations(self, cfg, model_dict=None):
+        return model_dict.keys()
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
         """Perform grid search with cross validation and return score"""
-        
+
         best_score = np.inf
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
@@ -257,25 +323,48 @@ class Modelability(BaseEmbeddingMetric):
             best_score = min(metric, best_score)
         return best_score
 
-    def calculate_metric(self, embeddings, fingerprints, properties, estimator, param_dict):
+    def _calculate_metric(self, embeddings, fingerprints, properties, estimator, param_dict):
         """Perform grid search for each metric and calculate ratio"""
 
         metric_array = []
+        embedding_errors = []
+        fingerprint_errors = []
         for col in properties.columns:
             props = properties[col].astype(cupy.float32).to_array()
             embedding_error = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, props)
             fingerprint_error = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, props)
             ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
             metric_array.append(ratio)
-        return cupy.array(metric_array)
+            embedding_errors.append(embedding_error)
+            fingerprint_errors.append(fingerprint_error)
 
-    def calculate(self, smiles_dataset, fingerprint_dataset, properties, stub, estimator, param_dict):
-        embeddings = self.sample_many(smiles_dataset, stub, zero_padded_vals=False, average_tokens=True)
+        return cupy.array(metric_array), cupy.array(fingerprint_errors), cupy.array(embedding_errors)
+
+
+    def calculate(self, **kwargs):
+        smiles_dataset = kwargs['smiles_dataset']
+        fingerprint_dataset = kwargs['fingerprint_dataset']
+        properties = kwargs['properties']
+        estimator = kwargs['estimator']
+        param_dict = kwargs['param_dict']
+
+        embeddings = self.sample_many(smiles_dataset, zero_padded_vals=False, average_tokens=True)
         embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
 
         fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
         fingerprints = cupy.asarray(fingerprints, order='C', dtype=cupy.float32)
 
-        metric = self.calculate_metric(embeddings, fingerprints, properties, estimator, param_dict)
+        metric, fingerprint_errors, embedding_errors  = self._calculate_metric(embeddings,
+                                                                               fingerprints,
+                                                                               properties,
+                                                                               estimator,
+                                                                               param_dict)
+        logger.info(f'{type(metric)}  {type(fingerprint_errors)} {type(embedding_errors)}')
         metric = cupy.nanmean(metric)
-        return pd.Series({'name': self.name, 'value': metric})
+        fingerprint_errors = cupy.nanmean(fingerprint_errors)
+        embedding_errors = cupy.nanmean(embedding_errors)
+
+        return pd.Series({'name': self.name,
+                          'value': metric,
+                          'fingerprint_error': fingerprint_errors,
+                          'embedding_error': embedding_errors})

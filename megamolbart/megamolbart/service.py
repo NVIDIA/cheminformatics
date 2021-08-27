@@ -1,14 +1,16 @@
 import logging
 import torch
 
-import generativesampler_pb2
+from generativesampler_pb2 import EmbeddingList, SmilesList, IterationVal
 import generativesampler_pb2_grpc
 from megamolbart.inference import MegaMolBART
+
+from cuchemcommon.utils import Singleton
 
 logger = logging.getLogger(__name__)
 
 
-class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
+class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=Singleton):
 
     def __init__(self, *args, **kwargs):
         decoder_max_seq_len = kwargs['decoder_max_seq_len'] if 'decoder_max_seq_len' in kwargs else None
@@ -39,9 +41,9 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
                                                                 pad_length=spec.padding)
         dim = embedding.shape
         embedding = embedding.flatten().tolist()
-        return generativesampler_pb2.EmbeddingList(embedding=embedding,
-                                                   dim=dim,
-                                                   pad_mask=pad_mask)
+        return EmbeddingList(embedding=embedding,
+                             dim=dim,
+                             pad_mask=pad_mask)
 
     def EmbeddingToSmiles(self, embedding_spec, context):
         '''
@@ -56,26 +58,35 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler):
         pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
 
         generated_mols = self.megamolbart.inverse_transform(embedding, pad_mask)
-        return generativesampler_pb2.SmilesList(generatedSmiles=generated_mols)
+        return SmilesList(generatedSmiles=generated_mols)
 
     def FindSimilars(self, spec, context):
 
         smile_str = ''.join(spec.smiles)
 
-        _, generated_smiles = \
-            self.megamolbart.find_similars_smiles(
+        generated_df = self.megamolbart.find_similars_smiles(
                 smile_str,
                 num_requested=spec.numRequested,
-                scaled_radius=spec.radius)
-        return generativesampler_pb2.SmilesList(generatedSmiles=generated_smiles)
+                scaled_radius=spec.radius,
+                force_unique=False)
+
+        embeddings = []
+
+        for _, row in generated_df.iterrows():
+            embeddings.append(EmbeddingList(embedding=row.embeddings,
+                                           dim=row.embeddings_dim))
+
+        return SmilesList(generatedSmiles=generated_df['SMILES'],
+                          embeddings=embeddings)
 
     def Interpolate(self, spec, context):
 
-        _, generated_smiles = self.megamolbart.interpolate_from_smiles(
+        _, generated_smiles = self.megamolbart.interpolate_smiles(
             spec.smiles,
             num_points=spec.numRequested,
-            scaled_radius=spec.radius)
-        return generativesampler_pb2.SmilesList(generatedSmiles=generated_smiles)
+            scaled_radius=spec.radius,
+            force_unique=False)
+        return SmilesList(generatedSmiles=generated_smiles)
 
     def GetIteration(self, spec, context):
-        return generativesampler_pb2.IterationVal(iteration=self.iteration)
+        return IterationVal(iteration=self.iteration)

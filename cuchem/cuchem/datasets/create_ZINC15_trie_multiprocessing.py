@@ -23,7 +23,11 @@ import os
 from pathlib import Path
 
 import pandas as pd
-from cuchem.utils.dataset import ZINC_CSV_DIR, ZINC_TRIE_DIR, generate_trie_filename
+from cuchem.utils.dataset import ZINC_CSV_DIR, \
+                                 ZINC_TRIE_DIR, \
+                                 generate_trie_filename, \
+                                 TRIE_FILENAME_LENGTH, \
+                                 SHORT_TRIE_FILENAME
 
 ### SETTINGS ###
 LOG_PATH = os.path.join(ZINC_TRIE_DIR, 'processing.log')
@@ -145,6 +149,10 @@ if __name__ == '__main__':
 
     # Gather list of filenames
     filelist = sorted(glob.glob(os.path.join(ZINC_CSV_DIR, '*.csv')))
+    logger.info(ZINC_CSV_DIR)
+    logger.info(filelist)
+    import sys
+    sys.exit(0)
     n_files = len(filelist)
     logger.info(f'Identified {n_files} files')
 

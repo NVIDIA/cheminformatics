@@ -1,10 +1,12 @@
 import logging
-from typing import List
-
-import generativesampler_pb2
-import generativesampler_pb2_grpc
 import grpc
 import pandas as pd
+
+from typing import List
+
+from generativesampler_pb2_grpc import GenerativeSamplerStub
+from generativesampler_pb2 import GenerativeSpec, EmbeddingList, GenerativeModel, google_dot_protobuf_dot_empty__pb2
+
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
 from cuchemcommon.utils.singleton import Singleton
@@ -20,38 +22,74 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         self.min_jitter_radius = 1
         channel = grpc.insecure_channel('megamolbart:50051')
-        self.stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
+        self.stub = GenerativeSamplerStub(channel)
+
+    def get_iteration(self):
+        result = self.stub.GetIteration(google_dot_protobuf_dot_empty__pb2.Empty())
+        return result.iteration
+
+    def smiles_to_embedding(self,
+                            smiles: str,
+                            padding: int,
+                            scaled_radius=None,
+                            num_requested: int = 10):
+        spec = GenerativeSpec(smiles=[smiles],
+                              padding=padding,
+                              radius=scaled_radius,
+                              numRequested=num_requested)
+
+        result = self.stub.SmilesToEmbedding(spec)
+        return result
+
+    def embedding_to_smiles(self,
+                            embedding,
+                            dim: int,
+                            pad_mask):
+        spec = EmbeddingList(embedding=embedding,
+                             dim=dim,
+                             pad_mask=pad_mask)
+
+        return self.stub.EmbeddingToSmiles(spec)
 
     def find_similars_smiles(self,
                              smiles: str,
                              num_requested: int = 10,
                              scaled_radius=None,
-                             force_unique=False):
-        spec = generativesampler_pb2.GenerativeSpec(
-            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
-            smiles=smiles,
-            radius=scaled_radius,
-            numRequested=num_requested)
+                             force_unique=False,
+                             sanitize=True):
+        spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
+                              smiles=smiles,
+                              radius=scaled_radius,
+                              numRequested=num_requested,
+                              forceUnique=force_unique,
+                              sanitize=sanitize)
 
         result = self.stub.FindSimilars(spec)
-        result = result.generatedSmiles
+        generatedSmiles = result.generatedSmiles
+        embeddings = []
+        dims = []
+        for embedding in result.embeddings:
+            embeddings.append(list(embedding.embedding))
+            dims.append(embedding.dim)
 
-        generated_df = pd.DataFrame({'SMILES': result,
-                                     'Generated': [True for i in range(len(result))]})
+        generated_df = pd.DataFrame({'SMILES': generatedSmiles,
+                                     'embeddings': embeddings,
+                                     'embeddings_dim': dims,
+                                     'Generated': [True for i in range(len(generatedSmiles))]})
         generated_df['Generated'].iat[0] = False
 
         return generated_df
 
-    def interpolate_from_smiles(self,
-                                smiles: List,
-                                num_points: int = 10,
-                                scaled_radius=None,
-                                force_unique=False):
-        spec = generativesampler_pb2.GenerativeSpec(
-            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
-            smiles=smiles,
-            radius=scaled_radius,
-            numRequested=num_points)
+    def interpolate_smiles(self,
+                           smiles: List,
+                           num_points: int = 10,
+                           scaled_radius=None,
+                           force_unique=False):
+        spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
+                              smiles=smiles,
+                              radius=scaled_radius,
+                              numRequested=num_points,
+                              forceUnique=force_unique)
 
         result = self.stub.Interpolate(spec)
         result = result.generatedSmiles

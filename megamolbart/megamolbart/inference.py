@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import List
 from rdkit import Chem
 
-import pandas as pd
 import torch
+import pandas as pd
 from checkpointing import load_checkpoint
 from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 from decoder import DecodeSampler
@@ -23,27 +23,18 @@ logger = logging.getLogger(__name__)
 
 
 @add_jitter.register(torch.Tensor)
-def _(embedding, radius, cnt):
+def _(embedding, radius, cnt, shape):
+    if shape is not None:
+        embedding = torch.reshape(embedding, (1, shape[0], shape[1])).to(embedding.device)
     permuted_emb = embedding.permute(1, 0, 2)
-    noise = torch.normal(0, radius, (cnt,) + permuted_emb.shape[1:]).to(embedding.device)
 
-    return (noise + permuted_emb).permute(1, 0, 2)
+    distorteds = []
+    for i in range(cnt):
+        noise = torch.normal(0, radius, permuted_emb.shape).to(embedding.device)
+        distorted = (noise + permuted_emb).permute(1, 0, 2)
+        distorteds.append(distorted)
 
-
-def clean_smiles_list(smiles_list, standardize=True):
-    """Ensure SMILES are valid and unique. Optionally standardize them."""
-
-    smiles_clean_list = []
-    for smiles in smiles_list:
-        mol = Chem.MolFromSmiles(smiles, sanitize=standardize)
-        if mol:
-            sanitized_smiles = Chem.MolToSmiles(mol)
-            if sanitized_smiles not in smiles_clean_list:
-                smiles_clean_list.append(sanitized_smiles)
-
-    if len(smiles_clean_list) == 0:
-        smiles_clean_list = [np.NaN]
-    return smiles_clean_list
+    return distorteds
 
 
 class MegaMolBART(BaseGenerativeWorkflow):
@@ -180,16 +171,19 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         batch_size = 1  # TODO: parallelize this loop as a batch
         with torch.no_grad():
-            for memory in embeddings.permute(1, 0, 2):
+            for memory in embeddings:
+
+                if isinstance(memory, list):
+                    memory = torch.FloatTensor(memory).cuda()
 
                 decode_fn = partial(self.model._decode_fn,
                                     mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
                                     memory=memory)
 
-                mol_strs, log_lhs = self.model.sampler.beam_decode(decode_fn,
-                                                                   batch_size=batch_size,
-                                                                   device='cuda',
-                                                                   k=k)
+                mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
+                                                             batch_size=batch_size,
+                                                             device='cuda',
+                                                             k=k)
                 mol_strs = sum(mol_strs, [])  # flatten list
 
                 for smiles in mol_strs:
@@ -197,9 +191,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
                         mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
                         if mol:
                             sanitized_smiles = Chem.MolToSmiles(mol)
-                            if sanitized_smiles not in smiles_interp_list:
-                                smiles_interp_list.append(sanitized_smiles)
-                                break
+                            smiles_interp_list.append(sanitized_smiles)
+                            logger.debug(f'Sanitized SMILES {sanitized_smiles} added...')
+                            break
                     smiles_interp_list.append(smiles)
 
         return smiles_interp_list
@@ -232,10 +226,20 @@ class MegaMolBART(BaseGenerativeWorkflow):
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()  # dims: batch, tokens, embedding
         combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
 
-        return self.inverse_transform(interpolated_emb,
+        embeddings = []
+        dims = []
+        for emb in interpolated_emb.permute(1, 0, 2):
+            dims.append(emb.shape)
+            embeddings.append(emb)
+
+        generated_mols = self.inverse_transform(embeddings,
                                       combined_mask,
                                       k=k,
-                                      sanitize=True), combined_mask
+                                      sanitize=True)
+        generated_mols = [smiles1] + generated_mols + [smiles2]
+        embeddings = [embedding1] + embeddings + [embedding2]
+        dims = [embedding1.shape] + dims + [embedding2.shape]
+        return generated_mols, embeddings, combined_mask, dims
 
     def find_similars_smiles_list(self,
                                   smiles: str,
@@ -252,8 +256,11 @@ class MegaMolBART(BaseGenerativeWorkflow):
         generated_mols = self.inverse_transform(neighboring_embeddings,
                                                 pad_mask.bool().cuda(),
                                                 k=1, sanitize=True)
+        if force_unique:
+            generated_mols = list(set(generated_mols))
 
         generated_mols = [smiles] + generated_mols
+        neighboring_embeddings = [embedding] + neighboring_embeddings
         return generated_mols, neighboring_embeddings, pad_mask
 
     def find_similars_smiles(self,
@@ -261,39 +268,39 @@ class MegaMolBART(BaseGenerativeWorkflow):
                              num_requested: int = 10,
                              scaled_radius=None,
                              force_unique=False):
-        distance = self._compute_radius(scaled_radius)
-        logger.info(f'Computing with distance {distance}...')
-
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
                                            scaled_radius=scaled_radius,
                                            force_unique=force_unique)
 
+        # Rest of the applications and libraries use RAPIDS and cuPY libraries.
+        # For interoperability, we need to convert the embeddings to cupy.
+        embeddings = []
+        dims = []
+        for neighboring_embedding in neighboring_embeddings:
+            dims.append(neighboring_embedding.shape)
+            embeddings.append(neighboring_embedding.flatten().tolist())
+
         generated_df = pd.DataFrame({'SMILES': generated_mols,
+                                     'embeddings': embeddings,
+                                     'embeddings_dim': dims,
                                      'Generated': [True for i in range(len(generated_mols))]})
-        generated_df.iat[0, 1] = False
+        generated_df.iat[0, 3] = False
 
         if force_unique:
             inv_transform_funct = partial(self.inverse_transform,
                                           mem_pad_mask=pad_mask)
             generated_df = self.compute_unique_smiles(generated_df,
-                                                      neighboring_embeddings,
                                                       inv_transform_funct,
-                                                      radius=distance)
+                                                      scaled_radius=scaled_radius)
+        return generated_df
 
-        smile_list = list(generated_df['SMILES'])
-
-        return generated_df, smile_list
-
-    def interpolate_from_smiles(self,
+    def interpolate_smiles(self,
                                 smiles: List,
                                 num_points: int = 10,
                                 scaled_radius=None,
                                 force_unique=False):
-        distance = self._compute_radius(scaled_radius)
-        logger.info(f'Computing with distance {distance}...')
-
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')
@@ -301,29 +308,34 @@ class MegaMolBART(BaseGenerativeWorkflow):
         k = 1
         result_df = []
         for idx in range(len(smiles) - 1):
-            interpolated_mol = [smiles[idx]]
-            interpolated, combined_mask = self.interpolate_molecules(smiles[idx],
-                                                                     smiles[idx + 1],
-                                                                     num_points,
-                                                                     self.tokenizer,
-                                                                     k=k)
-            interpolated_mol += interpolated
-            interpolated_mol.append(smiles[idx + 1])
+            interpolated_mol, interpolated_embeddings, combined_mask, dims = \
+                self.interpolate_molecules(smiles[idx],
+                                           smiles[idx + 1],
+                                           num_points,
+                                           self.tokenizer,
+                                           k=k)
+
+            # Rest of the applications and libraries use RAPIDS and cuPY libraries.
+            # For interoperability, we need to convert the embeddings to cupy.
+            embeddings = []
+            for interpolated_embedding in interpolated_embeddings:
+                embeddings.append(interpolated_embedding.cpu())
 
             interp_df = pd.DataFrame({'SMILES': interpolated_mol,
+                                      'embeddings': embeddings,
+                                      'embeddings_dim': dims,
                                       'Generated': [True for i in range(len(interpolated_mol))]})
 
             inv_transform_funct = partial(self.inverse_transform, mem_pad_mask=combined_mask)
 
             # Mark the source and desinations as not generated
-            interp_df.iat[0, 1] = False
-            interp_df.iat[-1, 1] = False
+            interp_df.iat[0, 3] = False
+            interp_df.iat[-1, 3] = False
 
             if force_unique:
                 interp_df = self.compute_unique_smiles(interp_df,
-                                                       interpolated_mol,
                                                        inv_transform_funct,
-                                                       radius=distance)
+                                                       scaled_radius=scaled_radius)
 
             result_df.append(interp_df)
 

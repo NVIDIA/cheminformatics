@@ -16,4 +16,13 @@ matplotlib==3.3.4
 waitress==1.4.3
 flask-restplus==0.13.0
 locust==1.4.3
+hydra-core==1.1.1
+dask_ml==1.8.0
+locust==1.4.3
+dask==2021.8.1
+distributed==2021.8.1
+plotly==4.9.0
+pytest==6.2.2
+umap-learn==0.5.1
+grpcio
 git+https://github.com/jrwnter/cddd.git@1.0

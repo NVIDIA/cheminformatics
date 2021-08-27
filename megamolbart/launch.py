@@ -23,15 +23,12 @@ import generativesampler_pb2_grpc
 
 from concurrent import futures
 from megamolbart.service import GenerativeSampler
-from util import (DEFAULT_MAX_SEQ_LEN, DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR)
 
 logging.basicConfig(level=logging.INFO)
-
 logger = logging.getLogger('megamolbart')
 formatter = logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
-from util import (REGEX, DEFAULT_CHEM_TOKEN_START, DEFAULT_MAX_SEQ_LEN,
-                  DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR,
+from util import (DEFAULT_MAX_SEQ_LEN, DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR,
                   DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS)
 
 

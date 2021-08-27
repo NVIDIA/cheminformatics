@@ -26,3 +26,6 @@ dask-worker-space
 .cache_dir
 portal
 megamolbart/models
+
+outputs/
+chemportal/frontend/node_modules/

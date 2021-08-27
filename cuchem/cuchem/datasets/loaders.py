@@ -16,12 +16,9 @@ class GenericCSVDataset():
         self.data_path = None
         self.data = None
 
-    def _load_csv(self, columns, length_columns=None, return_remaining=False, max_rows=None):
+    def _load_csv(self, columns, length_columns=None, return_remaining=False):
         columns = [columns] if not isinstance(columns, list) else columns
         data = cudf.read_csv(self.data_path).drop_duplicates(subset=columns)
-
-        if max_rows is not None:
-            data = data[:max_rows]
 
         if self.index_col:
             data = data.set_index(self.index_col).sort_index()
@@ -69,7 +66,7 @@ class GenericFingerprintDataset():
         if self.index_col:
             data = data.set_index(self.index_col).sort_index()
 
-        if index:
+        if index is not None:
             data = data.loc[index]
         self.data = data
         return
@@ -142,8 +139,8 @@ class ZINC15_TestSplit_20K_Samples(GenericCSVDataset):
                                       'benchmark_zinc15_test.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, columns=['canonical_smiles'], length_columns=['length'], max_rows=None):
-        self.data, self.properties = self._load_csv(columns, length_columns, return_remaining=True, max_rows=max_rows)
+    def load(self, columns=['canonical_smiles'], length_columns=['length']):
+        self.data, self.properties = self._load_csv(columns, length_columns, return_remaining=True)
 
 
 class ZINC15_TestSplit_20K_Fingerprints(GenericFingerprintDataset):

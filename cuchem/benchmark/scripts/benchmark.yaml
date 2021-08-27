@@ -1,0 +1,38 @@
+model:
+  name: MegaMolBART
+  params:
+    url: localhost:50051
+
+metric:
+  validity:
+    enabled: false
+    radius_list:
+      - 1
+      # - 2
+      # - 5
+
+  unique:
+    enabled: false
+    radius_list: ${metric.validity.radius_list}
+
+  novelty:
+    enabled: false
+    radius_list: ${metric.validity.radius_list}
+
+  nearestNeighborCorrelation:
+    enabled: false
+    top_k_list:
+      - 50
+      - 100
+      - 500
+
+  modelability:
+    enabled: true
+
+samplingSpec:
+  input_size: 1000
+  seq_len: 512
+  sample_size: 10
+
+output:
+  path: ./benchmark_output/

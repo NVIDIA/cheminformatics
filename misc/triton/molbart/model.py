@@ -281,11 +281,17 @@ class TritonPythonModel:
                   cnt=1):
         return add_jitter(embedding, radius, cnt)
 
+    def _compute_radius(self, scaled_radius):
+        if scaled_radius:
+            return float(scaled_radius * self.min_jitter_radius)
+        else:
+            return self.min_jitter_radius
+
     def compute_unique_smiles(self,
                               interp_df,
                               embeddings,
                               embedding_funct,
-                              radius=0.5):
+                              scaled_radius=0.5):
         """
         Identify duplicate SMILES and distorts the embedding. The input df
         must have columns 'SMILES' and 'Generated' at 0th and 1st position.
@@ -295,6 +301,7 @@ class TritonPythonModel:
         This function does not make any assumptions about order of embeddings.
         Instead it simply orders the df by SMILES to identify the duplicates.
         """
+        distance = self._compute_radius(scaled_radius)
 
         for i in range(5):
             smiles = interp_df['SMILES'].sort_values()
@@ -309,7 +316,7 @@ class TritonPythonModel:
                     if interp_df.iat[dup_idx, 1]:
                         # add jitter to generated molecules only
                         embeddings[dup_idx] = self.addjitter(
-                            embeddings[dup_idx], radius, 1)
+                            embeddings[dup_idx], distance, 1)
                 smiles = embedding_funct(embeddings)
             else:
                 break
@@ -323,7 +330,7 @@ class TritonPythonModel:
                 invalid_index = invalid_mol_df.index.to_list()
                 for idx in invalid_index:
                     embeddings[idx] = self.addjitter(embeddings[idx],
-                                                        radius,
+                                                        distance,
                                                         cnt=1)
                 smiles = embedding_funct(embeddings)
             else:

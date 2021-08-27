@@ -3,6 +3,7 @@
 import grpc
 
 import generativesampler_pb2 as generativesampler__pb2
+from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
 class GenerativeSamplerStub(object):
@@ -31,7 +32,7 @@ class GenerativeSamplerStub(object):
                 )
         self.GetIteration = channel.unary_unary(
                 '/nvidia.cheminformatics.grpc.GenerativeSampler/GetIteration',
-                request_serializer=generativesampler__pb2.GenerativeSpec.SerializeToString,
+                request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
                 response_deserializer=generativesampler__pb2.IterationVal.FromString,
                 )
 
@@ -83,7 +84,7 @@ def add_GenerativeSamplerServicer_to_server(servicer, server):
             ),
             'GetIteration': grpc.unary_unary_rpc_method_handler(
                     servicer.GetIteration,
-                    request_deserializer=generativesampler__pb2.GenerativeSpec.FromString,
+                    request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
                     response_serializer=generativesampler__pb2.IterationVal.SerializeToString,
             ),
     }
@@ -159,7 +160,7 @@ class GenerativeSampler(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/nvidia.cheminformatics.grpc.GenerativeSampler/GetIteration',
-            generativesampler__pb2.GenerativeSpec.SerializeToString,
+            google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
             generativesampler__pb2.IterationVal.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

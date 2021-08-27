@@ -89,24 +89,28 @@ else
 fi
 
 build() {
+    local IMG_OPTION=$1
     set -e
     DATE=$(date +%y%m%d)
 
-    IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
-    echo "Building ${CUCHEM_CONT_BASENAME}..."
-    docker build --network host \
-        -t ${CUCHEM_CONT_BASENAME}:latest \
-        -t ${CUCHEM_CONT_BASENAME}:${DATE} \
-        -f Dockerfile.cuchem .
+    if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "1" ]]; then
+        IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
+        echo "Building ${CUCHEM_CONT_BASENAME}..."
+        docker build --network host \
+            -t ${CUCHEM_CONT_BASENAME}:latest \
+            -t ${CUCHEM_CONT} \
+            -f Dockerfile.cuchem .
+    fi
 
-    IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
-    echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
-    docker build --no-cache --network host \
-        -t ${MEGAMOLBART_CONT_BASENAME}:latest \
-        -t ${MEGAMOLBART_CONT_BASENAME}:${DATE} \
-        --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT} \
-        -f Dockerfile.megamolbart \
-        .
+    if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "2" ]]; then
+        IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
+        echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
+        docker build --no-cache --network host \
+            -t ${MEGAMOLBART_CONT_BASENAME}:latest \
+            -t ${MEGAMOLBART_CONT} \
+            --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT} \
+            -f Dockerfile.megamolbart .
+    fi
 
     set +e
     exit
@@ -150,7 +154,14 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
         CONT=${MEGAMOLBART_CONT}
     else
+<<<<<<< HEAD
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}"
+=======
+        DOCKER_CMD="${DOCKER_CMD} --privileged"
+        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
+        DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:"
+>>>>>>> a3cae7e... Changes to improve runtime performance of benchmark tests.
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 
@@ -162,10 +173,7 @@ dev() {
 
 start() {
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-        # Executed within container or a managed env.
-        if [[ -d "/workspace/common/generated" ]]; then
-            PYTHONPATH="/workspace/cuchem:/workspace/common:/workspace/common/generated/"
-        fi
+        PYTHONPATH=/opt/nvidia/cheminfomatics/common/generated:/opt/nvidia/cheminfomatics/common:/opt/nvidia/cheminfomatics/cuchem:/opt/nvidia/cheminfomatics/chemportal
         dbSetup "${DATA_MOUNT_PATH}"
         cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
     else
@@ -176,6 +184,7 @@ start() {
         export ADDITIONAL_PARAM="$@"
         export CUCHEM_PATH=/workspace
         export MEGAMOLBART_PATH=/workspace/megamolbart
+        export WORKSPACE_DIR='.'
         docker-compose --env-file .env  \
                 -f setup/docker_compose.yml \
                 --project-directory . \

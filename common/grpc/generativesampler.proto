@@ -2,11 +2,15 @@ syntax = "proto3";
 
 package nvidia.cheminformatics.grpc;
 
-// python -m grpc_tools.protoc -I./grpc/ \
-//            --python_out=generated \
-//            --experimental_allow_proto3_optional \
-//            --grpc_python_out=generated \
-//            ./grpc/generativesampler.proto
+import "google/protobuf/empty.proto";
+
+//python -m pip install grpcio
+//python -m pip install grpcio-tools
+//python -m grpc_tools.protoc -I./grpc/ \
+//             --python_out=generated \
+//             --experimental_allow_proto3_optional \
+//             --grpc_python_out=generated \
+//             ./grpc/generativesampler.proto
 
 
 enum GenerativeModel {
@@ -20,7 +24,7 @@ service GenerativeSampler {
   rpc SmilesToEmbedding(GenerativeSpec) returns (EmbeddingList) {};
   rpc FindSimilars(GenerativeSpec) returns (SmilesList) {};
   rpc Interpolate(GenerativeSpec) returns (SmilesList) {};
-  rpc GetIteration(GenerativeSpec) returns (IterationVal) {};
+  rpc GetIteration(google.protobuf.Empty) returns (IterationVal) {};
 }
 
 
@@ -30,11 +34,14 @@ message GenerativeSpec {
   optional float radius = 3;
   optional int32 numRequested = 4;
   optional int32 padding = 5;
+  optional bool forceUnique = 6;
+  optional bool sanitize = 7;
 }
 
 
 message SmilesList {
   repeated string generatedSmiles = 1;
+  repeated EmbeddingList embeddings = 2;
 }
 
 message EmbeddingList{

@@ -66,7 +66,7 @@ class GenericFingerprintDataset():
         if self.index_col:
             data = data.set_index(self.index_col).sort_index()
 
-        if index:
+        if index is not None:
             data = data.loc[index]
         self.data = data
         return

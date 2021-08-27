@@ -1,5 +1,5 @@
 # gpuci-build-environment
-Clara Genomics build environment for gpuCI
+Chemformatics build environment for gpuCI
 
 ## How to extend gpuCI Dockerfiles
 
@@ -7,5 +7,5 @@ Clara Genomics build environment for gpuCI
 * Inherit from base gpuCI Docker image
 
 ```
-gpuci/rapidsai-base:cuda${CUDA_VERSION}-${LINUX_VERSION}-gcc${CC_VERSION}-py${PYTHON_VERSION}
+gpuci/miniconda-cuda:${CUDA_VER}-${IMAGE_TYPE}-${LINUX_VERSION}
 ```

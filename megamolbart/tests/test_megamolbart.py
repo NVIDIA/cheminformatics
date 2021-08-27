@@ -3,9 +3,7 @@
 import pandas as pd
 import torch
 
-import sys
-sys.path.insert(0, "/workspace/megamolbart_generative")
-from megamolbart_generative import MegaMolBART
+from megamolbart.inference import MegaMolBART
 
 
 if __name__ == '__main__':
@@ -33,8 +31,8 @@ if __name__ == '__main__':
         assert isinstance(mols_df_1, pd.DataFrame)
         assert isinstance(mols_df_1.loc[1, 'SMILES'], str)
 
-        mols_df_2 = wf.interpolate_from_smiles([smiles1, smiles2], num_interp)
+        mols_df_2 = wf.interpolate_smiles([smiles1, smiles2], num_interp)
         assert len(mols_df_2) == num_interp + 2
         assert isinstance(mols_df_2, pd.DataFrame)
         assert isinstance(mols_df_2.loc[1, 'SMILES'], str)
-        
+

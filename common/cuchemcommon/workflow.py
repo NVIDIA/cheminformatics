@@ -11,15 +11,20 @@ logger = logging.getLogger(__name__)
 
 
 @singledispatch
-def add_jitter(embedding, radius, cnt):
+def add_jitter(embedding, radius, cnt, shape):
     return NotImplemented
 
 
 @add_jitter.register(np.ndarray)
-def _(embedding, radius, cnt):
-    noise = np.random.normal(0, radius, (cnt,) + embedding.shape)
+def _(embedding, radius, cnt, shape):
 
-    return noise + embedding
+    distorteds = []
+    for i in range(cnt):
+        noise = np.random.normal(0, radius, embedding.shape)
+        distorted = noise + embedding
+        distorteds.append(distorted)
+
+    return distorteds
 
 
 class BaseGenerativeWorkflow:
@@ -28,11 +33,25 @@ class BaseGenerativeWorkflow:
         self.dao = dao
         self.min_jitter_radius = None
 
-    def interpolate_from_smiles(self,
-                                smiles: List,
-                                num_points: int = 10,
-                                scaled_radius=None,
-                                force_unique=False):
+    def get_iteration(self):
+        NotImplemented
+
+    def smiles_to_embedding(self,
+                            smiles: str,
+                            padding: int):
+        NotImplemented
+
+    def embedding_to_smiles(self,
+                            embedding: float,
+                            dim: int,
+                            pad_mask):
+        NotImplemented
+
+    def interpolate_smiles(self,
+                           smiles: List,
+                           num_points: int = 10,
+                           scaled_radius=None,
+                           force_unique=False):
         NotImplemented
 
     def find_similars_smiles_list(self,
@@ -58,15 +77,15 @@ class BaseGenerativeWorkflow:
     def addjitter(self,
                   embedding,
                   radius=None,
-                  cnt=1):
+                  cnt=1,
+                  shape=None):
         radius = radius if radius else self.radius_scale
-        return add_jitter(embedding, radius, cnt)
+        return add_jitter(embedding, radius, cnt, shape)
 
     def compute_unique_smiles(self,
                               interp_df,
-                              embeddings,
                               embedding_funct,
-                              radius=None):
+                              scaled_radius=None):
         """
         Identify duplicate SMILES and distorts the embedding. The input df
         must have columns 'SMILES' and 'Generated' at 0th and 1st position.
@@ -77,8 +96,9 @@ class BaseGenerativeWorkflow:
         Instead it simply orders the df by SMILES to identify the duplicates.
         """
 
-        radius = radius if radius else self.min_jitter_radius
-
+        distance = self._compute_radius(scaled_radius)
+        embeddings = interp_df['embeddings']
+        embeddings_dim = interp_df['embeddings_dim']
         for index, row in interp_df.iterrows():
             smile_string = row['SMILES']
             try:
@@ -99,11 +119,15 @@ class BaseGenerativeWorkflow:
 
             if len(duplicates) > 0:
                 for dup_idx in duplicates:
-                    if interp_df.iat[dup_idx, 1]:
+                    if interp_df.iat[dup_idx, 3]:
                         # add jitter to generated molecules only
-                        embeddings[dup_idx] = self.addjitter(
-                            embeddings[dup_idx], radius, 1)
-                interp_df['SMILES'] = embedding_funct(embeddings)
+                        distored = self.addjitter(embeddings[dup_idx],
+                                                  distance,
+                                                  cnt=1,
+                                                  shape=embeddings_dim[dup_idx])
+                        embeddings[dup_idx] = distored[0]
+                interp_df['SMILES'] = embedding_funct(embeddings.to_list())
+                interp_df['embeddings'] = embeddings
             else:
                 break
 
@@ -116,9 +140,11 @@ class BaseGenerativeWorkflow:
                 invalid_index = invalid_mol_df.index.to_list()
                 for idx in invalid_index:
                     embeddings[idx] = self.addjitter(embeddings[idx],
-                                                     radius,
-                                                     cnt=1)
-                interp_df['SMILES'] = embedding_funct(embeddings)
+                                                     distance,
+                                                     cnt=1,
+                                                     shape=embeddings_dim[idx])[0]
+                interp_df['SMILES'] = embedding_funct(embeddings.to_list())
+                interp_df['embeddings'] = embeddings
             else:
                 break
 
@@ -146,10 +172,10 @@ class BaseGenerativeWorkflow:
         else:
             raise Exception('id type %s not supported' % id_type)
 
-        return self.interpolate_from_smiles(smiles,
-                                            num_points=num_points,
-                                            scaled_radius=scaled_radius,
-                                            force_unique=force_unique)
+        return self.interpolate_smiles(smiles,
+                                       num_points=num_points,
+                                       scaled_radius=scaled_radius,
+                                       force_unique=force_unique)
 
     def find_similars_smiles_by_id(self,
                                    chemble_id: str,

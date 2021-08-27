@@ -16,7 +16,7 @@
 import re
 
 # ZINC dataset parameters
-ZINC_CSV_DIR = '/data/zinc_csv'
+ZINC_CSV_DIR = '/data/zinc_csv/train'
 
 # ZINC trie parameters
 ZINC_TRIE_DIR = '/data/zinc_trie'

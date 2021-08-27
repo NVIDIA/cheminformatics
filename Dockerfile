@@ -24,7 +24,7 @@ channels: \n\
   - defaults \n" > /conda/.condarc \
       && cat /conda/.condarc ;
 
-COPY ci/env.yml /tmp
+COPY cuchem/conda/env.yml /tmp
 
 # Create parabricks conda env and make default
 RUN source activate base

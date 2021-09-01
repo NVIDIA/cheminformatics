@@ -152,7 +152,7 @@
 
   - name: Download NGC resource
     unarchive:
-      src: https://api.ngc.nvidia.com/v2/resources/nvidia/clara/cheminformatics/versions/0.1/zip
+      src: https://api.ngc.nvidia.com/v2/resources/nvidia/clara/cheminformatics/versions/0.1.2/zip
       dest: /opt/megamolbart
       remote_src: yes
 

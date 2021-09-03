@@ -9,7 +9,6 @@ metric:
     radius:
       - 1
       - 2
-      - 5
 
   unique:
     enabled: true

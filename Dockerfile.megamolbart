@@ -1,9 +1,9 @@
-# Copyright 2020 NVIDIA Corporation
+# Copyright 2021 NVIDIA Corporation
 FROM nvcr.io/nvidia/pytorch:20.11-py3
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux vim libxrender1 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
 ENV UCX_LOG_LEVEL error
@@ -15,13 +15,6 @@ RUN echo "source activate base" > /etc/bash.bashrc
 ## Environment setup
 COPY megamolbart/conda/env.yml /tmp/.
 RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
-
-## Apex
-RUN cd /tmp && git clone https://github.com/NVIDIA/apex
-RUN cd /tmp/apex/ \
-    && /opt/conda/bin/python3 -m pip install -v \
-        --disable-pip-version-check --no-cache-dir \
-        --global-option="--cpp_ext" --global-option="--cuda_ext" ./
 
 ## PySMILES -- requirements handled by conda environment
 RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
@@ -39,11 +32,7 @@ RUN cd /tmp/common; pip install .
 
 RUN mkdir -p /opt/nvidia/cuchem/grpc
 COPY common/generated /opt/nvidia/cuchem/grpc
-
-ENV PYTHONPATH /opt/nvidia/cuchem/grpc:/opt/nvidia/cheminfomatics/common:$PYTHONPATH
+ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
 
 COPY megamolbart/ /opt/nvidia/megamolbart/
-
-SHELL ["/bin/bash", "-c"]
-
 CMD cd /opt/nvidia/megamolbart && python3 launch.py

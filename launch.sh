@@ -154,7 +154,6 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:/workspace/megamolbart:/opt/MolBART/megatron_molbart/"
         CONT=${MEGAMOLBART_CONT}
     else
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --privileged"
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"

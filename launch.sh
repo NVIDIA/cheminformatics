@@ -154,14 +154,10 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
         CONT=${MEGAMOLBART_CONT}
     else
-<<<<<<< HEAD
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}"
-=======
         DOCKER_CMD="${DOCKER_CMD} --privileged"
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:"
->>>>>>> a3cae7e... Changes to improve runtime performance of benchmark tests.
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 

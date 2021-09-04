@@ -16,10 +16,8 @@ RUN cd /opt/nvidia/cheminfomatics/common; \
     pip install -r requirements.txt
 RUN cd /opt/nvidia/cheminfomatics/cuchem; \
     pip install -r requirements.txt
-RUN cd /opt/nvidia/cheminfomatics/chemportal; \
-    pip install -r requirements.txt
 
 ENV UCX_LOG_LEVEL error
-ENV PYTHONPATH ./common/generated:./common:./cuchem:/./chemportal
+ENV PYTHONPATH ./common/generated:./common:./cuchem:
 
 CMD cd /opt/nvidia/cheminfomatics; ./launch.sh start

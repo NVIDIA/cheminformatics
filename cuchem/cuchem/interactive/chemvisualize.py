@@ -104,8 +104,8 @@ class ChemVisualization(metaclass=Singleton):
         self.n_clusters = cluster_wf.n_clusters
         self.chem_data = ChEmblData()
         self.genreated_df = None
-        self.cluster_wf_cls = 'cuchem.wf.cluster.gpukmeansumap.GpuKmeansUmap'
-        self.generative_wf_cls = 'cuchem.wf.generative.Cddd'
+        self.cluster_wf_cls = 'cuchem.wf.cluster.gpukmeansumap.GpuKmeansUmapHybrid'
+        self.generative_wf_cls = 'cuchem.wf.generative.MegatronMolBART'
 
         # Store colors to avoid plots changes colors on events such as
         # molecule selection, etc.
@@ -198,8 +198,8 @@ class ChemVisualization(metaclass=Singleton):
         self.app.callback(
             [Output('table_generated_molecules', 'children'),
              Output('show_generated_mol', 'children'),
-             Output('interpolation_error', 'children'),
-             Output('msg_generated_molecules', 'children')],
+             Output('msg_generated_molecules', 'children'),
+             Output('interpolation_error', 'children')],
             [Input("bt_generate", "n_clicks"), ],
             [State('sl_generative_wf', 'value'),
              State('ckl_candidate_mol_id', 'value'),
@@ -254,7 +254,7 @@ class ChemVisualization(metaclass=Singleton):
             return {'display': 'block', 'width': '100%'}, {'display': 'none'}
         return dash.no_update, dash.no_update
 
-    @report_ui_error(3)
+    @report_ui_error(4)
     def handle_generation(self, bt_generate,
                           sl_generative_wf, ckl_candidate_mol_id,
                           n2generate, scaled_radius, rd_generation_type, show_generated_mol):
@@ -273,11 +273,15 @@ class ChemVisualization(metaclass=Singleton):
         scaled_radius = int(scaled_radius)
 
         if rd_generation_type == 'SAMPLE':
+            if chemble_ids == None or len(chemble_ids) == 0:
+                raise ValueError('Please select at-least one molecule for Sampling.')
             self.genreated_df = generative_wf.find_similars_smiles_by_id(chemble_ids,
                                                                          num_requested=n2generate,
                                                                          scaled_radius=scaled_radius,
                                                                          force_unique=True)
         else:
+            if chemble_ids == None or len(chemble_ids) < 2:
+                raise ValueError('Please select at-least two molecules for Interpolation.')
             self.genreated_df = generative_wf.interpolate_by_id(chemble_ids,
                                                                 num_points=n2generate,
                                                                 scaled_radius=scaled_radius,
@@ -294,7 +298,10 @@ class ChemVisualization(metaclass=Singleton):
         # Create Table header
         table_headers = []
         columns = self.genreated_df.columns.to_list()
+        ignore_columns = ['embeddings', 'embeddings_dim']
         for column in columns:
+            if column in ignore_columns:
+                continue
             table_headers.append(html.Th(column, style={'fontSize': '150%', 'text-align': 'center'}))
 
         prop_recs = [html.Tr(table_headers, style={'background': 'lightgray'})]
@@ -314,6 +321,8 @@ class ChemVisualization(metaclass=Singleton):
 
             for col_id in range(len(columns)):
                 col_data = self.genreated_df.iat[row_idx, col_id]
+                if columns[col_id] in ignore_columns:
+                    continue
 
                 col_level = 'info'
                 if isinstance(col_data, dict):
@@ -343,8 +352,8 @@ class ChemVisualization(metaclass=Singleton):
         return html.Table(prop_recs, style={'width': '100%',
                                             'border': '1px solid lightgray'}), \
                show_generated_mol, \
-               dash.no_update, \
-               msg_generated_molecules
+               msg_generated_molecules, \
+               dash.no_update
 
     def handle_ckl_selection(self, ckl_candidate_mol_id, rd_generation_type):
         selection_msg = '**Please Select Two Molecules**'
@@ -430,7 +439,7 @@ class ChemVisualization(metaclass=Singleton):
 
         moi_molregno = []
         if north_stars:
-            moi_molregno = north_stars.split(",")
+            moi_molregno = list(map(int, north_stars.split(",")))
 
         moi_filter = ldf['id'].isin(moi_molregno)
 
@@ -671,10 +680,10 @@ class ChemVisualization(metaclass=Singleton):
                                 html.Div(children=[
                                     dcc.Dropdown(id='sl_wf',
                                                  multi=False,
-                                                 options=[{'label': 'GPU KMeans-UMAP',
-                                                           'value': 'cuchem.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
-                                                          {'label': 'GPU KMeans-UMAP - Single and Multiple GPUs',
+                                                 options=[{'label': 'GPU KMeans-UMAP - Single and Multiple GPUs',
                                                            'value': 'cuchem.wf.cluster.gpukmeansumap.GpuKmeansUmapHybrid'},
+                                                          {'label': 'GPU KMeans-UMAP',
+                                                           'value': 'cuchem.wf.cluster.gpukmeansumap.GpuKmeansUmap'},
                                                           {'label': 'GPU KMeans-Random Projection - Single GPU',
                                                            'value': 'cuchem.wf.cluster.gpurandomprojection.GpuWorkflowRandomProjection'},
                                                           {'label': 'CPU KMeans-UMAP',

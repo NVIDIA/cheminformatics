@@ -237,9 +237,12 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
                 new_fingerprints[col] = prop_ser
 
             self.df_embedding = self._remove_ui_columns(self.df_embedding)
-
-            # TODO: Should we maintain the original PCA result for use here
             self.df_embedding = self.df_embedding.append(new_fingerprints)
+
+            if hasattr(self.df_embedding, 'compute'):
+                self.df_embedding = self.df_embedding.compute()
+
+            logger.info(self.df_embedding.shape)
 
         return chem_mol_map, molregnos, self.df_embedding
 

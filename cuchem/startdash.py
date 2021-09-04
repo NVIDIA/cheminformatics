@@ -330,10 +330,10 @@ To start dash:
 
         n_molecules = args.n_mol
         if not args.cpu:
-            from cuchem.wf.cluster.gpukmeansumap import GpuKmeansUmap
-            workflow = GpuKmeansUmap(n_molecules=n_molecules,
-                                     pca_comps=args.pca_comps,
-                                     n_clusters=args.num_clusters)
+            from cuchem.wf.cluster.gpukmeansumap import GpuKmeansUmapHybrid
+            workflow = GpuKmeansUmapHybrid(n_molecules=n_molecules,
+                                           pca_comps=args.pca_comps,
+                                           n_clusters=args.num_clusters)
         else:
             from cuchem.wf.cluster.cpukmeansumap import CpuKmeansUmap
             workflow = CpuKmeansUmap(n_molecules=n_molecules,

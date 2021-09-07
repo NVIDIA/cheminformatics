@@ -27,8 +27,8 @@ If `.env` does not exist, then a template will be written for you.
 CUCHEM_CONT=nvcr.io/nvstaging/clara/cheminformatics_demo:latest
 MEGAMOLBART_CONT=nvcr.io/nvstaging/clara/megamolbart:latest
 MEGAMOLBART_MODEL=nvstaging/clara/megamolbart:0.1
-PROJECT_PATH=/home/rilango/Projects/github/cheminformatics
-CONTENT_PATH=/clara/testData/chemInformatics
+PROJECT_PATH=/home/user_home/code/cheminformatics
+CONTENT_PATH=/home/user_home/data
 DATA_MOUNT_PATH=/data
 PLOTLY_PORT=5000
 DASK_PORT=9001

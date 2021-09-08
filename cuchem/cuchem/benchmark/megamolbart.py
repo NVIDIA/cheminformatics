@@ -1,11 +1,13 @@
 import os
 import sys
-import time
 import logging
 import hydra
 import pandas as pd
+import multiprocessing
+from multiprocessing import Process
 
 from datetime import datetime
+from cuchem.benchmark.data import BenchmarkData
 from cuml.ensemble.randomforestregressor import RandomForestRegressor
 from cuml import LinearRegression, ElasticNet
 from cuml.svm import SVR
@@ -44,6 +46,63 @@ def save_metric_results(metric_list, output_dir):
     metric = metric_df['name'].iloc[0].replace(' ', '_')
     iteration = metric_df['iteration'].iloc[0]
     metric_df.to_csv(os.path.join(output_dir, f'{metric}_{iteration}.csv'), index=False)
+
+
+def _update_cache(inferrer, dataset, ds_start, ds_end, num_samples, scaled_radius, force_unique, sanitize):
+    logger.info(f'Caching from {ds_start} to {ds_end}...')
+    benchmark_data = BenchmarkData()
+
+    for index in range(ds_start, ds_end):
+        if index > dataset.data.shape[0]:
+            return
+        smiles = dataset.data.iloc[index]
+        # logger.info(f'Caching {smiles}...')
+        # generated_smiles = benchmark_data.fetch_sampling_data(inferrer.__class__.__name__,
+        #                                                     smiles,
+        #                                                     num_samples,
+        #                                                     scaled_radius,
+        #                                                     force_unique,
+        #                                                     sanitize)
+        # if not generated_smiles:
+        #     # Generate new samples and update the database
+        #     result = inferrer.find_similars_smiles(smiles,
+        #                                         num_samples,
+        #                                         scaled_radius=scaled_radius,
+        #                                         force_unique=force_unique,
+        #                                         sanitize=sanitize)
+        #     # Result from sampler includes the input SMILES. Removing it.
+        #     # result = result[result.Generated == True]
+        #     generated_smiles = result['SMILES'].to_list()
+
+        #     embeddings = result['embeddings'].to_list()
+        #     embeddings_dim = result['embeddings_dim'].to_list()
+
+        #     # insert generated smiles into a database for use later.
+        #     benchmark_data.insert_sampling_data(inferrer.__class__.__name__,
+        #                                         smiles,
+        #                                         num_samples,
+        #                                         scaled_radius,
+        #                                         force_unique,
+        #                                         sanitize,
+        #                                         generated_smiles,
+        #                                         embeddings,
+        #                                         embeddings_dim)
+
+
+def cache_samples(inferrer, dataset, num_samples, scaled_radius, force_unique, sanitize):
+    splits = multiprocessing.cpu_count() - 1
+    dataset_size = len(dataset.data)
+    data_split = int(dataset_size/splits) + 1
+    data_splits = [(i * data_split, i * data_split + data_split) for i in range(splits)]
+    logger.info(f'splits - {data_splits}')
+
+    for spilt in data_splits:
+        p = Process(target=_update_cache,
+                    args=(inferrer, dataset, spilt[0], spilt[1], num_samples, scaled_radius, force_unique, sanitize,))
+        p.start()
+        # _update_cache(inferrer, dataset, spilt[0], spilt[1], num_samples, scaled_radius, force_unique, sanitize)
+    p.join()
+
 
 
 @hydra.main(config_path=".", config_name="benchmark")
@@ -107,17 +166,20 @@ def main(cfg):
 
     iteration = None
     retry_count = 0
-    while retry_count < 30:
-        try:
-            # Wait for upto 5 min for the server to be up
-            iteration = inferrer.get_iteration()
-            break
-        except Exception as e:
-            logging.warning(f'Service not available. Retrying {retry_count}...')
-            time.sleep(10)
-            retry_count += 1
-            continue
-    logging.info(f'Service found after {retry_count} retries.')
+    # while retry_count < 30:
+    #     try:
+    #         # Wait for upto 5 min for the server to be up
+    #         iteration = inferrer.get_iteration()
+    #         break
+    #     except Exception as e:
+    #         logging.warning(f'Service not available. Retrying {retry_count}...')
+    #         time.sleep(10)
+    #         retry_count += 1
+    #         continue
+    # logging.info(f'Service found after {retry_count} retries.')
+
+    cache_samples(inferrer, smiles_dataset, 10, 1, False, True)
+    sys.exit(0)
 
     for metric in metric_list:
         logger.info(f'METRIC: {metric.name}')

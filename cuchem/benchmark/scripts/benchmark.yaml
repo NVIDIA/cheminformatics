@@ -29,7 +29,7 @@ metric:
     enabled: true
 
 samplingSpec:
-  input_size: 20000
+  input_size: 1000
   seq_len: 512
   sample_size: 10
 

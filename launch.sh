@@ -88,6 +88,7 @@ else
     CUCHEM_LOC="./"
 fi
 
+
 build() {
     local IMG_OPTION=$1
     set -e
@@ -108,7 +109,7 @@ build() {
         docker build --no-cache --network host \
             -t ${MEGAMOLBART_CONT_BASENAME}:latest \
             -t ${MEGAMOLBART_CONT} \
-            --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT} \
+            --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
             -f Dockerfile.megamolbart .
     fi
 

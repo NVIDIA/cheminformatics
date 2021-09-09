@@ -54,7 +54,7 @@ export IP_MEGAMOLBART=192.${ID}.100.2
 export CUCHEM_UI_START_CMD="python3 ./cuchem/cuchem/benchmark/megamolbart.py --config-dir /workspace/cuchem/benchmark/scripts"
 
 export MEGAMOLBART_CMD="bash -c 'CUDA_VISIBLE_DEVICES=${GPU_ID} \
-  python3 launch.py -c ${CHECKPOINT_DIR} \
+  GRPC_ENABLE_FORK_SUPPORT=1 python3 launch.py -c ${CHECKPOINT_DIR} \
     --num_layers=${NUM_LAYERS} \
     --hidden_size=${HIDDEN_SIZE} \
     --num_attention_heads=${NUM_ATTENTION_HEADS}'

@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
 
 import logging
+import numpy as np
+import pandas as pd
+import torch
+
+from typing import List
 from functools import partial
 from pathlib import Path
-from typing import List
-from rdkit import Chem
 
-import torch
-import pandas as pd
-from checkpointing import load_checkpoint
-from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
-from decoder import DecodeSampler
-from megatron import get_args
+from megatron.checkpointing import load_checkpoint
 from megatron.initialize import initialize_megatron
-from megatron_bart import MegatronBART
-from tokenizer import MolEncTokenizer
-from util import (REGEX, DEFAULT_CHEM_TOKEN_START, DEFAULT_MAX_SEQ_LEN,
-                  DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR,
-                  DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS)
+from megatron import get_args
+# from megatron.training import get_model
+from nemo.collections.chem.models.megamolbart import megatron_bart_model
 
+from nemo.collections.chem.decoder.decoder import DecodeSampler
+from nemo.collections.chem.tokenizer.tokenizer import MolEncTokenizer
+
+from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 logger = logging.getLogger(__name__)
 
 

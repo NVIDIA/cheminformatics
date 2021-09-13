@@ -146,6 +146,7 @@ pull() {
 
 
 dev() {
+    set -x
     local CONTAINER_OPTION=$1
     local CONT=${CUCHEM_CONT}
 

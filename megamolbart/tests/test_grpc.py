@@ -33,6 +33,7 @@ def similarity(add_server_method, service_cls, stub_cls):
 
 def test_fetch_iterations():
     sys.argv = [sys.argv[0]]
+    sys.argv.extend(['--micro-batch-size', '2'])
     with similarity(generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server,
                     GenerativeSampler,
                     generativesampler_pb2_grpc.GenerativeSamplerStub) as stub:

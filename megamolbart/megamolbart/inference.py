@@ -13,7 +13,7 @@ from megatron.checkpointing import load_checkpoint
 from megatron.initialize import initialize_megatron
 from megatron import get_args
 # from megatron.training import get_model
-from nemo.collections.chem.models.megamolbart import megatron_bart_model
+from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMolBARTModel
 
 from nemo.collections.chem.decoder.decoder import DecodeSampler
 from nemo.collections.chem.tokenizer.tokenizer import MolEncTokenizer

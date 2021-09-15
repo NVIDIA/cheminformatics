@@ -272,7 +272,7 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         fingerprints_dist = tanimoto_calculate(fingerprints, calc_distance=True)
         del fingerprints
 
-        corr = spearmanr(fingerprints_dist, embeddings_dist, top_k)
+        corr = spearmanr(fingerprints_dist, embeddings_dist, top_k=top_k)
         return corr
 
     def calculate(self, **kwargs):

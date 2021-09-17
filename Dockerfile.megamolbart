@@ -1,14 +1,17 @@
-# Copyright 2021 NVIDIA Corporation
-FROM nvcr.io/nvidia/pytorch:20.11-py3
+# Copyright 2020 NVIDIA Corporation
+FROM nvcr.io/nvidia/nemo:1.2.0
+ARG GITHUB_ACCESS_TOKEN
+ARG GITHUB_BRANCH=main
+ARG NEMO_HOME=/workspace/nemo
 
 RUN apt-get update \
     && apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-ENV UCX_LOG_LEVEL error
-ENV PATH /opt/conda/bin:$PATH
-ENV CUDA_HOME /usr/local/cuda
+# ENV UCX_LOG_LEVEL error
+# ENV PATH /opt/conda/bin:$PATH
+# ENV CUDA_HOME /usr/local/cuda
 SHELL ["/bin/bash", "-c"]
 RUN echo "source activate base" > /etc/bash.bashrc
 
@@ -26,7 +29,14 @@ RUN git clone https://github.com/MolecularAI/MolBART.git --branch megatron-molba
     && cd /opt/MolBART; pip install .
 ENV PYTHONPATH /opt/MolBART/megatron_molbart:/opt/MolBART
 
-# Copy and add generated code to PYTHONPATH
+## NeMo_MegaMolBART
+# RUN git clone https://${GITHUB_ACCESS_TOKEN}@github.com/clara-parabricks/NeMo_MegaMolBART.git \
+#     --branch ${GITHUB_BRANCH} /opt/NeMo_MegaMolBART \
+#     && rm -rf ${NEMO_HOME} \
+#     && mv /opt/NeMo_MegaMolBART ${NEMO_HOME} \
+#     && ln -s ${NEMO_HOME}/nemo/collections/chem /opt/conda/lib/python3.8/site-packages/nemo/collections/chem
+
+## Copy and add generated code to PYTHONPATH
 COPY common/ /tmp/common
 RUN cd /tmp/common; pip install .
 

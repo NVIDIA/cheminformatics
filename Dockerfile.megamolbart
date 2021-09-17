@@ -6,7 +6,7 @@ ARG NEMO_HOME=/workspace/nemo
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux vim libxrender1 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
 # ENV UCX_LOG_LEVEL error

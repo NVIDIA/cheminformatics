@@ -54,7 +54,7 @@ class Launcher(object):
                             dest='debug',
                             action='store_true',
                             default=False,
-                            help='Show debug message')
+                            help='Show debug messages')
 
         parser.add_argument('-v', '--vocab',
                             dest='vocab',

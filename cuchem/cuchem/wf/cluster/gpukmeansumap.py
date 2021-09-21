@@ -210,7 +210,7 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         molregnos = list(chem_mol_map.keys())
 
         if len(molregnos) != len(chemblids):
-            raise Exception(f"One of the ChEMBLE Id is either invalid or the DB does not contain structural properties.")
+            raise Exception(f"One of the ChEMBL ID is either invalid or the DB does not contain structural properties.")
 
         self.df_embedding['id_exists'] = self.df_embedding['id'].isin(molregnos)
 

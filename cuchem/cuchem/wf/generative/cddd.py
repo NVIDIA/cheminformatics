@@ -59,7 +59,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                   smiles: str,
                                   num_requested: int = 10,
                                   scaled_radius=None,
-                                  sanitize=False,
+                                  sanitize=True,
                                   force_unique=False):
 
         radius = self._compute_radius(scaled_radius)
@@ -77,7 +77,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                              smiles: str,
                              num_requested: int = 10,
                              scaled_radius=None,
-                             sanitize=False,
+                             sanitize=True,
                              force_unique=False):
         generated_mols, neighboring_embeddings = self.find_similars_smiles_list(smiles,
                                                                                 num_requested=num_requested,
@@ -105,7 +105,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                            num_points: int = 10,
                            scaled_radius=None,
                            force_unique=False,
-                           sanitize=False):
+                           sanitize=True):
 
         num_points = int(num_points) + 2
         if len(smiles) < 2:

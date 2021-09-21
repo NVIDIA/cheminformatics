@@ -42,7 +42,8 @@ RUN cd /tmp/common; pip install .
 
 RUN mkdir -p /opt/nvidia/cuchem/grpc
 COPY common/generated /opt/nvidia/cuchem/grpc
-ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
+
+ENV PYTHONPATH /opt/nvidia/cuchem/grpc:/opt/nvidia/cheminfomatics/common:$PYTHONPATH
 
 COPY megamolbart/ /opt/nvidia/megamolbart/
 CMD cd /opt/nvidia/megamolbart && python3 launch.py

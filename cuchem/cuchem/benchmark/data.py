@@ -17,10 +17,11 @@ class TrainingData(object, metaclass=Singleton):
 
         context = Context()
         db_file = context.get_config('data_mount_path', default='/data')
-        db_file = os.path.join(db_file, 'db/zinc_train.sqlite3')
+        db_file = os.path.join(db_file, 'db', 'zinc_train.sqlite3')
 
-        logger.info(f'Benchmark database {db_file}...')
-        self.conn = sqlite3.connect(db_file)
+        db_url = f'file:{db_file}?mode=ro'
+        logger.info(f'Train database {db_url}...')
+        self.conn = sqlite3.connect(db_url, uri=True)
 
     def is_known_smiles(self, smiles: str) -> bool:
         """

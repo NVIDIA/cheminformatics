@@ -49,7 +49,7 @@ def test_dataframe_similar():
         spec = generativesampler_pb2.GenerativeSpec(
             model=generativesampler_pb2.GenerativeModel.MegaMolBART,
             smiles=['CC(=O)Nc1ccc(O)cc1'],
-            radius=5.0,
+            radius=2.0,
             numRequested=10)
 
         result = stub.FindSimilars(spec)

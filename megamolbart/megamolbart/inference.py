@@ -67,17 +67,10 @@ class MegaMolBART(BaseGenerativeWorkflow):
             'load': checkpoints_dir
         }
 
-        with torch.no_grad():
-            initialize_megatron(args_defaults=args, ignore_unknown_args=True)
-            args = get_args()
-            self.tokenizer = self.load_tokenizer(args.vocab_file, regex, default_chem_token_start)
-            self.model = self.load_model(args, self.tokenizer, decoder_max_seq_len)
-
-    def _compute_radius(self, scaled_radius):  # TODO REMOVE
-        if scaled_radius:
-            return float(scaled_radius * self.min_jitter_radius)
-        else:
-            return self.min_jitter_radius
+        initialize_megatron(args_defaults=args, ignore_unknown_args=True)
+        args = get_args()
+        self.tokenizer = self.load_tokenizer(args.vocab_file, regex, default_chem_token_start)
+        self.model = self.load_model(args, self.tokenizer, decoder_max_seq_len)
 
     def load_tokenizer(self, tokenizer_vocab_path, regex, default_chem_token_start):
         """Load tokenizer from vocab file
@@ -165,7 +158,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         torch.cuda.empty_cache()
         return embedding, pad_mask
 
-    def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=False):
+    def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
         mem_pad_mask = mem_pad_mask.clone()
         smiles_interp_list = []
 
@@ -198,7 +191,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         return smiles_interp_list
 
-    def interpolate_molecules(self, smiles1, smiles2, num_interp, tokenizer, k=1, sanitize=False):
+    def interpolate_molecules(self, smiles1, smiles2, num_interp, tokenizer, k=1, sanitize=True):
         """Interpolate between two molecules in embedding space.
 
         Params
@@ -229,7 +222,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         embeddings = []
         dims = []
         for emb in interpolated_emb.permute(1, 0, 2):
-            dims.append(emb.shape)
+            dims.append(tuple(emb.shape))
             embeddings.append(emb)
 
         generated_mols = self.inverse_transform(embeddings,
@@ -238,7 +231,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                       sanitize=sanitize)
         generated_mols = [smiles1] + generated_mols + [smiles2]
         embeddings = [embedding1] + embeddings + [embedding2]
-        dims = [embedding1.shape] + dims + [embedding2.shape]
+        dims = [tuple(embedding1.shape)] + dims + [tuple(embedding2.shape)]
         return generated_mols, embeddings, combined_mask, dims
 
     def find_similars_smiles_list(self,
@@ -246,7 +239,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   num_requested: int = 10,
                                   scaled_radius=None,
                                   force_unique=False,
-                                  sanitize=False):
+                                  sanitize=True):
         distance = self._compute_radius(scaled_radius)
         logger.info(f'Computing with distance {distance}...')
 
@@ -269,19 +262,20 @@ class MegaMolBART(BaseGenerativeWorkflow):
                              num_requested: int = 10,
                              scaled_radius=None,
                              force_unique=False,
-                             sanitize=False):
+                             sanitize=True):
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
                                            scaled_radius=scaled_radius,
-                                           force_unique=force_unique)
+                                           force_unique=force_unique,
+                                           sanitize=sanitize)
 
         # Rest of the applications and libraries use RAPIDS and cuPY libraries.
         # For interoperability, we need to convert the embeddings to cupy.
         embeddings = []
         dims = []
         for neighboring_embedding in neighboring_embeddings:
-            dims.append(neighboring_embedding.shape)
+            dims.append(tuple(neighboring_embedding.shape))
             embeddings.append(neighboring_embedding.flatten().tolist())
 
         generated_df = pd.DataFrame({'SMILES': generated_mols,
@@ -299,11 +293,11 @@ class MegaMolBART(BaseGenerativeWorkflow):
         return generated_df
 
     def interpolate_smiles(self,
-                                smiles: List,
-                                num_points: int = 10,
-                                scaled_radius=None,
-                                force_unique=False,
-                                sanitize=False):
+                           smiles: List,
+                           num_points: int = 10,
+                           scaled_radius=None,
+                           force_unique=False,
+                           sanitize=True):
         num_points = int(num_points)
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')
@@ -323,7 +317,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
             # For interoperability, we need to convert the embeddings to cupy.
             embeddings = []
             for interpolated_embedding in interpolated_embeddings:
-                embeddings.append(interpolated_embedding.cpu())
+                embeddings.append(interpolated_embedding.flatten().tolist())
+
+            logger.info(f'-------------- {type(interpolated_mol[0])} {type(embeddings[0])}  {dims}   {type(dims[0])} ')
 
             interp_df = pd.DataFrame({'SMILES': interpolated_mol,
                                       'embeddings': embeddings,

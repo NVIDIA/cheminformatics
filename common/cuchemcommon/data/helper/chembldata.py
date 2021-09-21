@@ -32,12 +32,10 @@ ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
-FROM compound_properties cp,
-        compound_structures cs,
-        molecule_dictionary md
-WHERE cp.molregno = md.molregno
-        AND md.molregno = cs.molregno
-        AND md.molregno in (%s)
+FROM molecule_dictionary as md
+    join compound_structures cs on md.molregno = cs.molregno
+    left join compound_properties cp on cs.molregno = cp.molregno
+WHERE  md.molregno in (%s)
 """
 
 
@@ -79,12 +77,10 @@ class ChEmblData(object, metaclass=Singleton):
         """
         sql_stml = """
             SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
-            FROM compound_properties cp,
-                    compound_structures cs,
-                    molecule_dictionary md
-            WHERE cp.molregno = md.molregno
-                    AND md.molregno = cs.molregno
-                    AND md.chembl_id in (%s)
+            FROM molecule_dictionary as md
+                join compound_properties cp on md.molregno = cp.molregno
+                left join compound_structures cs on cp.molregno = cs.molregno
+            WHERE  md.chembl_id in (%s)
             """
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
@@ -100,12 +96,10 @@ class ChEmblData(object, metaclass=Singleton):
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT md.molregno as molregno
-                FROM compound_properties cp,
-                        compound_structures cs,
-                        molecule_dictionary md
-                WHERE cp.molregno = md.molregno
-                    AND md.molregno = cs.molregno
-                    AND md.chembl_id in (%s)
+                FROM molecule_dictionary as md
+                    join compound_properties cp on md.molregno = cp.molregno
+                    left join compound_structures cs on cp.molregno = cs.molregno
+                WHERE  md.chembl_id in in (%s)
             ''' % "'%s'" % "','".join(chemblIds)
             cur.execute(select_stmt)
             return cur.fetchall()
@@ -116,12 +110,11 @@ class ChEmblData(object, metaclass=Singleton):
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = '''
-                SELECT cs.molregno as molregno, md.chembl_id as chembl_id,
-                       cs.canonical_smiles as smiles
-                FROM compound_structures cs,
-                    molecule_dictionary md
-                WHERE md.molregno = cs.molregno
-                    AND md.chembl_id in (%s)
+                SELECT md.molregno as molregno, md.chembl_id as chembl_id,
+                    cs.canonical_smiles as smiles
+                FROM molecule_dictionary as md
+                    join compound_structures cs on md.molregno = cs.molregno
+                WHERE md.chembl_id in (%s)
             ''' % "'%s'" % "','".join([x.strip().upper() for x in new_molecules])
             cur.execute(select_stmt)
 

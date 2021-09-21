@@ -206,7 +206,7 @@ class Validity(BaseSampleMetric):
                                                       num_samples,
                                                       scaled_radius=radius,
                                                       force_unique=False,
-                                                      sanitize=True)
+                                                      sanitize=False)
         return len(generated_smiles)
 
 
@@ -224,7 +224,7 @@ class Unique(BaseSampleMetric):
                                                       num_samples,
                                                       scaled_radius=radius,
                                                       force_unique=False,
-                                                      sanitize=True)
+                                                      sanitize=False)
         # Get the unquie ones
         generated_smiles = set(generated_smiles)
         return len(generated_smiles)
@@ -248,7 +248,7 @@ class Novelty(BaseSampleMetric):
                                                       num_samples,
                                                       scaled_radius=radius,
                                                       force_unique=False,
-                                                      sanitize=True)
+                                                      sanitize=False)
 
         result = sum([self.smiles_in_train(x) for x in generated_smiles])
         return result

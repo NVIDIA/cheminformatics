@@ -165,7 +165,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         torch.cuda.empty_cache()
         return embedding, pad_mask
 
-    def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=False):
+    def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
         mem_pad_mask = mem_pad_mask.clone()
         smiles_interp_list = []
 

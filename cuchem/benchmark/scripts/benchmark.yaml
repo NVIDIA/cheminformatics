@@ -5,23 +5,22 @@ model:
 
 metric:
   validity:
-    enabled: true
-    radius:
+    enabled: false
+    radius_list:
       - 1
       - 2
-      - 5
 
   unique:
-    enabled: true
-    radius: ${metric.validity.radius}
+    enabled: false
+    radius_list: ${metric.validity.radius_list}
 
   novelty:
     enabled: false
-    radius: ${metric.validity.radius}
+    radius_list: ${metric.validity.radius_list}
 
   nearestNeighborCorrelation:
-    enabled: true
-    top_k:
+    enabled: false
+    top_k_list:
       - 50
       - 100
       - 500
@@ -35,4 +34,4 @@ samplingSpec:
   sample_size: 10
 
 output:
-  path: ./benchmark_output/
+  path: /data/benchmark_output/

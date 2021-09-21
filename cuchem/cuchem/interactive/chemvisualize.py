@@ -278,14 +278,16 @@ class ChemVisualization(metaclass=Singleton):
             self.genreated_df = generative_wf.find_similars_smiles_by_id(chemble_ids,
                                                                          num_requested=n2generate,
                                                                          scaled_radius=scaled_radius,
-                                                                         force_unique=True)
+                                                                         force_unique=True,
+                                                                         sanitize=True)
         else:
             if chemble_ids == None or len(chemble_ids) < 2:
                 raise ValueError('Please select at-least two molecules for Interpolation.')
             self.genreated_df = generative_wf.interpolate_by_id(chemble_ids,
                                                                 num_points=n2generate,
                                                                 scaled_radius=scaled_radius,
-                                                                force_unique=True)
+                                                                force_unique=True,
+                                                                sanitize=True)
 
         if show_generated_mol is None:
             show_generated_mol = 0

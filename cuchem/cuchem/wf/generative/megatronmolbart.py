@@ -32,11 +32,13 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                             smiles: str,
                             padding: int,
                             scaled_radius=None,
-                            num_requested: int = 10):
+                            num_requested: int = 10,
+                            sanitize=True):
         spec = GenerativeSpec(smiles=[smiles],
                               padding=padding,
                               radius=scaled_radius,
-                              numRequested=num_requested)
+                              numRequested=num_requested,
+                              sanitize=sanitize)
 
         result = self.stub.SmilesToEmbedding(spec)
         return result
@@ -84,12 +86,14 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                            smiles: List,
                            num_points: int = 10,
                            scaled_radius=None,
-                           force_unique=False):
+                           force_unique=False,
+                           sanitize=True):
         spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
                               smiles=smiles,
                               radius=scaled_radius,
                               numRequested=num_points,
-                              forceUnique=force_unique)
+                              forceUnique=force_unique,
+                              sanitize=sanitize)
 
         result = self.stub.Interpolate(spec)
         result = result.generatedSmiles

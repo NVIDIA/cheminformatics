@@ -134,7 +134,7 @@ dbSetup() {
                 ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
             return_code=$?
             if [[ $return_code -ne 0 ]]; then
-                echo -e "${RED}${BOLD}ChEMBL database download failed. Please check network settings and disk space(25GB).${RESET}"
+                echo -e "${RED}${BOLD}ChEMBL DB download failed. Please check network settings, disk space(25GB) and wget version>=(1.20.3).${RESET}"
                 rm -rf ${DATA_DIR}/chembl_27_sqlite.tar.gz
                 exit $return_code
             fi
@@ -169,11 +169,16 @@ dbSetup() {
 download_model() {
     set -e
     if [[ ! -e "${MODEL_PATH}" ]]; then
+
+        MEGAMOLBART_MODEL_VERSION=$(echo ${MEGAMOLBART_MODEL} | cut -d ":" -f2)
         mkdir -p ${MODEL_PATH}
         echo -e "${YELLOW}Downloading model ${MEGAMOLBART_MODEL} to ${MODEL_PATH}...${RESET}"
-        ngc registry model download-version \
-            --dest ${MODEL_PATH} \
-            "${MEGAMOLBART_MODEL}"
+        wget -q --show-progress \
+            --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/clara/megamolbart/versions/${MEGAMOLBART_MODEL_VERSION}/zip \
+            -O ${MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip
+        mkdir ${MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
+        unzip -q ${MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip \
+            -d ${MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
     fi
     set +e
 }

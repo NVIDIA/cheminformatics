@@ -53,7 +53,7 @@ variables:
         cheminformatics_demo:latest
     MEGAMOLBART_CONT
         container image for MegaMolBART service, prepended with registry.
-    PROJECT_PATH
+    CONTENT_PATH
         path to repository. e.g.,
         /home/user/projects/cheminformatics
     DATA_PATH
@@ -120,6 +120,20 @@ push() {
     set -x
     IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
     IFS=':' read -ra MEGAMOLBART_BASENAME <<< ${MEGAMOLBART_CONT}
+
+    if [ -z ${REGISTRY_ACCESS_TOKEN} ]; then
+        echo "${RED}Please ensure 'REGISTRY_ACCESS_TOKEN' in $LOCAL_ENV is correct and rerun this script. Please set NGC API key to REGISTRY_ACCESS_TOKEN.${RESET}"
+        exit
+    else
+        echo "${YELLOW}Attempting docker login to ${REGISTRY}.${RESET}"
+    fi
+
+    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+    if [[ $? -ne 0 ]]; then
+        echo "${RED}Docker login failed. Please setup ngc('ngc config set'). "
+        echo "Please also check network settings and ensure 'REGISTRY_ACCESS_TOKEN' is $LOCAL_ENV is correct.${RESET}"
+        exit 1
+    fi
 
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
 

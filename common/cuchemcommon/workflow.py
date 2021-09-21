@@ -51,21 +51,24 @@ class BaseGenerativeWorkflow:
                            smiles: List,
                            num_points: int = 10,
                            scaled_radius=None,
-                           force_unique=False):
+                           force_unique=False,
+                           sanitize=True):
         NotImplemented
 
     def find_similars_smiles_list(self,
                                   smiles: str,
                                   num_requested: int = 10,
                                   scaled_radius=None,
-                                  force_unique=False):
+                                  force_unique=False,
+                                  sanitize=True):
         NotImplemented
 
     def find_similars_smiles(self,
                              smiles: str,
                              num_requested: int = 10,
                              scaled_radius=None,
-                             force_unique=False):
+                             force_unique=False,
+                             sanitize=True):
         NotImplemented
 
     def _compute_radius(self, scaled_radius):
@@ -159,7 +162,8 @@ class BaseGenerativeWorkflow:
                           id_type: str = 'chembleid',
                           num_points=10,
                           force_unique=False,
-                          scaled_radius: int = 1):
+                          scaled_radius: int = 1,
+                          sanitize=True):
         smiles = None
 
         if not self.min_jitter_radius:
@@ -175,14 +179,16 @@ class BaseGenerativeWorkflow:
         return self.interpolate_smiles(smiles,
                                        num_points=num_points,
                                        scaled_radius=scaled_radius,
-                                       force_unique=force_unique)
+                                       force_unique=force_unique,
+                                       sanitize=sanitize)
 
     def find_similars_smiles_by_id(self,
                                    chemble_id: str,
                                    id_type: str = 'chembleid',
                                    num_requested=10,
                                    force_unique=False,
-                                   scaled_radius: int = 1):
+                                   scaled_radius: int = 1,
+                                   sanitize=True):
         smiles = None
 
         if not self.min_jitter_radius:
@@ -198,4 +204,5 @@ class BaseGenerativeWorkflow:
         return self.find_similars_smiles(smiles[0],
                                          num_requested=num_requested,
                                          scaled_radius=scaled_radius,
-                                         force_unique=force_unique)
+                                         force_unique=force_unique,
+                                         sanitize=sanitize)

@@ -21,7 +21,6 @@ services:
     volumes:
       - "${WORKSPACE_DIR}/:/workspace"
       - "${CONTENT_PATH}/data:/data"
-    user: "${UID}:${GID}"
     working_dir: ${CUCHEM_PATH}
     command: ${CUCHEM_UI_START_CMD}
     extra_hosts:
@@ -44,7 +43,6 @@ services:
         - './:/workspace'
         - "${CONTENT_PATH}/data:/data"
         - "${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
-    user: "${UID}:${GID}"
     working_dir: ${MEGAMOLBART_PATH}
     command: ${MEGAMOLBART_CMD}
     deploy:

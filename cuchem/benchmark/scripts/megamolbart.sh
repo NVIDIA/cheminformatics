@@ -52,6 +52,10 @@ export IP_CUCHEM_UI=192.${ID}.100.1
 export IP_MEGAMOLBART=192.${ID}.100.2
 
 export CUCHEM_UI_START_CMD="python3 ./cuchem/cuchem/benchmark/megamolbart.py --config-dir /workspace/cuchem/benchmark/scripts"
+<<<<<<< HEAD
+=======
+# export CUCHEM_UI_START_CMD="which python3"
+>>>>>>> rilango/remove_ngc
 
 export MEGAMOLBART_CMD="bash -c 'CUDA_VISIBLE_DEVICES=${GPU_ID} \
   python3 launch.py -c ${CHECKPOINT_DIR} \

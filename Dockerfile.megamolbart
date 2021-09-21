@@ -1,9 +1,5 @@
-# Copyright 2020 NVIDIA Corporation
-FROM nvcr.io/nvidia/nemo:1.2.0
-ARG GITHUB_ACCESS_TOKEN
-ARG GITHUB_BRANCH=main
-ARG NEMO_HOME=/workspace/nemo
-
+# Copyright 2021 NVIDIA Corporation
+FROM nvcr.io/nvidia/pytorch:20.11-py3
 RUN apt-get update \
     && apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 \

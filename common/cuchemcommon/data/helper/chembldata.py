@@ -311,3 +311,27 @@ class ChEmblData(object, metaclass=Singleton):
 
         mol_df = self.fetch_mol_embedding(num_recs=num_recs, batch_size=batch_size)
         mol_df.to_hdf(hdf_path, 'fingerprints')
+
+
+    def is_valid_chemble_smiles(self, smiles, con=None):
+
+        if con is None:
+            with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
+                    closing(con.cursor()) as cur:
+                select_stmt = '''
+                    SELECT count(*)
+                    FROM compound_structures cs
+                    WHERE canonical_smiles = ?
+                '''
+                cur.execute(select_stmt, (smiles))
+                return cur.fetchone()[0]
+        else:
+            cur = con.cursor()
+            select_stmt = '''
+                    SELECT count(*)
+                    FROM compound_structures cs
+                    WHERE canonical_smiles = ?
+                '''
+            cur.execute(select_stmt, (smiles,))
+
+            return cur.fetchone()[0]

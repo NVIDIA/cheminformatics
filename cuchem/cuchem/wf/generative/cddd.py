@@ -1,4 +1,6 @@
 import logging
+import sqlite3
+from contextlib import closing
 from typing import List
 
 import numpy as np
@@ -23,6 +25,10 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
         self.dao = dao
         self.cddd_embeddings = Embeddings(model_dir=self.default_model_loc)
         self.min_jitter_radius = 0.5
+
+    def is_known_smiles(self, smiles):
+        with closing(sqlite3.connect(self.dao.chembl_db, uri=True)) as con:
+            return self.dao.is_valid_chemble_smiles(smiles, con)
 
     def inverse_transform(self, embeddings, sanitize):
         mol_strs = self.cddd_embeddings.inverse_transform(embeddings)

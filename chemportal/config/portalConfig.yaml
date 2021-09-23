@@ -1,5 +1,0 @@
-db:
-  username: 'root'
-  password: 'chemportal_database#321'
-  database: 'cuchem_db'
-  server: 'localhost'

@@ -6,27 +6,27 @@ model:
 metric:
   validity:
     enabled: false
-    radius_list:
+    radius:
       - 1
       - 2
 
   unique:
     enabled: false
-    radius_list: ${metric.validity.radius_list}
+    radius: ${metric.validity.radius}
 
   novelty:
-    enabled: false
-    radius_list: ${metric.validity.radius_list}
+    enabled: True
+    radius: ${metric.validity.radius}
 
   nearestNeighborCorrelation:
     enabled: false
-    top_k_list:
+    top_k:
       - 50
       - 100
       - 500
 
   modelability:
-    enabled: true
+    enabled: false
 
 samplingSpec:
   input_size: 20000

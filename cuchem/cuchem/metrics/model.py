@@ -343,7 +343,6 @@ class Modelability(BaseEmbeddingMetric):
 
         return cupy.array(metric_array), cupy.array(fingerprint_errors), cupy.array(embedding_errors)
 
-
     def calculate(self, **kwargs):
         smiles_dataset = kwargs['smiles_dataset']
         fingerprint_dataset = kwargs['fingerprint_dataset']

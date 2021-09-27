@@ -74,7 +74,7 @@ EOF
 }
 
 source setup/env.sh
-MEGAMOLBART_TRAINING_CONT=${MEGAMOLBART_TRAINING_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart_training:latest}
+MEGAMOLBART_TRAINING_CONT=${MEGAMOLBART_TRAINING_CONT:=nvcr.io/nvidian/clara-lifesciences/megamolbart_training_nemo:latest}
 DEV_PYTHONPATH="/workspace/cuchem:/workspace/common:/workspace/common/generated/"
 
 if [ -e /workspace/cuchem/startdash.py ]; then

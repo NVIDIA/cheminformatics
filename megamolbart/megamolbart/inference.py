@@ -8,19 +8,15 @@ from rdkit import Chem
 
 import torch
 import pandas as pd
-from checkpointing import load_checkpoint
+from omegaconf import OmegaConf
 from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
-from decoder import DecodeSampler
-from megatron import get_args
-from megatron.initialize import initialize_megatron
-from megatron_bart import MegatronBART
-from tokenizer import MolEncTokenizer
-from util import (REGEX, DEFAULT_CHEM_TOKEN_START, DEFAULT_MAX_SEQ_LEN,
-                  DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR,
-                  DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS)
+
+from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMolBARTModel
+from nemo.collections.chem.tokenizer import DEFAULT_MAX_SEQ_LEN
 
 logger = logging.getLogger(__name__)
 
+CHECKPOINT_PATH = '/checkpoint/megamolbart_checkpoint.nemo' # TODO RAJESH: this is the path to the checkpoint inside container -- find better way to set
 
 @add_jitter.register(torch.Tensor)
 def _(embedding, radius, cnt, shape):
@@ -40,15 +36,7 @@ def _(embedding, radius, cnt, shape):
 class MegaMolBART(BaseGenerativeWorkflow):
 
     def __init__(self,
-                 max_seq_len=DEFAULT_MAX_SEQ_LEN,
-                 vocab_path=DEFAULT_VOCAB_PATH,
-                 regex=REGEX,
-                 default_chem_token_start=DEFAULT_CHEM_TOKEN_START,
-                 checkpoints_dir=CHECKPOINTS_DIR,
-                 num_layers=DEFAULT_NUM_LAYERS,
-                 hidden_size=DEFAULT_D_MODEL,
-                 num_attention_heads=DEFAULT_NUM_HEADS,
-                 decoder_max_seq_len=None) -> None:
+                 max_seq_len=DEFAULT_MAX_SEQ_LEN) -> None:
         super().__init__()
 
         torch.set_grad_enabled(False)  # Testing this instead of `with torch.no_grad():` context since it doesn't exit
@@ -56,72 +44,20 @@ class MegaMolBART(BaseGenerativeWorkflow):
         self.device = 'cuda'  # Megatron arg loading seems to only work with GPU
         self.min_jitter_radius = 1.0
         self.max_model_position_embeddings = max_seq_len
+        self.model = model
+        self.tokenizer = self.model.tokenizer
 
-        args = {
-            'num_layers': num_layers,
-            'hidden_size': hidden_size,
-            'num_attention_heads': num_attention_heads,
-            'max_position_embeddings': self.max_model_position_embeddings,
-            'tokenizer_type': 'GPT2BPETokenizer',
-            'vocab_file': vocab_path,
-            'load': checkpoints_dir
-        }
-
-        initialize_megatron(args_defaults=args, ignore_unknown_args=True)
-        args = get_args()
-        self.tokenizer = self.load_tokenizer(args.vocab_file, regex, default_chem_token_start)
-        self.model = self.load_model(args, self.tokenizer, decoder_max_seq_len)
-
-    def load_tokenizer(self, tokenizer_vocab_path, regex, default_chem_token_start):
-        """Load tokenizer from vocab file
-
-        Params:
-            tokenizer_vocab_path: str, path to tokenizer vocab
-
-        Returns:
-            MolEncTokenizer tokenizer object
-        """
-
-        tokenizer_vocab_path = Path(tokenizer_vocab_path)
-        tokenizer = MolEncTokenizer.from_vocab_file(
-            tokenizer_vocab_path,
-            regex,
-            default_chem_token_start)
-
-        return tokenizer
-
-    def load_model(self, args, tokenizer, decoder_max_seq_len=None):
+    def load_model(self, checkpoint_path):
         """Load saved model checkpoint
 
         Params:
-            tokenizer: MolEncTokenizer tokenizer object
-            decoder_max_seq_len: int, maximum sequence length
-            args: Megatron initialized arguments
+            checkpoint_path: path to nemo checkpoint
 
         Returns:
             MegaMolBART trained model
         """
-
-        vocab_size = len(tokenizer)
-        pad_token_idx = tokenizer.vocab[tokenizer.pad_token]
-
-        # TODO how to handle length overrun for batch processing
-        if not decoder_max_seq_len:
-            decoder_max_seq_len = args.max_position_embeddings
-
-        sampler = DecodeSampler(tokenizer, decoder_max_seq_len)
-        model = MegatronBART(
-            sampler,
-            pad_token_idx,
-            vocab_size,
-            args.hidden_size,
-            args.num_layers,
-            args.num_attention_heads,
-            args.hidden_size * 4,
-            args.max_position_embeddings,
-            dropout=0.1,
-        )
-        self.iteration = load_checkpoint(model, None, None)
+        model = MegaMolBARTModel.restore_from(checkpoint_path)        
+        # self.iteration = load_checkpoint(model, None, None) # TODO RAJESH: this will no longer work but I belive it's no longer needed per your refactor
         model = model.cuda()
         model.eval()
         return model

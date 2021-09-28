@@ -12,7 +12,6 @@ from omegaconf import OmegaConf
 from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 
 from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMolBARTModel
-from nemo.collections.chem.tokenizer import DEFAULT_MAX_SEQ_LEN
 
 logger = logging.getLogger(__name__)
 
@@ -35,16 +34,15 @@ def _(embedding, radius, cnt, shape):
 
 class MegaMolBART(BaseGenerativeWorkflow):
 
-    def __init__(self,
-                 max_seq_len=DEFAULT_MAX_SEQ_LEN) -> None:
+    def __init__(self) -> None:
         super().__init__()
 
         torch.set_grad_enabled(False)  # Testing this instead of `with torch.no_grad():` context since it doesn't exit
 
         self.device = 'cuda'  # Megatron arg loading seems to only work with GPU
         self.min_jitter_radius = 1.0
-        self.max_model_position_embeddings = max_seq_len
         self.model = model
+        self.max_model_position_embeddings = self.model.max_seq_len
         self.tokenizer = self.model.tokenizer
 
     def load_model(self, checkpoint_path):

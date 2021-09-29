@@ -6,6 +6,7 @@ import pickle
 import cupy
 import numpy as np
 import pandas as pd
+from rdkit import Chem
 
 from cuml.metrics import pairwise_distances
 from sklearn.model_selection import ParameterGrid, KFold
@@ -207,7 +208,13 @@ class Validity(BaseSampleMetric):
                                                       scaled_radius=radius,
                                                       force_unique=False,
                                                       sanitize=False)
-        return len(generated_smiles)
+        valid_ctr = 0
+        for new_smiles in generated_smiles[1:]:
+            m = Chem.MolFromSmiles(new_smiles)
+            if m:
+                valid_ctr += 1
+
+        return valid_ctr
 
 
 class Unique(BaseSampleMetric):
@@ -226,7 +233,7 @@ class Unique(BaseSampleMetric):
                                                       force_unique=False,
                                                       sanitize=False)
         # Get the unquie ones
-        generated_smiles = set(generated_smiles)
+        generated_smiles = set(generated_smiles[1:])
         return len(generated_smiles)
 
 

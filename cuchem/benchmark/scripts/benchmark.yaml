@@ -5,7 +5,7 @@ model:
 
 metric:
   validity:
-    enabled: false
+    enabled: True
     radius:
       - 1
       - 2
@@ -15,7 +15,7 @@ metric:
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: True
+    enabled: False
     radius: ${metric.validity.radius}
 
   nearestNeighborCorrelation:
@@ -29,7 +29,7 @@ metric:
     enabled: false
 
 samplingSpec:
-  input_size: 20000
+  input_size: 1000
   seq_len: 512
   sample_size: 10
 

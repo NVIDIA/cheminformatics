@@ -25,4 +25,5 @@ plotly==4.9.0
 pytest==6.2.2
 umap-learn==0.5.1
 grpcio
+biopython
 git+https://github.com/jrwnter/cddd.git@1.0

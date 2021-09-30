@@ -5,6 +5,9 @@ import logging
 import hydra
 import pandas as pd
 
+import cudf
+import cupy
+
 from datetime import datetime
 from cuml.ensemble.randomforestregressor import RandomForestRegressor
 from cuml import LinearRegression, ElasticNet
@@ -15,8 +18,56 @@ from cuchem.wf.generative import Cddd
 from cuchem.datasets.loaders import ZINC15_TestSplit_20K_Samples, ZINC15_TestSplit_20K_Fingerprints
 from cuchem.metrics.model import Validity, Unique, Novelty, NearestNeighborCorrelation, Modelability
 
+gene_list = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1A", "ADRA1D", 
+             "ADRB1", "ADRB2", "ADRB3", "AKT1", "AKT2", "ALK", "ALOX5", "AR", "AURKA", 
+             "AURKB", "BACE1", "CA1", "CA12", "CA2", "CA9", "CASP1", "CCKBR", "CCR2", 
+             "CCR5", "CDK1", "CDK2", "CHEK1", "CHRM1", "CHRM2", "CHRM3", "CHRNA7", "CLK4", 
+             "CNR1", "CNR2", "CRHR1", "CSF1R", "CTSK", "CTSS", "CYP19A1", "DHFR", "DPP4", 
+             "DRD1", "DRD3", "DRD4", "DYRK1A", "EDNRA", "EGFR", "EPHX2", "ERBB2", "ESR1", 
+             "ESR2", "F10", "F2", "FAAH", "FGFR1", "FLT1", "FLT3", "GHSR", "GNRHR", "GRM5", 
+             "GSK3A", "GSK3B", "HDAC1", "HPGD", "HRH3", "HSD11B1", "HSP90AA1", "HTR2A", 
+             "HTR2C", "HTR6", "HTR7", "IGF1R", "INSR", "ITK", "JAK2", "JAK3", "KCNH2", 
+             "KDR", "KIT", "LCK", "MAOB", "MAPK14", "MAPK8", "MAPK9", "MAPKAPK2", "MC4R", 
+             "MCHR1", "MET", "MMP1", "MMP13", "MMP2", "MMP3", "MMP9", "MTOR", "NPY5R", 
+             "NR3C1", "NTRK1", "OPRD1", "OPRK1", "OPRL1", "OPRM1", "P2RX7", "PARP1", "PDE5A", 
+             "PDGFRB", "PGR", "PIK3CA", "PIM1", "PIM2", "PLK1", "PPARA", "PPARD", "PPARG", 
+             "PRKACA", "PRKCD", "PTGDR2", "PTGS2", "PTPN1", "REN", "ROCK1", "ROCK2", "S1PR1", 
+             "SCN9A", "SIGMAR1", "SLC6A2", "SLC6A3", "SRC", "TACR1", "TRPV1", "VDR"]
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def fetch_filtered_excape_data(data_file='/data/ExCAPE/pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv'):
+    """
+    Loads the data and filter records with reference to genes in interest
+    """
+
+    data = cudf.read_csv(data_file,
+                         delimiter='\t',
+                         usecols=['Entrez_ID', 'pXC50', 'Gene_Symbol'])
+    return data[data.Gene_Symbol.isin(gene_list)]
+    
+    
+def summarize_excape_data(df_data):
+    """
+    Summarize the data to produce count of unique Gene_Symbol, Entrez_ID 
+    combinations with min and max pXC50 values
+    """
+    df_data['Cnt'] = cupy.zeros(df_data.shape[0])
+    
+    # Group by Entrez_ID and compute data for each Entrez_ID
+    df_data = df_data.set_index(['Gene_Symbol', 'Entrez_ID'])
+    grouped_df = df_data.groupby(level=['Entrez_ID', 'Gene_Symbol'])
+
+    count_df = grouped_df.count()
+    count_df.drop('pXC50', axis=1, inplace=True)
+    count_df = count_df.sort_values('Cnt', ascending=False)
+    count_df['pXC50_min'] = grouped_df.pXC50.min()
+    count_df['pXC50_max'] = grouped_df.pXC50.max()
+    return count_df()
+
 
 def get_model():
         rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0)
@@ -89,6 +140,9 @@ def main(cfg):
     smiles_dataset = ZINC15_TestSplit_20K_Samples(max_len=seq_len)
     fingerprint_dataset = ZINC15_TestSplit_20K_Fingerprints()
     smiles_dataset.load()
+
+    excape_df = fetch_filtered_excape_data()
+
     fingerprint_dataset.load(smiles_dataset.data.index)
     n_data = cfg.samplingSpec.input_size
     if n_data <= 0:

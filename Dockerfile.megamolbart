@@ -30,9 +30,7 @@ RUN git clone https://${GITHUB_ACCESS_TOKEN}@github.com/clara-parabricks/NeMo_Me
     && mv /opt/NeMo_MegaMolBART ${NEMO_HOME} \
     && ln -s ${NEMO_HOME}/nemo/collections/chem /opt/conda/lib/python3.8/site-packages/nemo/collections/chem
 
-RUN mkdir /checkpoint
-# TODO RAJESH: update with correct code to copy NeMo checkpoint from your computer into container. Keep destination name the same.
-COPY small_span_aug.nemo /checkpoint/megamolbart_checkpoint.nemo
+RUN pip install --upgrade pytorch_lightning
 
 ## Copy and add generated code to PYTHONPATH
 COPY common/ /tmp/common

@@ -60,7 +60,6 @@ if [ $write_env -eq 1 ]; then
     echo MEGAMOLBART_MODEL=${MEGAMOLBART_MODEL} >> $LOCAL_ENV
     echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
     echo CONTENT_PATH=${CONTENT_PATH} >> $LOCAL_ENV
-    echo DATA_MOUNT_PATH=${DATA_MOUNT_PATH} >> $LOCAL_ENV
     echo PLOTLY_PORT=${PLOTLY_PORT} >> $LOCAL_ENV
     echo DASK_PORT=${DASK_PORT} >> $LOCAL_ENV
     echo SUBNET=${SUBNET} >> $LOCAL_ENV
@@ -114,6 +113,7 @@ DOCKER_CMD="docker run \
     -p ${PLOTLY_PORT}:5000 \
     -v ${PROJECT_PATH}:/workspace \
     -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
+    -v ${MODEL_PATH}:/models \
     --shm-size=1g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
@@ -162,23 +162,51 @@ dbSetup() {
             exit 1
         fi
         cd ${CURR_DIR}
+    else
+        echo "${YELLOW}ChEMBL DB found at ${DATA_DIR}/db/chembl_27.db.${RESET}"
     fi
 }
 
 
 download_model() {
     set -e
-    if [[ ! -e "${MODEL_PATH}" ]]; then
+    local MEGAMOLBART_MODEL_PATH=${MODEL_PATH}
+    local MEGAMOLBART_MODEL_VERSION=$(echo ${MEGAMOLBART_MODEL} | cut -d ":" -f2)
 
-        MEGAMOLBART_MODEL_VERSION=$(echo ${MEGAMOLBART_MODEL} | cut -d ":" -f2)
-        mkdir -p ${MODEL_PATH}
-        echo -e "${YELLOW}Downloading model ${MEGAMOLBART_MODEL} to ${MODEL_PATH}...${RESET}"
+    if [ -n "${ALT_MEGAMOLBART_MODEL}" ]; then
+        # This is an alternate path for developers to download from an 
+        # alternate/pre-release location. Please add 'ALT_MEGAMOLBART_MODEL' 
+        # to .env with the alternate path. ALT_MEGAMOLBART_MODEL can only be 
+        # an NGC model and will require NGC installed and configured.
+        local MEGAMOLBART_MODEL_VERSION=$(echo ${ALT_MEGAMOLBART_MODEL} | cut -d ":" -f2)
+
+        if [[ ! -e "${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}" ]]; then
+            local DOWNLOAD_URL=${MEGAMOLBART_MODEL_URL}
+            mkdir -p ${MEGAMOLBART_MODEL_PATH}    
+            ngc registry model download-version \
+                --dest ${MEGAMOLBART_MODEL_PATH} \
+                "${ALT_MEGAMOLBART_MODEL}"
+        fi
+    elif [[ ! -e "${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}" ]]; then
+        local DOWNLOAD_URL="https://api.ngc.nvidia.com/v2/models/nvidia/clara/megamolbart/versions/${MEGAMOLBART_MODEL_VERSION}/zip"
+        echo -e "${YELLOW}Downloading model ${MEGAMOLBART_MODEL} to ${MEGAMOLBART_MODEL_PATH}...${RESET}"
+
+        mkdir -p ${MEGAMOLBART_MODEL_PATH}
+
         wget -q --show-progress \
-            --content-disposition https://api.ngc.nvidia.com/v2/models/nvidia/clara/megamolbart/versions/${MEGAMOLBART_MODEL_VERSION}/zip \
-            -O ${MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip
-        mkdir ${MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
-        unzip -q ${MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip \
-            -d ${MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
+            --content-disposition ${DOWNLOAD_URL} \
+            -O ${MEGAMOLBART_MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip
+        mkdir ${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
+        unzip -q ${MEGAMOLBART_MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip \
+            -d ${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
     fi
+
+    local NUM_DIRS=`find ${MEGAMOLBART_MODEL_PATH} -type d -maxdepth 1 2>/dev/null | wc -l`
+    
+    if [[ $NUM_DIRS -gt 2 ]]; then
+        echo "${RED}Too many models at location ${MEGAMOLBART_MODEL_PATH}. Please delete models not required.${RESET}"
+        exit 1
+    fi
+
     set +e
 }

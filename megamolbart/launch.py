@@ -14,9 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import sys
+import shutil
 import logging
 import argparse
+import pathlib
 
 import grpc
 import generativesampler_pb2_grpc
@@ -27,9 +30,6 @@ from megamolbart.service import GenerativeSampler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('megamolbart')
 formatter = logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s')
-
-from util import (DEFAULT_MAX_SEQ_LEN, DEFAULT_VOCAB_PATH, CHECKPOINTS_DIR,
-                  DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS)
 
 
 class Launcher(object):
@@ -45,64 +45,54 @@ class Launcher(object):
                             type=int,
                             default=50051,
                             help='GRPC server Port')
-        parser.add_argument('-l', '--max_decode_length',
-                            dest='max_decode_length',
-                            type=int,
-                            default=DEFAULT_MAX_SEQ_LEN,
-                            help='Maximum length of decoded sequence')
         parser.add_argument('-d', '--debug',
                             dest='debug',
                             action='store_true',
                             default=False,
                             help='Show debug messages')
 
-        parser.add_argument('-v', '--vocab',
-                            dest='vocab',
-                            default=DEFAULT_VOCAB_PATH,
-                            help='Path to vocab file')
-        parser.add_argument('-c', '--checkpoints_dir',
-                            dest='checkpoints_dir',
-                            default=CHECKPOINTS_DIR,
-                            help='Path to Checkpoints dir.')
-
-        parser.add_argument('--num_layers',
-                            dest='num_layers',
-                            type=int,
-                            default=DEFAULT_NUM_LAYERS,
-                            help='Number hidden layers in the model')
-
-        parser.add_argument('--hidden_size',
-                            dest='hidden_size',
-                            type=int,
-                            default=DEFAULT_D_MODEL,
-                            help='Hidden size of the model')
-
-        parser.add_argument('--num_attention_heads',
-                            dest='num_attention_heads',
-                            type=int,
-                            default=DEFAULT_NUM_HEADS,
-                            help='Maximum length of decoded sequence')
+        parser.add_argument('-m', '--model_path',
+                            dest='model_path',
+                            default=None,
+                            help='Path to model content.')
 
         args = parser.parse_args(sys.argv[1:])
 
         if args.debug:
             logger.setLevel(logging.DEBUG)
 
-        logger.info(f'Maximum decoded sequence length is set to {args.max_decode_length}')
+        if args.model_path is None:
+            model_dir = self._fetch_model_path()
+        else:
+            model_dir = args.model_path
+        logger.info(f'Using checkpoint: {model_dir}')
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(
-            GenerativeSampler(decoder_max_seq_len=args.max_decode_length,
-                              vocab_path=args.vocab,
-                              checkpoints_dir=args.checkpoints_dir,
-                              num_layers=args.num_layers,
-                              hidden_size=args.hidden_size,
-                              num_attention_heads=args.num_attention_heads),
+            GenerativeSampler(model_dir=model_dir),
             server)
         server.add_insecure_port(f'[::]:{args.port}')
         server.start()
         server.wait_for_termination()
 
+    def _fetch_model_path(self, search_loc='/models'):
+        """
+        Fetch the model path from the model server.
+        """
+        checkpoints = sorted(pathlib.Path(search_loc).glob('**/megamolbart_checkpoint.nemo'))
+        logger.info(f'Found {len(checkpoints)} checkpoints in {search_loc}')
+        
+        if not checkpoints or len(checkpoints) == 0:
+            raise Exception('Model not found')
+        else:
+            checkpoint_dir = checkpoints[-1].absolute().parent.as_posix()
+
+            # TODO: This is a hack to place the vocab file where the model is expecting it.
+            vocab_path = '/workspace/nemo/nemo/collections/chem/vocab/'
+            os.makedirs(vocab_path, exist_ok=True)
+            shutil.copy(os.path.join(checkpoint_dir, 'bart_vocab.txt'), 
+                        os.path.join(vocab_path, 'megamolbart_pretrain_vocab.txt'))
+            return checkpoint_dir
 
 def main():
     Launcher()

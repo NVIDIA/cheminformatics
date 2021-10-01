@@ -1,6 +1,7 @@
 import sys
 import grpc
 import logging
+import pathlib
 
 from concurrent import futures
 from contextlib import contextmanager
@@ -8,7 +9,6 @@ from contextlib import contextmanager
 from megamolbart.service import GenerativeSampler
 import generativesampler_pb2
 import generativesampler_pb2_grpc
-from util import (DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS, CHECKPOINTS_DIR)
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +17,8 @@ logger = logging.getLogger(__name__)
 def similarity(add_server_method, service_cls, stub_cls):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 
-    add_server_method(service_cls(num_layers=DEFAULT_NUM_LAYERS,
-                                  hidden_size=DEFAULT_D_MODEL,
-                                  num_attention_heads=DEFAULT_NUM_HEADS,
-                                  checkpoints_dir=CHECKPOINTS_DIR,
-                                  vocab_path='/models/megamolbart/bart_vocab.txt',),
+    model_dir = sorted(pathlib.Path('/models/').glob('**/megamolbart_checkpoint.nemo'))[-1].absolute().parent.as_posix()
+    add_server_method(service_cls(model_dir=model_dir),
                       server)
     port = server.add_insecure_port('[::]:0')
     server.start()

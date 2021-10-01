@@ -15,7 +15,6 @@ from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMol
 
 logger = logging.getLogger(__name__)
 
-CHECKPOINT_PATH = '/checkpoint/megamolbart_checkpoint.nemo' # TODO RAJESH: this is the path to the checkpoint inside container -- find better way to set
 
 @add_jitter.register(torch.Tensor)
 def _(embedding, radius, cnt, shape):
@@ -34,14 +33,14 @@ def _(embedding, radius, cnt, shape):
 
 class MegaMolBART(BaseGenerativeWorkflow):
 
-    def __init__(self) -> None:
+    def __init__(self, model_dir) -> None:
         super().__init__()
 
         torch.set_grad_enabled(False)  # Testing this instead of `with torch.no_grad():` context since it doesn't exit
 
         self.device = 'cuda'  # Megatron arg loading seems to only work with GPU
         self.min_jitter_radius = 1.0
-        self.model = model
+        self.model = self.load_model(model_dir)
         self.max_model_position_embeddings = self.model.max_seq_len
         self.tokenizer = self.model.tokenizer
 
@@ -54,8 +53,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         Returns:
             MegaMolBART trained model
         """
-        model = MegaMolBARTModel.restore_from(checkpoint_path)        
-        # self.iteration = load_checkpoint(model, None, None) # TODO RAJESH: this will no longer work but I belive it's no longer needed per your refactor
+        model = MegaMolBARTModel.restore_from(checkpoint_path)
         model = model.cuda()
         model.eval()
         return model
@@ -88,7 +86,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
         pad_mask = torch.tensor(tokens['masked_pad_masks']).bool().cuda().T
         encode_input = {"encoder_input": token_ids, "encoder_pad_mask": pad_mask}
 
-        embedding = self.model.encode(encode_input)
+        embedding = self.model.model.encode(encode_input)
         torch.cuda.empty_cache()
         return embedding, pad_mask
 
@@ -103,7 +101,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                 if isinstance(memory, list):
                     memory = torch.FloatTensor(memory).cuda()
 
-                decode_fn = partial(self.model._decode_fn,
+                decode_fn = partial(self.model.model._decode_fn,
                                     mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
                                     memory=memory)
 

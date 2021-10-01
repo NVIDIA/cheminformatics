@@ -13,17 +13,10 @@ logger = logging.getLogger(__name__)
 class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=Singleton):
 
     def __init__(self, *args, **kwargs):
-        decoder_max_seq_len = kwargs['decoder_max_seq_len'] if 'decoder_max_seq_len' in kwargs else None
-        vocab_path = kwargs['vocab_path'] if 'vocab_path' in kwargs else None
-        checkpoints_dir = kwargs['checkpoints_dir'] if 'checkpoints_dir' in kwargs else None
         torch.set_grad_enabled(False)
 
-        self.megamolbart = MegaMolBART(decoder_max_seq_len=decoder_max_seq_len,
-                                       vocab_path=vocab_path,
-                                       checkpoints_dir=checkpoints_dir,
-                                       num_layers=kwargs['num_layers'],
-                                       hidden_size=kwargs['hidden_size'],
-                                       num_attention_heads=kwargs['num_attention_heads'])
+        model_dir = kwargs['model_dir'] if 'model_dir' in kwargs else None
+        self.megamolbart = MegaMolBART(model_dir=model_dir + '/megamolbart_checkpoint.nemo')
 
         try:
             iteration = int(self.megamolbart.iteration)

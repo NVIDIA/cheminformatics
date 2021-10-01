@@ -105,6 +105,7 @@ build() {
         IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
         echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
         docker build --no-cache --network host \
+            --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
             -t ${MEGAMOLBART_CONT_BASENAME}:latest \
             -t ${MEGAMOLBART_CONT} \
             -f Dockerfile.megamolbart .
@@ -156,6 +157,11 @@ pull() {
 }
 
 
+setup() {
+    download_model
+    dbSetup "${DATA_PATH}"
+}
+
 dev() {
     local CONTAINER_OPTION=$1
     local CONT=${CUCHEM_CONT}
@@ -186,8 +192,7 @@ start() {
         cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
     else
         # run a container and start dash inside container.
-        download_model
-        dbSetup "${DATA_PATH}"
+        setup
 
         export CUCHEM_UI_START_CMD="./launch.sh start $@"
         export MEGAMOLBART_CMD="python3 launch.py"
@@ -256,6 +261,8 @@ case $1 in
     push)
         ;&
     pull)
+        ;&
+    setup)
         ;&
     dev)
         $@

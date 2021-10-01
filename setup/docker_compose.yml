@@ -42,7 +42,7 @@ services:
     volumes:
         - './:/workspace'
         - "${CONTENT_PATH}/data:/data"
-        - "${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
+        - "${CONTENT_PATH}/models:/models"
     working_dir: ${MEGAMOLBART_PATH}
     command: ${MEGAMOLBART_CMD}
     deploy:

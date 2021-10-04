@@ -31,7 +31,6 @@ physchem_columns = ['measured log solubility in mols per litre']
 if __name__ == '__main__':
     data_benchmark_path = os.path.join(DATA_BENCHMARK_DIR, 'benchmark_MoleculeNet_ESOL.csv')
     benchmark_df = pd.read_csv(data_benchmark_path, usecols=columns+physchem_columns)
-    # benchmark_df = benchmark_df.rename(columns={phychem_columns[0]: 'log_solubility_(mol_per_L)'})
 
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?
     fp = calc_morgan_fingerprints(benchmark_df, smiles_col=columns[0])

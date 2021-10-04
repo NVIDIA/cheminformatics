@@ -5,7 +5,7 @@ SCRIPT_LOC=$(dirname "$0")
 ID=100
 ACTION="up"
 GPU_ID="0"
-CHECKPOINT_DIR="/models/megamolbart/checkpoints"
+MODEL_DIR="/models"
 SIZE=''
 NUM_LAYERS=4
 HIDDEN_SIZE=256
@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   --ckp)
-    CHECKPOINT_DIR=$2
+    MODEL_DIR=$2
     shift
     shift
     ;;
@@ -53,12 +53,7 @@ export IP_MEGAMOLBART=192.${ID}.100.2
 
 export CUCHEM_UI_START_CMD="python3 ./cuchem/cuchem/benchmark/megamolbart.py --config-dir /workspace/cuchem/benchmark/scripts"
 
-export MEGAMOLBART_CMD="bash -c 'CUDA_VISIBLE_DEVICES=${GPU_ID} \
-  python3 launch.py -c ${CHECKPOINT_DIR} \
-    --num_layers=${NUM_LAYERS} \
-    --hidden_size=${HIDDEN_SIZE} \
-    --num_attention_heads=${NUM_ATTENTION_HEADS}'
-"
+export MEGAMOLBART_CMD="bash -c 'CUDA_VISIBLE_DEVICES=${GPU_ID} python3 launch.py'"
 
 export CUCHEM_PATH=/workspace
 export MEGAMOLBART_PATH=/workspace/megamolbart

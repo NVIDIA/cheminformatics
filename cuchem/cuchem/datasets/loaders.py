@@ -72,9 +72,13 @@ class GenericFingerprintDataset():
         return
 
 
-class ChEMBL_Approved_Drugs(GenericCSVDataset):
-    def __init__(self, index_col='molregno', max_len=None, index=None):
+class ChEMBL_Approved_Drugs_Physchem(GenericCSVDataset):
+    def __init__(self, index_col='index', max_len=None, index=None):
         self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
+        self.properties = ['canonical_smiles', 'mw_freebase', 'alogp', 'hba', 'hbd', 'psa', 'rtb', \
+                    'ro3_pass', 'num_ro5_violations', 'cx_logp', 'cx_logd', \
+                    'full_mwt', 'aromatic_rings', 'heavy_atoms', 'qed_weighted', \
+                    'mw_monoisotopic', 'hba_lipinski', 'hbd_lipinski', 'num_lipinski_ro5_violations']
 
         assert (max_len is None) | (index is None)
         self.index_col = index_col
@@ -82,44 +86,14 @@ class ChEMBL_Approved_Drugs(GenericCSVDataset):
         self.index = index
         self.length = None
 
-        data_path = pathlib.Path(__file__).absolute()
-        while 'cuchem/nvidia' in data_path.as_posix(): # stop at cuchem base path
-            data_path = data_path.parent
-        self.data_path = os.path.join(data_path,
-                                      'tests',
-                                      'data',
-                                      'benchmark_approved_drugs.csv')
-        assert os.path.exists(self.data_path)
-
-
-class ChEMBL_20K_Samples(GenericCSVDataset):
-
-    def __init__(self, index_col='molregno', max_len=None, index=None):
-        self.name = 'ChEMBL 20K Samples'
-
-        assert (max_len is None) | (index is None)
-        self.index_col = index_col
-        self.max_len = max_len
-        self.index = index
-        self.data = None
-        self.length = None
-
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
                                       'data',
-                                      'benchmark_ChEMBL_random_sampled_drugs.csv')
+                                      'benchmark_ChEMBL_approved_drugs_physchem.csv')
         assert os.path.exists(self.data_path)
 
-
-class ChEMBL_20K_Fingerprints(GenericFingerprintDataset):
-    def __init__(self, index_col='molregno'):
-        self.name = 'ChEMBL 20K Fingerprints'
-
-        self.index_col = index_col
-        self.data = None
-        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
-                                      'fingerprints_ChEMBL_random_sampled_drugs.csv')
-        assert os.path.exists(self.data_path)
+    def load(self, columns=['canonical_smiles']):
+        data, _ = self._load_csv()
+        self.data = data[columns + self.properties]
 
 
 class ZINC15_TestSplit_20K_Samples(GenericCSVDataset):
@@ -136,7 +110,7 @@ class ZINC15_TestSplit_20K_Samples(GenericCSVDataset):
 
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
                                       'data',
-                                      'benchmark_zinc15_test.csv')
+                                      'benchmark_ZINC15_test.csv')
         assert os.path.exists(self.data_path)
 
     def load(self, columns=['canonical_smiles'], length_columns=['length']):
@@ -151,5 +125,36 @@ class ZINC15_TestSplit_20K_Fingerprints(GenericFingerprintDataset):
         self.data = None
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
                                       'data',
-                                      'fingerprints_zinc15_test.csv')
+                                      'fingerprints_ZINC15_test.csv')
+        assert os.path.exists(self.data_path)
+
+
+### DEPRECATED ###
+class ChEMBL_20K_Samples(GenericCSVDataset):
+
+    def __init__(self, index_col='molregno', max_len=None, index=None):
+        self.name = 'ChEMBL 20K Samples'
+
+        assert (max_len is None) | (index is None)
+        self.index_col = index_col
+        self.max_len = max_len
+        self.index = index
+        self.data = None
+        self.length = None
+
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'DEPRECATED_benchmark_ChEMBL_random_sampled_drugs.csv')
+        assert os.path.exists(self.data_path)
+
+
+class ChEMBL_20K_Fingerprints(GenericFingerprintDataset):
+    def __init__(self, index_col='molregno'):
+        self.name = 'ChEMBL 20K Fingerprints'
+
+        self.index_col = index_col
+        self.data = None
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'DEPRECATED_fingerprints_ChEMBL_random_sampled_drugs.csv')
         assert os.path.exists(self.data_path)

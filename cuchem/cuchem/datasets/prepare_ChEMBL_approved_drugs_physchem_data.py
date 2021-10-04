@@ -50,7 +50,7 @@ if __name__ == '__main__':
     fp = fp.reset_index()
     
     # Write results
-    benchmark_df.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_approved_drugs_physchem.csv'), index=False)
-    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_approved_drugs_physchem.csv'), index=False)
+    benchmark_df.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_ChEMBL_approved_drugs_physchem.csv'), index=False)
+    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_ChEMBL_approved_drugs_physchem.csv'), index=False)
     # fp_hdf5 = cudf.DataFrame(fp)
     # fp_hdf5.to_hdf(os.path.join(DATA_BENCHMARK_DIR, 'filter_00.h5', 'fingerprints', format='table'))

@@ -96,6 +96,120 @@ class ChEMBL_Approved_Drugs_Physchem(GenericCSVDataset):
         self.data = data[columns + self.properties]
 
 
+class ChEMBL_Approved_Drugs_Fingerprints(GenericFingerprintDataset):
+    def __init__(self, index_col='index'):
+        self.name = 'ChEMBL Approved Drugs (Phase III/IV) Fingerprints'
+
+        self.index_col = index_col
+        self.data = None
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'fingerprints_ChEMBL_approved_drugs_physchem.csv')
+        assert os.path.exists(self.data_path)
+
+
+class MoleculeNet_Lipophilicity_Physchem(GenericCSVDataset):
+    def __init__(self, index_col='index', max_len=None, index=None):
+        self.name = 'MoleculeNet Lipophilicity'
+        self.properties = ['logD']
+
+        assert (max_len is None) | (index is None)
+        self.index_col = index_col
+        self.max_len = max_len
+        self.index = index
+        self.length = None
+
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'benchmark_MoleculeNet_Lipophilicity.csv')
+        assert os.path.exists(self.data_path)
+
+    def load(self, columns=['smiles']):
+        data, _ = self._load_csv()
+        orig_property_name = 'exp'
+        data = data.rename(columns={columns[0]: 'canonical_smiles', orig_property_name: self.properties[0]})
+        self.data = data[columns + self.properties]
+
+
+class MoleculeNet_Lipophilicity_Fingerprints(GenericFingerprintDataset):
+    def __init__(self, index_col='index'):
+        self.name = 'MoleculeNet Lipophilicity Fingerprints'
+        self.index_col = index_col
+        self.data = None
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'fingerprints_MoleculeNet_Lipophilicity.csv')
+        assert os.path.exists(self.data_path)
+
+
+class MoleculeNet_ESOL_Physchem(GenericCSVDataset):
+    def __init__(self, index_col='index', max_len=None, index=None):
+        self.name = 'MoleculeNet ESOL'
+        self.properties = ['log_solubility_(mol_per_L)']
+
+        assert (max_len is None) | (index is None)
+        self.index_col = index_col
+        self.max_len = max_len
+        self.index = index
+        self.length = None
+
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'benchmark_MoleculeNet_ESOL.csv')
+        assert os.path.exists(self.data_path)
+
+    def load(self, columns=['smiles']):
+        data, _ = self._load_csv()
+        orig_property_name = 'measured log solubility in mols per litre'
+        data = data.rename(columns={columns[0]: 'canonical_smiles', orig_property_name: self.properties[0]})
+        self.data = data[columns + self.properties]
+
+
+class MoleculeNet_ESOL_Fingerprints(GenericFingerprintDataset):
+    def __init__(self, index_col='index'):
+        self.name = 'MoleculeNet ESOL Fingerprints'
+        self.index_col = index_col
+        self.data = None
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'fingerprints_MoleculeNet_ESOL.csv')
+        assert os.path.exists(self.data_path)
+
+
+class MoleculeNet_FreeSolv_Physchem(GenericCSVDataset):
+    def __init__(self, index_col='index', max_len=None, index=None):
+        self.name = 'MoleculeNet FreeSolv'
+        self.properties = ['hydration_free_energy']
+
+        assert (max_len is None) | (index is None)
+        self.index_col = index_col
+        self.max_len = max_len
+        self.index = index
+        self.length = None
+
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'benchmark_MoleculeNet_FreeSolv.csv')
+        assert os.path.exists(self.data_path)
+
+    def load(self, columns=['smiles']):
+        data, _ = self._load_csv()
+        orig_property_name = 'y'
+        data = data.rename(columns={columns[0]: 'canonical_smiles', orig_property_name: self.properties[0]})
+        self.data = data[columns + self.properties]
+
+
+class MoleculeNet_FreeSolv_Fingerprints(GenericFingerprintDataset):
+    def __init__(self, index_col='index'):
+        self.name = 'MoleculeNet FreeSolv Fingerprints'
+        self.index_col = index_col
+        self.data = None
+        self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
+                                      'data',
+                                      'fingerprints_MoleculeNet_FreeSolv.csv')
+        assert os.path.exists(self.data_path)
+
+
 class ZINC15_TestSplit_20K_Samples(GenericCSVDataset):
 
     def __init__(self, index_col='index', max_len=None, index=None):

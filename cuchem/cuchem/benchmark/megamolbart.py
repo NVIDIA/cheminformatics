@@ -67,9 +67,16 @@ def fetch_filtered_excape_data(inferrer,
         filtered_df = filtered_df.compute()
         
         smiles = filtered_df['SMILES'].unique().to_pandas()
-        smiles_df = smiles.apply(compute_fp, args=(inferrer, max_len))
+        smiles = smiles[smiles.str.len() <= max_len]
+
+        emb_df = smiles.apply(compute_fp, args=(inferrer, max_len))
+        emb_df = pd.DataFrame(emb_df)
+
+        smiles_df = emb_df.merge(smiles, left_index=True, right_index=True)
 
         # Save for later use.
+        logger.info('Saving filtered Excape DB records...')
+        logger.info('Saving embedding of SMILES filtered from Excape DB records')
         filtered_df.to_csv(filter_data_file)
         smiles_df.to_csv(embedding_file)
 
@@ -168,7 +175,10 @@ def main(cfg):
     smiles_dataset.load()
 
     excape_df, excape_emb_df = fetch_filtered_excape_data(inferrer, seq_len)
-    
+    print(excape_df.head())
+    print(excape_emb_df.head())
+    exit(1)
+
     fingerprint_dataset.load(smiles_dataset.data.index)
     n_data = cfg.samplingSpec.input_size
     if n_data <= 0:

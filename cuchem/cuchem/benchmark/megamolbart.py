@@ -5,8 +5,9 @@ import logging
 import hydra
 import pandas as pd
 
-import cudf
 import cupy
+import dask_cudf
+import numpy as np
 
 from datetime import datetime
 from cuml.ensemble.randomforestregressor import RandomForestRegressor
@@ -39,15 +40,47 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def fetch_filtered_excape_data(data_file='/data/ExCAPE/pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv'):
+def compute_fp(smiles, inferrer, max_len):
+    emb_result = inferrer.smiles_to_embedding(smiles, max_len)
+    emb = np.array(emb_result.embedding)
+    emb = np.reshape(emb, emb_result.dim)
+    return emb
+
+
+def fetch_filtered_excape_data(inferrer, 
+                               max_len,
+                               data_dir='/data/ExCAPE'):
     """
     Loads the data and filter records with reference to genes in interest
     """
+    filter_data_file = os.path.join(data_dir, 'filter_data.csv')
+    embedding_file = os.path.join(data_dir, 'embedding.csv')
+    if os.path.exists(filter_data_file):
+        filtered_df = pd.read_csv(filter_data_file)
+        smiles_df = pd.read_csv(embedding_file)
+    else:
+        data = dask_cudf.read_csv(os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv'),
+                                  delimiter='\t',
+                                  usecols=['Entrez_ID', 'pXC50', 'Gene_Symbol', 'SMILES', 'Original_Entry_ID'])
 
-    data = cudf.read_csv(data_file,
-                         delimiter='\t',
-                         usecols=['Entrez_ID', 'pXC50', 'Gene_Symbol'])
-    return data[data.Gene_Symbol.isin(gene_list)]
+        filtered_df = data[data.Gene_Symbol.isin(gene_list)]
+        filtered_df = filtered_df.compute()
+        
+        smiles = filtered_df['SMILES'].unique().to_pandas()
+        smiles = smiles[smiles.str.len() <= max_len]
+
+        emb_df = smiles.apply(compute_fp, args=(inferrer, max_len))
+        emb_df = pd.DataFrame(emb_df)
+
+        smiles_df = emb_df.merge(smiles, left_index=True, right_index=True)
+
+        # Save for later use.
+        logger.info('Saving filtered Excape DB records...')
+        logger.info('Saving embedding of SMILES filtered from Excape DB records')
+        filtered_df.to_csv(filter_data_file)
+        smiles_df.to_csv(embedding_file)
+
+    return filtered_df, smiles_df
     
     
 def summarize_excape_data(df_data):
@@ -141,7 +174,10 @@ def main(cfg):
     fingerprint_dataset = ZINC15_TestSplit_20K_Fingerprints()
     smiles_dataset.load()
 
-    excape_df = fetch_filtered_excape_data()
+    excape_df, excape_emb_df = fetch_filtered_excape_data(inferrer, seq_len)
+    print(excape_df.head())
+    print(excape_emb_df.head())
+    exit(1)
 
     fingerprint_dataset.load(smiles_dataset.data.index)
     n_data = cfg.samplingSpec.input_size

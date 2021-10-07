@@ -270,7 +270,7 @@ class ChemVisualization(metaclass=Singleton):
         wf_class = locate(self.generative_wf_cls)
         generative_wf = wf_class()
         n2generate = int(n2generate)
-        scaled_radius = int(scaled_radius)
+        scaled_radius = float(scaled_radius)
 
         if rd_generation_type == 'SAMPLE':
             if chemble_ids == None or len(chemble_ids) == 0:

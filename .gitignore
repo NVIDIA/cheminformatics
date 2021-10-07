@@ -34,3 +34,4 @@ benchmark.csv
 chemportal/frontend/node_modules/
 chemportal/outputs/
 outputs/
+**/*.onnx

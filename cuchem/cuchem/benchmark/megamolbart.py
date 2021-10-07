@@ -6,7 +6,7 @@ import hydra
 import pandas as pd
 
 import cupy
-import dask_cudf
+import dask.dataframe as dd
 import numpy as np
 
 from datetime import datetime
@@ -59,12 +59,16 @@ def fetch_filtered_excape_data(inferrer,
         filtered_df = pd.read_csv(filter_data_file)
         smiles_df = pd.read_csv(embedding_file)
     else:
-        data = dask_cudf.read_csv(os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv'),
-                                  delimiter='\t',
-                                  usecols=['Entrez_ID', 'pXC50', 'Gene_Symbol', 'SMILES', 'Original_Entry_ID'])
+        data = dd.read_csv(os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv'),
+                          delimiter='\t',
+                          usecols=['SMILES', 'Gene_Symbol', 'pXC50'])
 
         filtered_df = data[data.Gene_Symbol.isin(gene_list)]
+        filtered_df = filtered_df[filtered_df['SMILES'].map(len) <= max_len]
+
         filtered_df = filtered_df.compute()
+        filtered_df = filtered_df.sort_values(['Gene_Symbol', 'pXC50']).reset_index(drop=True)
+        filtered_df.index.name = 'index'
         
         smiles = filtered_df['SMILES'].unique().to_pandas()
         smiles = smiles[smiles.str.len() <= max_len]

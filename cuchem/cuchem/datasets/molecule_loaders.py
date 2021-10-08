@@ -48,7 +48,7 @@ class GenericCSVDataset():
         self.data, _ = self._load_csv(columns, length_columns)
 
 
-class ChEMBL_Approved_Drugs_Physchem(GenericCSVDataset):
+class ChEMBLApprovedDrugsPhyschem(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
         self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
@@ -69,7 +69,7 @@ class ChEMBL_Approved_Drugs_Physchem(GenericCSVDataset):
         self.data, self.properties = data, properties
 
 
-class MoleculeNet_Lipophilicity_Physchem(GenericCSVDataset):
+class MoleculeNetLipophilicityPhyschem(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
         self.name = 'MoleculeNet Lipophilicity'
@@ -88,7 +88,7 @@ class MoleculeNet_Lipophilicity_Physchem(GenericCSVDataset):
         self.data, self.properties = data, properties
 
 
-class MoleculeNet_ESOL_Physchem(GenericCSVDataset):
+class MoleculeNetESOLPhyschem(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
         self.name = 'MoleculeNet ESOL'
@@ -107,7 +107,7 @@ class MoleculeNet_ESOL_Physchem(GenericCSVDataset):
         self.data, self.properties = data, properties
 
 
-class MoleculeNet_FreeSolv_Physchem(GenericCSVDataset):
+class MoleculeNetFreeSolvPhyschem(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
         self.name = 'MoleculeNet FreeSolv'
@@ -126,7 +126,7 @@ class MoleculeNet_FreeSolv_Physchem(GenericCSVDataset):
         self.data, self.properties = data, properties
 
 
-class ZINC15_TestSplit_20K_Samples(GenericCSVDataset):
+class ZINC15TestSplit(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
         self.name = 'ZINC15 Test Split 20K Samples'
@@ -142,7 +142,7 @@ class ZINC15_TestSplit_20K_Samples(GenericCSVDataset):
 
 
 ### DEPRECATED ###
-class ChEMBL_20K_Samples(GenericCSVDataset):
+class ChEMBL20KSamples(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
         self.name = 'ChEMBL 20K Samples'

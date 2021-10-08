@@ -25,7 +25,7 @@ class GenericFingerprintDataset():
         return
 
 
-class ChEMBL_Approved_Drugs_Fingerprints(GenericFingerprintDataset):
+class ChEMBLApprovedDrugsFingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='index'):
         self.name = 'ChEMBL Approved Drugs (Phase III/IV) Fingerprints'
 
@@ -37,7 +37,7 @@ class ChEMBL_Approved_Drugs_Fingerprints(GenericFingerprintDataset):
         assert os.path.exists(self.data_path)
 
 
-class MoleculeNet_Lipophilicity_Fingerprints(GenericFingerprintDataset):
+class MoleculeNetLipophilicityFingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='index'):
         self.name = 'MoleculeNet Lipophilicity Fingerprints'
         self.index_col = index_col
@@ -48,7 +48,7 @@ class MoleculeNet_Lipophilicity_Fingerprints(GenericFingerprintDataset):
         assert os.path.exists(self.data_path)
 
 
-class MoleculeNet_ESOL_Fingerprints(GenericFingerprintDataset):
+class MoleculeNetESOLFingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='index'):
         self.name = 'MoleculeNet ESOL Fingerprints'
         self.index_col = index_col
@@ -59,7 +59,7 @@ class MoleculeNet_ESOL_Fingerprints(GenericFingerprintDataset):
         assert os.path.exists(self.data_path)
 
 
-class MoleculeNet_FreeSolv_Fingerprints(GenericFingerprintDataset):
+class MoleculeNetFreeSolvFingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='index'):
         self.name = 'MoleculeNet FreeSolv Fingerprints'
         self.index_col = index_col
@@ -70,7 +70,7 @@ class MoleculeNet_FreeSolv_Fingerprints(GenericFingerprintDataset):
         assert os.path.exists(self.data_path)
 
 
-class ZINC15_TestSplit_20K_Fingerprints(GenericFingerprintDataset):
+class ZINC15TestSplitFingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='index'):
         self.name = 'ZINC15 Test Split 20K Fingerprints'
 
@@ -83,7 +83,7 @@ class ZINC15_TestSplit_20K_Fingerprints(GenericFingerprintDataset):
 
 
 ### DEPRECATED ###
-class ChEMBL_20K_Fingerprints(GenericFingerprintDataset):
+class ChEMBL20KFingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='molregno'):
         self.name = 'ChEMBL 20K Fingerprints'
         logger.warn(f'Class {self.name} is deprecated.')

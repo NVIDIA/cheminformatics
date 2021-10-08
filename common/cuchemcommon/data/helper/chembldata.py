@@ -154,8 +154,8 @@ class ChEmblData(object, metaclass=Singleton):
                 di.max_phase_for_ind >= 3
                 AND cs.canonical_smiles IS NOT NULL;"""
             cur.execute(select_stmt)
-            labels = [x[0] for x in cur.description]
             if with_labels:
+                labels = [x[0] for x in cur.description]
                 return cur.fetchall(), labels
             else:
                 return cur.fetchall()
@@ -190,8 +190,8 @@ class ChEmblData(object, metaclass=Singleton):
             HAVING di.max_phase_for_ind = max(di.max_phase_for_ind);
             '''
             cur.execute(select_stmt)
-            labels = [x[0] for x in cur.description]
             if with_labels:
+                labels = [x[0] for x in cur.description]
                 return cur.fetchall(), labels
             else:
                 return cur.fetchall()

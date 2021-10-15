@@ -233,7 +233,7 @@ def main(cfg):
 
             result = metric.calculate(smiles_dataset=smiles_dataset,
                                       fingerprint_dataset=fingerprint_dataset,
-                                      top_k=iter_val,
+                                      top_k=iter_val, # TODO IS THIS A BUG
                                       properties=smiles_dataset.properties,
                                       estimator=estimator,
                                       param_dict=param_dict,

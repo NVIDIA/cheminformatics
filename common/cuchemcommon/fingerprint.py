@@ -59,13 +59,19 @@ class MorganFingerprint(BaseTransformation):
         self.kwargs.update(kwargs)
         self.func = AllChem.GetMorganFingerprintAsBitVect
 
+    def transform_single(self, mol):
+        """Process single molecule"""
+        m = Chem.MolFromSmiles(mol)
+        fp = self.func(m, **self.kwargs)
+        return list(fp.ToBitString())
+
     def transform(self, data, col_name='transformed_smiles'):
+        """Single threaded processing of list"""
         data = data[col_name]
         fp_array = []
         for mol in data:
-            m = Chem.MolFromSmiles(mol)
-            fp = self.func(m, **self.kwargs)
-            fp_array.append(list(fp.ToBitString()))
+            fp = self.transform_single(mol)
+            fp_array.append(fp)
         fp_array = np.asarray(fp_array)
         return fp_array
 

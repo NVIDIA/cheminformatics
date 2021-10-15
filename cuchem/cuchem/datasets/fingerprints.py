@@ -2,28 +2,11 @@ import logging
 import os
 import pathlib
 import cudf
+from .base import GenericFingerprintDataset
 
 __all__ = ['ChEMBLApprovedDrugsFingerprints', 'MoleculeNetLipophilicityFingerprints', 'MoleculeNetESOLFingerprints', 'MoleculeNetFreeSolvFingerprints', 'ZINC15TestSplitFingerprints']
 
 logger = logging.getLogger(__name__)
-
-class GenericFingerprintDataset():
-    def __init__(self):
-        self.name = None
-        self.index_col = None
-        self.data = None
-        self.data_path = None
-
-    def load(self, index=None):
-        data = cudf.read_csv(self.data_path)
-        if self.index_col:
-            data = data.set_index(self.index_col).sort_index()
-
-        if index is not None:
-            data = data.loc[index]
-        self.data = data
-        return
-
 
 class ChEMBLApprovedDrugsFingerprints(GenericFingerprintDataset):
     def __init__(self, index_col='index'):

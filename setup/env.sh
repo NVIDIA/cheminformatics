@@ -132,7 +132,7 @@ dbSetup() {
         if [[ ! -e "${DATA_DIR}/chembl_27_sqlite.tar.gz" ]]; then
             wget -q --show-progress \
                 -O ${DATA_DIR}/chembl_27_sqlite.tar.gz \
-                ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
+                https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
             return_code=$?
             if [[ $return_code -ne 0 ]]; then
                 echo -e "${RED}${BOLD}ChEMBL database download failed. Please check network settings and disk space(25GB).${RESET}"
@@ -143,7 +143,7 @@ dbSetup() {
 
         wget -q --show-progress \
             -O ${DATA_DIR}/checksums.txt \
-            ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/checksums.txt
+            https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/checksums.txt
         echo "Unzipping chembl db to ${DATA_DIR}..."
 
         CURR_DIR=$PWD;
@@ -169,12 +169,36 @@ dbSetup() {
 
 download_model() {
     set -e
-    if [[ ! -e "${MODEL_PATH}" ]]; then
-        mkdir -p ${MODEL_PATH}
-        echo -e "${YELLOW}Downloading model ${MEGAMOLBART_MODEL} to ${MODEL_PATH}...${RESET}"
-        ngc registry model download-version \
-            --dest ${MODEL_PATH} \
-            "${MEGAMOLBART_MODEL}"
+    local MEGAMOLBART_MODEL_PATH=${MODEL_PATH}
+    local MEGAMOLBART_MODEL_VERSION=$(echo ${MEGAMOLBART_MODEL} | cut -d ":" -f2)
+
+    if [ -n "${ALT_MEGAMOLBART_MODEL}" ]; then
+        # This is an alternate path for developers to download from an
+        # alternate/pre-release location. Please add 'ALT_MEGAMOLBART_MODEL'
+        # to .env with the alternate path. ALT_MEGAMOLBART_MODEL can only be
+        # an NGC model and will require NGC installed and configured.
+        local MEGAMOLBART_MODEL_VERSION=$(echo ${ALT_MEGAMOLBART_MODEL} | cut -d ":" -f2)
+
+        if [[ ! -e "${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}" ]]; then
+            local DOWNLOAD_URL=${MEGAMOLBART_MODEL_URL}
+            mkdir -p ${MEGAMOLBART_MODEL_PATH}
+            ngc registry model download-version \
+                --dest ${MEGAMOLBART_MODEL_PATH} \
+                "${ALT_MEGAMOLBART_MODEL}"
+        fi
+    elif [[ ! -e "${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}" ]]; then
+        local DOWNLOAD_URL="https://api.ngc.nvidia.com/v2/models/nvidia/clara/megamolbart/versions/${MEGAMOLBART_MODEL_VERSION}/zip"
+        echo -e "${YELLOW}Downloading model ${MEGAMOLBART_MODEL} to ${MEGAMOLBART_MODEL_PATH}...${RESET}"
+
+        mkdir -p ${MEGAMOLBART_MODEL_PATH}
+
+        wget -q --show-progress \
+            --content-disposition ${DOWNLOAD_URL} \
+            -O ${MEGAMOLBART_MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip
+        mkdir ${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
+        unzip -q ${MEGAMOLBART_MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip \
+            -d ${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
     fi
+
     set +e
 }

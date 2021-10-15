@@ -10,6 +10,8 @@ from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['ExCAPEBioactivity', 'ExCAPEFingerprints', 'BIOACTIVITY_TABLE_LIST']
+BIOACTIVITY_TABLE_LIST = ['excape_activity', 'excape_fp']
 
 GENE_SYMBOLS = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1A", "ADRA1D", 
              "ADRB1", "ADRB2", "ADRB3", "AKT1", "AKT2", "ALK", "ALOX5", "AR", "AURKA", 
@@ -43,7 +45,6 @@ class ExCAPEDataset():
                             usecols=['SMILES', filter_col] + self.properties_cols)
 
         filtered_df = data[data[filter_col].isin(filter_list)]
-        self.max_len = filtered_df['SMILES'].map(len).max()
 
         filtered_df = filtered_df.compute()
         filtered_df.index.name = 'index'        
@@ -75,8 +76,11 @@ class ExCAPEBioactivity(ExCAPEDataset):
         if filter_len:
             data = data[data['canonical_smiles'].map(len) <= filter_len]
             self.max_len = filter_len
+        else:
+            self.max_len = data['canonical_smiles'].map(len).max()
 
-        self.data = cudf.DataFrame(data)
+        self.data = cudf.DataFrame(data[['canonical_smiles', 'gene']]).reset_index().set_index(['gene', 'index'])
+        self.properties = cudf.DataFrame(data[['pXC50', 'gene']]).reset_index().set_index(['gene', 'index'])
 
 
 class ExCAPEFingerprints(ExCAPEDataset):
@@ -101,4 +105,4 @@ class ExCAPEFingerprints(ExCAPEDataset):
         # very few repeated SMILES, so probably not worth making unique and then merging
         fp = calc_morgan_fingerprints(data)
         fp['gene'] = data['gene'] # TODO may remove this if grouping will be by index from other dataframe
-        self.data = cudf.DataFrame(fp)
+        self.data = cudf.DataFrame(fp).reset_index().set_index(['gene', 'index'])

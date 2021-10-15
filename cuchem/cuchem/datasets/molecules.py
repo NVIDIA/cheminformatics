@@ -6,8 +6,8 @@ from .base import GenericCSVDataset
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['ChEMBLApprovedDrugsPhyschem', 'MoleculeNetLipophilicityPhyschem', 'MoleculeNetESOLPhyschem', 'MoleculeNetFreeSolvPhyschem', 'ZINC15TestSplit', 'TABLE_LIST']
-TABLE_LIST = ['chembl', 'lipophilicity', 'esol', 'freesolv', 'zinc15_test'] # must match datasets table_names
+__all__ = ['ChEMBLApprovedDrugsPhyschem', 'MoleculeNetLipophilicityPhyschem', 'MoleculeNetESOLPhyschem', 'MoleculeNetFreeSolvPhyschem', 'ZINC15TestSplit', 'PHYSCHEM_TABLE_LIST']
+PHYSCHEM_TABLE_LIST = ['chembl', 'lipophilicity', 'esol', 'freesolv', 'zinc15_test'] # must match datasets table_names, could cycle through classes to get them
 
 class ChEMBLApprovedDrugsPhyschem(GenericCSVDataset):
     def __init__(self, **kwargs):

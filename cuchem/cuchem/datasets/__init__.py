@@ -1,2 +1,2 @@
 from .fingerprints import *
-from .molecules_properties import *
+from .molecules import *

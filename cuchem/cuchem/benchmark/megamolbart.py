@@ -178,10 +178,10 @@ def main(cfg):
     fingerprint_dataset = ZINC15_TestSplit_20K_Fingerprints()
     smiles_dataset.load()
 
-    excape_df, excape_emb_df = fetch_filtered_excape_data(inferrer, seq_len)
-    print(excape_df.head())
-    print(excape_emb_df.head())
-    exit(1)
+    # excape_df, excape_emb_df = fetch_filtered_excape_data(inferrer, seq_len)
+    # print(excape_df.head())
+    # print(excape_emb_df.head())
+    # exit(1)
 
     fingerprint_dataset.load(smiles_dataset.data.index)
     n_data = cfg.samplingSpec.input_size

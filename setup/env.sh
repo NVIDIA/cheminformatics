@@ -131,7 +131,7 @@ dbSetup() {
         if [[ ! -e "${DATA_DIR}/chembl_27_sqlite.tar.gz" ]]; then
             wget -q --show-progress \
                 -O ${DATA_DIR}/chembl_27_sqlite.tar.gz \
-                ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
+                https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/chembl_27_sqlite.tar.gz
             return_code=$?
             if [[ $return_code -ne 0 ]]; then
                 echo -e "${RED}${BOLD}ChEMBL DB download failed. Please check network settings, disk space(25GB) and wget version>=(1.20.3).${RESET}"
@@ -142,7 +142,7 @@ dbSetup() {
 
         wget -q --show-progress \
             -O ${DATA_DIR}/checksums.txt \
-            ftp://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/checksums.txt
+            https://ftp.ebi.ac.uk/pub/databases/chembl/ChEMBLdb/releases/chembl_27/checksums.txt
         echo "Unzipping chembl db to ${DATA_DIR}..."
 
         CURR_DIR=$PWD;

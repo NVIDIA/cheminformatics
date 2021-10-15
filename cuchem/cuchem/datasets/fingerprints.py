@@ -1,11 +1,11 @@
 import logging
 import os
 import pathlib
-
 import cudf
 
-logger = logging.getLogger(__name__)
+__all__ = ['ChEMBLApprovedDrugsFingerprints', 'MoleculeNetLipophilicityFingerprints', 'MoleculeNetESOLFingerprints', 'MoleculeNetFreeSolvFingerprints', 'ZINC15TestSplitFingerprints']
 
+logger = logging.getLogger(__name__)
 
 class GenericFingerprintDataset():
     def __init__(self):

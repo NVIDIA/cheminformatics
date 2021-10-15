@@ -7,13 +7,14 @@ from typing import List
 
 from cuchemcommon.utils.singleton import Singleton
 from cuchemcommon.context import Context
+from cuchem.datasets.molecules_properties import TABLE_LIST
 
 logger = logging.getLogger(__name__)
 
-
-class TrainingData(object, metaclass=Singleton):
+class ZINC15TrainData(object, metaclass=Singleton):
 
     def __init__(self):
+        """Store training split from ZINC15 for calculation of novelty"""
 
         context = Context()
         db_file = context.get_config('data_mount_path', default='/data')
@@ -41,7 +42,7 @@ class TrainingData(object, metaclass=Singleton):
         return True if id else False
 
 
-class BenchmarkData(object, metaclass=Singleton):
+class ZINC15TestSamplingData(object, metaclass=Singleton):
 
     def __init__(self):
 
@@ -57,7 +58,6 @@ class BenchmarkData(object, metaclass=Singleton):
         sql_file = open("/workspace/cuchem/benchmark/scripts/benchmark.sql")
         sql_as_string = sql_file.read()
         cursor.executescript(sql_as_string)
-
 
     def insert_sampling_data(self,
                              model_name,
@@ -97,7 +97,6 @@ class BenchmarkData(object, metaclass=Singleton):
                 VALUES(?, ?, ?, ?)
                 ''', [id, gsmiles, sqlite3.Binary(embedding), sqlite3.Binary(embedding_dim)])
         self.conn.commit()
-
 
     def fetch_sampling_data(self,
                             model_name,
@@ -175,3 +174,88 @@ class BenchmarkData(object, metaclass=Singleton):
         # generated_smiles = [x for x in generated_smiles]
 
         return generated_smiles
+
+
+class PhysChemEmbeddingData(object, metaclass=Singleton):
+
+    def __init__(self):
+
+        context = Context()
+        db_file = context.get_config('data_mount_path', default='/data')
+        db_file = os.path.join(db_file, 'db/physchem.sqlite3')
+
+        logger.info(f'Physchem properties database {db_file}...')
+        self.conn = sqlite3.connect(db_file)
+        self._create_tables()
+
+    def _create_tables(self):
+        cursor = self.conn.cursor()
+
+        for table_name in TABLE_LIST:
+            table_creation = '''
+                            CREATE TABLE IF NOT EXISTS ''' + table_name + ''' (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            input_id INTEGER NOT NULL,
+                            smiles TEXT NOT NULL,
+                            model_name TEXT NOT NULL,
+                            embedding TEXT NOT NULL,
+                            embedding_dim TEXT NOT NULL);
+                            '''
+            cursor.execute(table_creation)
+
+    def insert_embedding_data(self,
+                             table_name,
+                             model_name,
+                             smiles,
+                             smiles_index,
+                             embeddings: List,
+                             embeddings_dim: List):
+        """
+        Inserts a list of dicts into the benchmark data table.
+        :param data:
+        :return:
+        """
+        cursor = self.conn.cursor()
+        
+        # Add embedding
+        logger.debug('Inserting benchmark data...')
+        embedding = list(embeddings)
+        embedding = pickle.dumps(embedding)
+
+        embedding_dim = list(embeddings_dim)
+        embedding_dim = pickle.dumps(embedding_dim)
+        
+        id = cursor.execute(
+            '''
+            INSERT INTO ''' + table_name + '''(input_id, smiles, model_name, embedding, embedding_dim)
+            VALUES(?,?,?,?,?)
+            ''',
+            [smiles_index, smiles, model_name, sqlite3.Binary(embedding), sqlite3.Binary(embedding_dim)])
+        self.conn.commit()
+
+    def fetch_embedding_data(self,
+                            table_name,
+                            model_name,
+                            smiles):
+        """
+        Fetch the embedding data for a given dataset and smiles
+        :param data:
+        :return:
+        """
+
+        logger.debug('Fetching embedding data...')
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            '''
+            SELECT embedding, embedding_dim FROM ''' + table_name + '''
+            WHERE model_name=?
+                  AND smiles=?
+            ''',
+            [model_name, smiles])
+        embedding_results = cursor.fetchone()
+
+        if not embedding_results:
+            return None
+
+        return embedding_results

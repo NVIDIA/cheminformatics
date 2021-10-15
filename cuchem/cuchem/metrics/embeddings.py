@@ -63,7 +63,6 @@ class BaseEmbeddingMetric():
     def encode(self, table_name, smiles, smiles_index, max_len, zero_padded_vals, average_tokens):
         """Encode a single SMILES to embedding from model"""
         embedding, dim = self._find_embedding(table_name, smiles, smiles_index, max_len)
-        print('DEBUG', smiles, dim)
 
         embedding = cupy.array(embedding).reshape(dim).squeeze()
         assert embedding.ndim == 2, "Metric calculation code currently only works with 2D data (embeddings, not batched)"
@@ -199,8 +198,8 @@ class Modelability(BaseEmbeddingMetric):
 
         return cupy.array(metric_array), cupy.array(fingerprint_errors), cupy.array(embedding_errors)
 
-    def calculate(self, smiles_dataset, fingerprint_dataset, properties_dataset, estimator, param_dict, **kwargs):
-        # smiles_dataset = kwargs['smiles_dataset']
+    def calculate(self, smiles_dataset, fingerprint_dataset, properties_dataset, estimator, param_dict, **kwargs): # TODO FIX PROPERTIES CALL
+        # smiles_dataset = kwargs['smiles_dataset'] # TODO remove if not needed
         # fingerprint_dataset = kwargs['fingerprint_dataset']
         # properties = kwargs['properties']
         # estimator = kwargs['estimator']

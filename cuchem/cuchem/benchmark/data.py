@@ -244,7 +244,6 @@ class PhysChemEmbeddingData(object, metaclass=Singleton):
         :param data:
         :return:
         """
-        print('A')
 
         logger.debug('Fetching embedding data...')
 

@@ -133,49 +133,18 @@
   - name: Rebooting machine
     reboot:
 
-- name: NGC Megamolbart Resources
+- name: Cheminfo Setup
   hosts: all
   become: yes
+
   tasks:
-  - name: Create directory
-    ansible.builtin.file:
-      path: /opt/megamolbart
-      state: directory
-      owner: "{{ ansible_user }}"
-      mode: '0755'
+  - name: Checkout cheminformatics github repo
+    ansible.builtin.git:
+      repo: https://github.com/NVIDIA/cheminformatics
+      dest: /opt/cheminfomatics
+      version: dev
 
-  - name: Download NGC resource
-    unarchive:
-      src: https://api.ngc.nvidia.com/v2/resources/nvidia/clara/cheminformatics/versions/0.1.3/zip
-      dest: /opt/megamolbart
-      remote_src: yes
-
-  - name: Fix permissions
-    ansible.builtin.file:
-      path: /opt/megamolbart/launch
-      mode: '1777'
-
-- name: Start App
-  hosts: all
-  become: yes
-  tasks:
-  - name: Create .env file
-    command: ./launch stop
+  - name: Execute Setup
+    command: /opt/cheminfomatics/launch.sh setup
     args:
-      chdir: /opt/megamolbart/
-    environment:
-      PATH: '/opt/ngc:{{ ansible_env.PATH }} '
-
-  - name: Set NGC API token
-    ansible.builtin.lineinfile:
-      path: /opt/megamolbart/.env
-      regexp: '^REGISTRY_ACCESS_TOKEN='
-      line: REGISTRY_ACCESS_TOKEN={{ NGC_KEY }}
-
-  - name: Start application
-    command: ./launch
-    args:
-      chdir: /opt/megamolbart/
-    environment:
-      PATH: '/opt/ngc:{{ ansible_env.PATH }}'
-    register: command_output_full
+      chdir: /opt/cheminfomatics/

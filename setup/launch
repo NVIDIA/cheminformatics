@@ -74,6 +74,10 @@ source env.sh
 start() {
     # run a container and start dash inside container.
     echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
+<<<<<<< HEAD
+=======
+    export ADDITIONAL_PARAM="$@"
+>>>>>>> 67db0ad... Remove the need to login to ngc to download containers.
 
     download_model
     dbSetup ${DATA_PATH}

@@ -150,7 +150,6 @@ push() {
 
 
 pull() {
-    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
     docker pull ${CUCHEM_CONT}
     docker pull ${MEGAMOLBART_CONT}
     exit
@@ -160,6 +159,7 @@ pull() {
 setup() {
     download_model
     dbSetup "${DATA_PATH}"
+    pull
 }
 
 dev() {

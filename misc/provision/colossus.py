@@ -170,7 +170,7 @@ class Colossus():
                       "provisionMode": "CLEAN",
                       "ansibleGitScmUrl": "https://gitlab-master.nvidia.com/genomics/playbooks.git",
                       "ansibleGitBranch": "main",
-                      "ansiblePlaybook": "drugdiscovery/ansible-nvidia-driver.yml"}
+                      "ansiblePlaybook": "nvidia-driver-ubuntu-1804.yml"}
 
         headers = {'authorization':
                    'Bearer ' + Colossus.authentication_token['authToken']}

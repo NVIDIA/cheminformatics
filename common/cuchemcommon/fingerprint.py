@@ -62,8 +62,11 @@ class MorganFingerprint(BaseTransformation):
     def transform_single(self, mol):
         """Process single molecule"""
         m = Chem.MolFromSmiles(mol)
-        fp = self.func(m, **self.kwargs)
-        return list(fp.ToBitString())
+        if m:
+            fp = self.func(m, **self.kwargs)
+            return list(fp.ToBitString())
+        else:
+            return None
 
     def transform(self, data, col_name='transformed_smiles'):
         """Single threaded processing of list"""

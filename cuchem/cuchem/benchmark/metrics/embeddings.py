@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
 import logging
-import pickle
 
 import cupy
 import numpy as np
 import pandas as pd
-from rdkit import Chem
 
 from cuml.metrics import pairwise_distances
 from sklearn.model_selection import ParameterGrid, KFold
@@ -24,45 +22,39 @@ class BaseEmbeddingMetric():
     name = None
 
     """Base class for metrics based on embedding datasets"""
-    def __init__(self, inferrer, benchmark_data):
+    def __init__(self, inferrer, sample_cache, smiles_dataset):
         self.inferrer = inferrer
-        self.benchmark_data = benchmark_data
+        self.sample_cache = sample_cache
+        self.smiles_dataset = smiles_dataset
 
     def variations(self):
         return NotImplemented
 
     def _find_embedding(self,
-                        table_name,
                         smiles,
-                        smiles_index,
                         max_len):
 
         # Check db for results from a previous run
-        model_name = self.inferrer.__class__.__name__
-        embedding_results = self.benchmark_data.fetch_embedding_data(table_name,
-                                                                     model_name,
-                                                                     smiles)
+        embedding_results = self.sample_cache.fetch_embedding_data(smiles)
         if not embedding_results:
             # Generate new samples and update the database
             embedding_results = self.inferrer.smiles_to_embedding(smiles,
-                                                                 max_len)
-            embedding = list(embedding_results.embedding)
-            embedding_dim = list(embedding_results.dim)  # dims: [max_len, batch_size, embedding]
+                                                                  max_len + 2)
+            embedding = embedding_results.embedding
+            embedding_dim = embedding_results.dim
 
-            self.benchmark_data.insert_embedding_data(table_name, model_name, smiles, 
-                                                      smiles_index, pickle.dumps(embedding), pickle.dumps(embedding_dim))
-
+            self.sample_cache.insert_embedding_data(smiles,
+                                                    embedding_results.embedding,
+                                                    embedding_results.dim)
         else:
             # Convert result to correct format
-            embedding, embedding_dim = embedding_results        
-            embedding = pickle.loads(embedding)
-            embedding_dim = pickle.loads(embedding_dim)
+            embedding, embedding_dim = embedding_results
 
         return embedding, embedding_dim
 
-    def encode(self, table_name, smiles, smiles_index, max_len, zero_padded_vals, average_tokens):
+    def encode(self, smiles, max_len, zero_padded_vals, average_tokens):
         """Encode a single SMILES to embedding from model"""
-        embedding, dim = self._find_embedding(table_name, smiles, smiles_index, max_len)
+        embedding, dim = self._find_embedding(smiles, max_len)
 
         embedding = cupy.array(embedding).reshape(dim).squeeze()
         assert embedding.ndim == 2, "Metric calculation code currently only works with 2D data (embeddings, not batched)"
@@ -81,28 +73,17 @@ class BaseEmbeddingMetric():
     def _calculate_metric(self):
         raise NotImplementedError
 
-    def encode_many(self, smiles_dataset, max_len=None, zero_padded_vals=True, average_tokens=False):
+    def encode_many(self, max_len=None, zero_padded_vals=True, average_tokens=False):
         # Calculate pairwise distances for embeddings
-        table_name = smiles_dataset.table_name
 
         if not max_len:
-            max_len = smiles_dataset.max_len
-        embeddings = []
-        for smiles_index in smiles_dataset.data.index.to_pandas():
-            smiles = smiles_dataset.data['canonical_smiles'].loc[smiles_index]
-            embedding = self.encode(table_name, smiles, smiles_index, max_len, zero_padded_vals, average_tokens)
-            embeddings.append(cupy.array(embedding))
+            max_len = self.smiles_dataset.max_len
 
-        # if max_len > 0: # TODO remove
-        #     embeddings_resized = []
-        #     for embedding in embeddings:
-        #         n_pad = max_len - embedding.shape[0]
-        #         if n_pad <= 0:
-        #             embeddings_resized.append(embedding)
-        #             continue
-        #         embedding = cupy.resize(embedding, max_len)
-        #         embeddings_resized.append(embedding)
-        #     embeddings = embeddings_resized
+        embeddings = []
+        for smiles in self.smiles_dataset.data['canonical_smiles'].to_arrow().to_pylist():
+            # smiles = self.smiles_dataset.data.loc[smiles_index]
+            embedding = self.encode(smiles, max_len, zero_padded_vals, average_tokens)
+            embeddings.append(cupy.array(embedding))
 
         return cupy.asarray(embeddings)
 
@@ -115,8 +96,8 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
     name = 'nearest neighbor correlation'
 
-    def __init__(self, inferrer, benchmark_data):
-        super().__init__(inferrer, benchmark_data)
+    def __init__(self, inferrer, sample_cache, smiles_dataset):
+        super().__init__(inferrer, sample_cache, smiles_dataset)
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.nearestNeighborCorrelation.top_k
@@ -131,13 +112,12 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         corr = spearmanr(fingerprints_dist, embeddings_dist, top_k=top_k)
         return corr
 
-    def calculate(self, smiles_dataset, fingerprint_dataset, top_k=None, **kwargs):
+    def calculate(self, fingerprint_dataset, top_k=None, **kwargs):
         # smiles_dataset = kwargs['smiles_dataset'] # TODO remove
         # fingerprint_dataset = kwargs['fingerprint_dataset']
         # top_k = kwargs['top_k']
 
-        embeddings = self.encode_many(smiles_dataset,
-                                      zero_padded_vals=True,
+        embeddings = self.encode_many(zero_padded_vals=True,
                                       average_tokens=False)
 
         # Calculate pairwise distances for fingerprints
@@ -154,8 +134,8 @@ class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, inferrer, benchmark_data):
-        super().__init__(inferrer, benchmark_data)
+    def __init__(self, inferrer, sample_cache, smiles_dataset):
+        super().__init__(inferrer, sample_cache, smiles_dataset)
 
     def variations(self, cfg, model_dict=None):
         return model_dict.keys()
@@ -181,12 +161,14 @@ class Modelability(BaseEmbeddingMetric):
             best_score = min(metric, best_score)
         return best_score
 
-    def _calculate_metric(self, embeddings, fingerprints, properties, estimator, param_dict):
+    def _calculate_metric(self, embeddings, fingerprints, estimator, param_dict):
         """Perform grid search for each metric and calculate ratio"""
 
         metric_array = []
         embedding_errors = []
         fingerprint_errors = []
+        properties = self.smiles_dataset.properties
+
         for col in properties.columns:
             props = properties[col].astype(cupy.float32).to_array()
             embedding_error = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, props)
@@ -198,24 +180,23 @@ class Modelability(BaseEmbeddingMetric):
 
         return cupy.array(metric_array), cupy.array(fingerprint_errors), cupy.array(embedding_errors)
 
-    def calculate(self, smiles_dataset, fingerprint_dataset, properties_dataset, estimator, param_dict, **kwargs): # TODO FIX PROPERTIES CALL
+    def calculate(self, fingerprint_dataset, estimator, param_dict, **kwargs): # TODO FIX PROPERTIES CALL
         # smiles_dataset = kwargs['smiles_dataset'] # TODO remove if not needed
         # fingerprint_dataset = kwargs['fingerprint_dataset']
         # properties = kwargs['properties']
         # estimator = kwargs['estimator']
         # param_dict = kwargs['param_dict']
 
-        embeddings = self.encode_many(smiles_dataset, zero_padded_vals=False, average_tokens=True)
+        embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
         embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
 
         fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
         fingerprints = cupy.asarray(fingerprints, order='C', dtype=cupy.float32)
 
-        metric, fingerprint_errors, embedding_errors  = self._calculate_metric(embeddings,
-                                                                               fingerprints,
-                                                                               properties_dataset,
-                                                                               estimator,
-                                                                               param_dict)
+        metric, fingerprint_errors, embedding_errors = self._calculate_metric(embeddings,
+                                                                              fingerprints,
+                                                                              estimator,
+                                                                              param_dict)
         logger.info(f'{type(metric)}  {type(fingerprint_errors)} {type(embedding_errors)}')
         metric = cupy.nanmean(metric)
         fingerprint_errors = cupy.nanmean(fingerprint_errors)

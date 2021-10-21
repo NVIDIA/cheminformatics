@@ -1,24 +1,36 @@
 import logging
 import os
 import pathlib
-import cudf
+
 from .base import GenericCSVDataset
+
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['ChEMBLApprovedDrugsPhyschem', 'MoleculeNetLipophilicityPhyschem', 'MoleculeNetESOLPhyschem', 'MoleculeNetFreeSolvPhyschem', 'ZINC15TestSplit', 'PHYSCHEM_TABLE_LIST']
-PHYSCHEM_TABLE_LIST = ['chembl', 'lipophilicity', 'esol', 'freesolv', 'zinc15_test'] # must match datasets table_names, could cycle through classes to get them
+
+__all__ = ['ChEMBLApprovedDrugsPhyschem',
+           'MoleculeNetLipophilicityPhyschem',
+           'MoleculeNetESOLPhyschem',
+           'MoleculeNetFreeSolvPhyschem',
+           'ZINC15TestSplit',
+           'PHYSCHEM_TABLE_LIST']
+
+# must match datasets table_names, could cycle through classes to get them
+PHYSCHEM_TABLE_LIST = ['chembl', 'lipophilicity',
+                       'esol', 'freesolv',
+                       'zinc15_test']
+
 
 class ChEMBLApprovedDrugsPhyschem(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(kwargs)
         self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
         self.table_name = 'chembl'
-        self.properties_cols = ['max_phase_for_ind', 'mw_freebase', \
-                           'alogp', 'hba', 'hbd', 'psa', 'rtb', 'ro3_pass', 'num_ro5_violations', \
-                           'cx_logp', 'cx_logd', 'full_mwt', 'aromatic_rings', 'heavy_atoms', \
-                           'qed_weighted', 'mw_monoisotopic', 'hba_lipinski', 'hbd_lipinski', \
-                           'num_lipinski_ro5_violations']
+        self.properties_cols = ['max_phase_for_ind', 'mw_freebase',
+                                'alogp', 'hba', 'hbd', 'psa', 'rtb', 'ro3_pass', 'num_ro5_violations',
+                                'cx_logp', 'cx_logd', 'full_mwt', 'aromatic_rings', 'heavy_atoms',
+                                'qed_weighted', 'mw_monoisotopic', 'hba_lipinski', 'hbd_lipinski',
+                                'num_lipinski_ro5_violations']
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
                                       'data',
                                       'benchmark_ChEMBL_approved_drugs_physchem.csv')

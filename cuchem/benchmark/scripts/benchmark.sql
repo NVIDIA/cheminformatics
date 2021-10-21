@@ -18,3 +18,11 @@ CREATE TABLE IF NOT EXISTS smiles_samples (
 	embedding TEXT NOT NULL,
 	embedding_dim TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS meta_data (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+   	name TEXT NOT NULL,
+   	value TEXT NOT NULL,
+	date DATETIME NOT NULL,
+	version TEXT NOT NULL
+);

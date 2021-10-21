@@ -16,23 +16,35 @@ from cuml.svm import SVR
 
 from cuchem.wf.generative import MegatronMolBART
 from cuchem.wf.generative import Cddd
-from cuchem.datasets.loaders import ZINC15_TestSplit_20K_Samples, ZINC15_TestSplit_20K_Fingerprints
-from cuchem.metrics.model import Validity, Unique, Novelty, NearestNeighborCorrelation, Modelability
+from cuchem.benchmark.data import PhysChemEmbeddingData, SampleCacheData, ZINC15TrainDataset
+from cuchem.benchmark.datasets.fingerprints import ZINC15TestSplitFingerprints
+from cuchem.benchmark.datasets.molecules import ZINC15TestSplit
+from cuchem.benchmark.metrics.sampling import Validity, Unique, Novelty
+from cuchem.benchmark.metrics.embeddings import NearestNeighborCorrelation, Modelability
+from cuchem.benchmark.datasets.molecules import (ChEMBLApprovedDrugsPhyschem,
+                                                 MoleculeNetESOLPhyschem,
+                                                 MoleculeNetFreeSolvPhyschem,
+                                                 MoleculeNetLipophilicityPhyschem )
+from cuchem.benchmark.datasets.fingerprints import (ChEMBLApprovedDrugsFingerprints,
+                                                    MoleculeNetESOLFingerprints,
+                                                    MoleculeNetFreeSolvFingerprints,
+                                                    MoleculeNetLipophilicityFingerprints )
+from cuchem.benchmark.datasets.bioactivity import (ExCAPEBioactivity, ExCAPEFingerprints)
 
-gene_list = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1A", "ADRA1D", 
-             "ADRB1", "ADRB2", "ADRB3", "AKT1", "AKT2", "ALK", "ALOX5", "AR", "AURKA", 
-             "AURKB", "BACE1", "CA1", "CA12", "CA2", "CA9", "CASP1", "CCKBR", "CCR2", 
-             "CCR5", "CDK1", "CDK2", "CHEK1", "CHRM1", "CHRM2", "CHRM3", "CHRNA7", "CLK4", 
-             "CNR1", "CNR2", "CRHR1", "CSF1R", "CTSK", "CTSS", "CYP19A1", "DHFR", "DPP4", 
-             "DRD1", "DRD3", "DRD4", "DYRK1A", "EDNRA", "EGFR", "EPHX2", "ERBB2", "ESR1", 
-             "ESR2", "F10", "F2", "FAAH", "FGFR1", "FLT1", "FLT3", "GHSR", "GNRHR", "GRM5", 
-             "GSK3A", "GSK3B", "HDAC1", "HPGD", "HRH3", "HSD11B1", "HSP90AA1", "HTR2A", 
-             "HTR2C", "HTR6", "HTR7", "IGF1R", "INSR", "ITK", "JAK2", "JAK3", "KCNH2", 
-             "KDR", "KIT", "LCK", "MAOB", "MAPK14", "MAPK8", "MAPK9", "MAPKAPK2", "MC4R", 
-             "MCHR1", "MET", "MMP1", "MMP13", "MMP2", "MMP3", "MMP9", "MTOR", "NPY5R", 
-             "NR3C1", "NTRK1", "OPRD1", "OPRK1", "OPRL1", "OPRM1", "P2RX7", "PARP1", "PDE5A", 
-             "PDGFRB", "PGR", "PIK3CA", "PIM1", "PIM2", "PLK1", "PPARA", "PPARD", "PPARG", 
-             "PRKACA", "PRKCD", "PTGDR2", "PTGS2", "PTPN1", "REN", "ROCK1", "ROCK2", "S1PR1", 
+gene_list = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1A", "ADRA1D",
+             "ADRB1", "ADRB2", "ADRB3", "AKT1", "AKT2", "ALK", "ALOX5", "AR", "AURKA",
+             "AURKB", "BACE1", "CA1", "CA12", "CA2", "CA9", "CASP1", "CCKBR", "CCR2",
+             "CCR5", "CDK1", "CDK2", "CHEK1", "CHRM1", "CHRM2", "CHRM3", "CHRNA7", "CLK4",
+             "CNR1", "CNR2", "CRHR1", "CSF1R", "CTSK", "CTSS", "CYP19A1", "DHFR", "DPP4",
+             "DRD1", "DRD3", "DRD4", "DYRK1A", "EDNRA", "EGFR", "EPHX2", "ERBB2", "ESR1",
+             "ESR2", "F10", "F2", "FAAH", "FGFR1", "FLT1", "FLT3", "GHSR", "GNRHR", "GRM5",
+             "GSK3A", "GSK3B", "HDAC1", "HPGD", "HRH3", "HSD11B1", "HSP90AA1", "HTR2A",
+             "HTR2C", "HTR6", "HTR7", "IGF1R", "INSR", "ITK", "JAK2", "JAK3", "KCNH2",
+             "KDR", "KIT", "LCK", "MAOB", "MAPK14", "MAPK8", "MAPK9", "MAPKAPK2", "MC4R",
+             "MCHR1", "MET", "MMP1", "MMP13", "MMP2", "MMP3", "MMP9", "MTOR", "NPY5R",
+             "NR3C1", "NTRK1", "OPRD1", "OPRK1", "OPRL1", "OPRM1", "P2RX7", "PARP1", "PDE5A",
+             "PDGFRB", "PGR", "PIK3CA", "PIM1", "PIM2", "PLK1", "PPARA", "PPARD", "PPARG",
+             "PRKACA", "PRKCD", "PTGDR2", "PTGS2", "PTPN1", "REN", "ROCK1", "ROCK2", "S1PR1",
              "SCN9A", "SIGMAR1", "SLC6A2", "SLC6A3", "SRC", "TACR1", "TRPV1", "VDR"]
 
 
@@ -45,65 +57,6 @@ def compute_fp(smiles, inferrer, max_len):
     emb = np.array(emb_result.embedding)
     emb = np.reshape(emb, emb_result.dim)
     return emb
-
-
-def fetch_filtered_excape_data(inferrer, 
-                               max_len,
-                               data_dir='/data/ExCAPE'):
-    """
-    Loads the data and filter records with reference to genes in interest
-    """
-    filter_data_file = os.path.join(data_dir, 'filter_data.csv')
-    embedding_file = os.path.join(data_dir, 'embedding.csv')
-    if os.path.exists(filter_data_file):
-        filtered_df = pd.read_csv(filter_data_file)
-        smiles_df = pd.read_csv(embedding_file)
-    else:
-        data = dd.read_csv(os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv'),
-                          delimiter='\t',
-                          usecols=['SMILES', 'Gene_Symbol', 'pXC50'])
-
-        filtered_df = data[data.Gene_Symbol.isin(gene_list)]
-        filtered_df = filtered_df[filtered_df['SMILES'].map(len) <= max_len]
-
-        filtered_df = filtered_df.compute()
-        filtered_df = filtered_df.sort_values(['Gene_Symbol', 'pXC50']).reset_index(drop=True)
-        filtered_df.index.name = 'index'
-        
-        smiles = filtered_df['SMILES'].unique().to_pandas()
-        smiles = smiles[smiles.str.len() <= max_len]
-
-        emb_df = smiles.apply(compute_fp, args=(inferrer, max_len))
-        emb_df = pd.DataFrame(emb_df)
-
-        smiles_df = emb_df.merge(smiles, left_index=True, right_index=True)
-
-        # Save for later use.
-        logger.info('Saving filtered Excape DB records...')
-        logger.info('Saving embedding of SMILES filtered from Excape DB records')
-        filtered_df.to_csv(filter_data_file)
-        smiles_df.to_csv(embedding_file)
-
-    return filtered_df, smiles_df
-    
-    
-def summarize_excape_data(df_data):
-    """
-    Summarize the data to produce count of unique Gene_Symbol, Entrez_ID 
-    combinations with min and max pXC50 values
-    """
-    df_data['Cnt'] = cupy.zeros(df_data.shape[0])
-    
-    # Group by Entrez_ID and compute data for each Entrez_ID
-    df_data = df_data.set_index(['Gene_Symbol', 'Entrez_ID'])
-    grouped_df = df_data.groupby(level=['Entrez_ID', 'Gene_Symbol'])
-
-    count_df = grouped_df.count()
-    count_df.drop('pXC50', axis=1, inplace=True)
-    count_df = count_df.sort_values('Cnt', ascending=False)
-    count_df['pXC50_min'] = grouped_df.pXC50.min()
-    count_df['pXC50_max'] = grouped_df.pXC50.max()
-    return count_df()
 
 
 def get_model():
@@ -151,48 +104,92 @@ def main(cfg):
         logger.error(f'Model {cfg.model.name} not supported')
         sys.exit(1)
 
+    sample_cache = SampleCacheData()
+    embedding_cache = PhysChemEmbeddingData()
+
+    training_data = ZINC15TrainDataset()
+
+    # Create Datasets of size input_size. Initialy load 20% more then reduce to
+    # input_size after cleaning and preprocessing.
+    smiles_dataset = ZINC15TestSplit(max_len=seq_len)
+    smiles_dataset.load()
+
     # Metrics
     metric_list = []
     if cfg.metric.validity.enabled == True:
-        metric_list.append(Validity(inferrer))
+        metric_list.append(Validity(inferrer, sample_cache, smiles_dataset))
 
     if cfg.metric.unique.enabled == True:
-        metric_list.append(Unique(inferrer))
+        metric_list.append(Unique(inferrer, sample_cache, smiles_dataset))
 
     if cfg.metric.novelty.enabled == True:
-        metric_list.append(Novelty(inferrer))
+        metric_list.append(Novelty(inferrer, sample_cache, smiles_dataset, training_data))
 
     if cfg.metric.nearestNeighborCorrelation.enabled == True:
-        metric_list.append(NearestNeighborCorrelation(inferrer))
+        metric_list.append(NearestNeighborCorrelation(inferrer, embedding_cache, smiles_dataset))
 
-    if cfg.metric.modelability.enabled == True:
-        metric_list.append(Modelability(inferrer))
+    if cfg.metric.modelabilityBioActivity.enabled == True:
+
+        excape_bioactivity_dataset = ExCAPEBioactivity()
+        excape_fingerprint_dataset = ExCAPEFingerprints()
+
+        excape_bioactivity_dataset.load()
+        excape_fingerprint_dataset.load()
+
+        groups = zip(excape_bioactivity_dataset.data.groupby(level=0),
+                     excape_bioactivity_dataset.properties.groupby(level=0),
+                     excape_fingerprint_dataset.data.groupby(level=0))
+        for (label, sm_), (_, prop_), (_, fp_) in groups:
+            excape_bioactivity_dataset.data = sm_ # This is a hack to reduce dataset size for testing
+            excape_bioactivity_dataset.properties = prop_
+            excape_fingerprint_dataset.data = fp_
+
+            metric_list.append(Modelability(inferrer,
+                                            embedding_cache,
+                                            excape_bioactivity_dataset))
+
+    if cfg.metric.modelabilityPhysChem.enabled == True:
+        physchem_dataset_list = [MoleculeNetESOLPhyschem(),
+                                 MoleculeNetFreeSolvPhyschem(),
+                                 MoleculeNetLipophilicityPhyschem()]
+        physchem_fingerprint_list = [MoleculeNetESOLFingerprints(),
+                                     MoleculeNetFreeSolvFingerprints(),
+                                     MoleculeNetLipophilicityFingerprints()]
+        for x in physchem_dataset_list:
+            x.load()
+        for x in physchem_fingerprint_list:
+            x.load()
+
+        groups = zip([x.name for x in physchem_dataset_list],
+                    physchem_dataset_list,
+                    physchem_fingerprint_list)
+
+        n_data = 200
+        for (label, smiles_, fp_) in groups:
+            smiles_.data = smiles_.data.iloc[:n_data] # TODO for testing
+            smiles_.properties = smiles_.properties.iloc[:n_data]  # TODO for testing
+            fp_.data = fp_.data.iloc[:n_data]  # TODO for testing
+
+            print(label, smiles_.data.head(n=1), smiles_.properties.head(n=1), fp_.data.head(n=1))
+            metric_list.append(Modelability(inferrer,
+                                            embedding_cache,
+                                            smiles_))
+
 
     # ML models
     model_dict = get_model()
 
-    # Create Datasets of size input_size. Initialy load 20% more then reduce to
-    # input_size after cleaning and preprocessing.
-
-    smiles_dataset = ZINC15_TestSplit_20K_Samples(max_len=seq_len)
-    fingerprint_dataset = ZINC15_TestSplit_20K_Fingerprints()
-    smiles_dataset.load()
-
-    # excape_df, excape_emb_df = fetch_filtered_excape_data(inferrer, seq_len)
-    # print(excape_df.head())
-    # print(excape_emb_df.head())
-    # exit(1)
+    fingerprint_dataset = ZINC15TestSplitFingerprints()
 
     fingerprint_dataset.load(smiles_dataset.data.index)
     n_data = cfg.samplingSpec.input_size
     if n_data <= 0:
         n_data = len(smiles_dataset.data)
-    # assert fingerprint_dataset.data.index == smiles_dataset.data.index
 
-    # DEBUG
+    # Filter and rearrage data as expected by downstream components.
     smiles_dataset.data = smiles_dataset.data.iloc[:n_data]
-    smiles_dataset.properties = smiles_dataset.properties.iloc[:n_data]
     fingerprint_dataset.data = fingerprint_dataset.data.iloc[:n_data]
+    smiles_dataset.data = smiles_dataset.data['canonical_smiles']
 
     # DEBUG
     n_data = cfg.samplingSpec.input_size
@@ -231,10 +228,8 @@ def main(cfg):
             if iter_val in model_dict:
                 estimator, param_dict = model_dict[iter_val]
 
-            result = metric.calculate(smiles_dataset=smiles_dataset,
-                                      fingerprint_dataset=fingerprint_dataset,
+            result = metric.calculate(fingerprint_dataset=fingerprint_dataset,
                                       top_k=iter_val, # TODO IS THIS A BUG
-                                      properties=smiles_dataset.properties,
                                       estimator=estimator,
                                       param_dict=param_dict,
                                       num_samples=sample_size,

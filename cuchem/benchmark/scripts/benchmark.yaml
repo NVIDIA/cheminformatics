@@ -5,13 +5,13 @@ model:
 
 metric:
   validity:
-    enabled: True
+    enabled: False
     radius:
       - 1
       - 2
 
   unique:
-    enabled: false
+    enabled: False
     radius: ${metric.validity.radius}
 
   novelty:
@@ -19,17 +19,20 @@ metric:
     radius: ${metric.validity.radius}
 
   nearestNeighborCorrelation:
-    enabled: false
+    enabled: False
     top_k:
       - 50
       - 100
       - 500
 
-  modelability:
-    enabled: false
+  modelabilityBioActivity:
+    enabled: False
+
+  modelabilityPhysChem:
+    enabled: True
 
 samplingSpec:
-  input_size: 1000
+  input_size: 10
   seq_len: 512
   sample_size: 10
 

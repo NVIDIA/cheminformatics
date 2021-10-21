@@ -1,11 +1,18 @@
 import logging
 import cudf
 
+from cuchemcommon.utils.singleton import Singleton
+
 logger = logging.getLogger(__name__)
 
 
 class GenericCSVDataset():
-    def __init__(self, name=None, properties_cols=None, index_col=None, index_selection=None, data_path=None):
+    def __init__(self,
+                 name=None,
+                 properties_cols=None,
+                 index_col=None,
+                 index_selection=None,
+                 data_path=None):
         self.name = name
         self.data_path = data_path
         self.data = None
@@ -27,7 +34,7 @@ class GenericCSVDataset():
 
         if self.index_selection:
             data = data.loc[self.index_selection]
-            
+
         if length_column:
             self.max_len = data[length_column].max()
         elif len(columns) == 1:

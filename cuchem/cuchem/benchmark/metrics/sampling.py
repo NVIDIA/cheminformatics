@@ -1,19 +1,10 @@
 #!/usr/bin/env python3
 
 import logging
-import pickle
 
-import cupy
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-
-from cuml.metrics import pairwise_distances
-from sklearn.model_selection import ParameterGrid, KFold
-from cuml.metrics.regression import mean_squared_error
-from cuchem.utils.metrics import spearmanr
-from cuchem.utils.distance import tanimoto_calculate
-from cuchem.benchmark.data import ZINC15TestSamplingData, ZINC15TrainData
 
 
 logger = logging.getLogger(__name__)
@@ -25,9 +16,10 @@ class BaseSampleMetric():
     name = None
 
     """Base class for metrics based on sampling for a single SMILES string"""
-    def __init__(self, inferrer):
+    def __init__(self, inferrer, sample_cache, smiles_dataset):
         self.inferrer = inferrer
-        self.benchmark_data = ZINC15TestSamplingData()
+        self.sample_cache = sample_cache
+        self.smiles_dataset = smiles_dataset
 
     def _find_similars_smiles(self,
                               smiles,
@@ -36,7 +28,7 @@ class BaseSampleMetric():
                               force_unique,
                               sanitize):
         # Check db for results from a previous run
-        generated_smiles = self.benchmark_data.fetch_sampling_data(self.inferrer.__class__.__name__,
+        generated_smiles = self.sample_cache.fetch_sampling_data(self.inferrer.__class__.__name__,
                                                                    smiles,
                                                                    num_samples,
                                                                    scaled_radius,
@@ -57,7 +49,7 @@ class BaseSampleMetric():
             embeddings_dim = result['embeddings_dim'].to_list()
 
             # insert generated smiles into a database for use later.
-            self.benchmark_data.insert_sampling_data(self.inferrer.__class__.__name__,
+            self.sample_cache.insert_sampling_data(self.inferrer.__class__.__name__,
                                                      smiles,
                                                      num_samples,
                                                      scaled_radius,
@@ -91,11 +83,10 @@ class BaseSampleMetric():
         return np.array(metric_result)
 
     def calculate(self, **kwargs):
-        smiles_dataset = kwargs['smiles_dataset']
         num_samples = kwargs['num_samples']
         radius = kwargs['radius']
 
-        metric_array = self.sample_many(smiles_dataset, num_samples, radius)
+        metric_array = self.sample_many(self.smiles_dataset, num_samples, radius)
         metric = self._calculate_metric(metric_array, num_samples)
 
         return pd.Series({'name': self.__class__.name,
@@ -107,8 +98,8 @@ class BaseSampleMetric():
 class Validity(BaseSampleMetric):
     name = 'validity'
 
-    def __init__(self, inferrer):
-        super().__init__(inferrer)
+    def __init__(self, inferrer, sample_cache, smiles_dataset):
+        super().__init__(inferrer, sample_cache, smiles_dataset)
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.validity.radius
@@ -131,8 +122,8 @@ class Validity(BaseSampleMetric):
 class Unique(BaseSampleMetric):
     name = 'uniqueness'
 
-    def __init__(self, inferrer):
-        super().__init__(inferrer)
+    def __init__(self, inferrer, sample_cache, smiles_dataset):
+        super().__init__(inferrer, sample_cache, smiles_dataset)
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.unique.radius
@@ -151,9 +142,9 @@ class Unique(BaseSampleMetric):
 class Novelty(BaseSampleMetric):
     name = 'novelty'
 
-    def __init__(self, inferrer):
-        super().__init__(inferrer)
-        self.training_data = ZINC15TrainData()
+    def __init__(self, inferrer, sample_cache, smiles_dataset, training_data):
+        super().__init__(inferrer, sample_cache, smiles_dataset)
+        self.training_data = training_data
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.novelty.radius
@@ -171,4 +162,3 @@ class Novelty(BaseSampleMetric):
 
         result = sum([self.smiles_in_train(x) for x in generated_smiles])
         return result
-

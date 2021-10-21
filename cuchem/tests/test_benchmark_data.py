@@ -2,14 +2,14 @@ import logging
 import sqlite3
 from contextlib import closing
 
-from cuchem.benchmark.data import ZINC15TrainData
+from cuchem.benchmark.data import ZINC15TrainDataset
 from cuchemcommon.data.helper.chembldata import ChEmblData
 
 logger = logging.getLogger(__name__)
 
 
 def test_training_data_megatron_molbart():
-    training_data = ZINC15TrainData()
+    training_data = ZINC15TrainDataset()
 
     cursor = training_data.conn.cursor()
     cursor.execute('SELECT smiles FROM train_data limit 10')

@@ -7,12 +7,12 @@ from typing import List
 
 from cuchemcommon.utils.singleton import Singleton
 from cuchemcommon.context import Context
-from cuchem.datasets.molecules import PHYSCHEM_TABLE_LIST
-from cuchem.datasets.bioactivity import BIOACTIVITY_TABLE_LIST
+from cuchem.benchmark.datasets.molecules import PHYSCHEM_TABLE_LIST
+from cuchem.benchmark.datasets.bioactivity import BIOACTIVITY_TABLE_LIST
 
 logger = logging.getLogger(__name__)
 
-class ZINC15TrainData(object, metaclass=Singleton):
+class ZINC15TrainDataset(object, metaclass=Singleton):
 
     def __init__(self):
         """Store training split from ZINC15 for calculation of novelty"""
@@ -43,7 +43,7 @@ class ZINC15TrainData(object, metaclass=Singleton):
         return True if id else False
 
 
-class ZINC15TestSamplingData(object, metaclass=Singleton):
+class SampleCacheData(object, metaclass=Singleton):
 
     def __init__(self):
 
@@ -178,7 +178,6 @@ class ZINC15TestSamplingData(object, metaclass=Singleton):
 
 
 class PhysChemEmbeddingData(object, metaclass=Singleton):
-    # TODO RAJESH there is a bug upon retriving data from the SQL databases -- the dimensions are not the same as those input
 
     def __init__(self):
 
@@ -193,32 +192,26 @@ class PhysChemEmbeddingData(object, metaclass=Singleton):
     def _create_tables(self):
         cursor = self.conn.cursor()
 
-        for table_name in PHYSCHEM_TABLE_LIST:
-            table_creation = '''
-                            CREATE TABLE IF NOT EXISTS ''' + table_name + ''' (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            input_id INTEGER NOT NULL,
-                            smiles TEXT NOT NULL,
-                            model_name TEXT NOT NULL,
-                            embedding TEXT NOT NULL,
-                            embedding_dim TEXT NOT NULL);
-                            '''
-            cursor.execute(table_creation)
+        table_creation = '''
+                        CREATE TABLE IF NOT EXISTS emb (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        smiles TEXT NOT NULL,
+                        embedding TEXT NOT NULL,
+                        embedding_dim TEXT NOT NULL);
+                        '''
+        cursor.execute(table_creation)
 
     def insert_embedding_data(self,
-                             table_name,
-                             model_name,
-                             smiles,
-                             smiles_index,
-                             embeddings: List,
-                             embeddings_dim: List):
+                              smiles,
+                              embeddings: List,
+                              embeddings_dim: List):
         """
         Inserts a list of dicts into the benchmark data table.
         :param data:
         :return:
         """
         cursor = self.conn.cursor()
-        
+
         # Add embedding
         logger.debug('Inserting benchmark data...')
         embedding = list(embeddings)
@@ -226,19 +219,16 @@ class PhysChemEmbeddingData(object, metaclass=Singleton):
 
         embedding_dim = list(embeddings_dim)
         embedding_dim = pickle.dumps(embedding_dim)
-        
+
         id = cursor.execute(
             '''
-            INSERT INTO ''' + table_name + '''(input_id, smiles, model_name, embedding, embedding_dim)
-            VALUES(?,?,?,?,?)
+            INSERT INTO emb(smiles, embedding, embedding_dim)
+            VALUES(?,?,?)
             ''',
-            [smiles_index, smiles, model_name, sqlite3.Binary(embedding), sqlite3.Binary(embedding_dim)])
+            [smiles, sqlite3.Binary(embedding), sqlite3.Binary(embedding_dim)])
         self.conn.commit()
 
-    def fetch_embedding_data(self,
-                            table_name,
-                            model_name,
-                            smiles):
+    def fetch_embedding_data(self, smiles):
         """
         Fetch the embedding data for a given dataset and smiles
         :param data:
@@ -250,21 +240,23 @@ class PhysChemEmbeddingData(object, metaclass=Singleton):
         cursor = self.conn.cursor()
         cursor.execute(
             '''
-            SELECT embedding, embedding_dim FROM ''' + table_name + '''
-            WHERE model_name=?
-                  AND smiles=?
+            SELECT embedding, embedding_dim
+            FROM emb
+            WHERE smiles=?
             ''',
-            [model_name, smiles])
+            [smiles])
         embedding_results = cursor.fetchone()
 
         if not embedding_results:
             return None
 
-        return embedding_results
+        embedding, embedding_dim = embedding_results
+        embedding = pickle.loads(embedding)
+        embedding_dim = pickle.loads(embedding_dim)
+        return (embedding, embedding_dim)
 
 
 class BioActivityEmbeddingData(object, metaclass=Singleton):
-    # TODO RAJESH this needs testing
 
     def __init__(self):
 
@@ -280,24 +272,17 @@ class BioActivityEmbeddingData(object, metaclass=Singleton):
     def _create_tables(self):
         cursor = self.conn.cursor()
 
-        # TODO update as appropriate for fingerprints
-        for table_name in BIOACTIVITY_TABLE_LIST:
-            table_creation = '''
-                            CREATE TABLE IF NOT EXISTS ''' + table_name + ''' (
-                            id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            input_id INTEGER NOT NULL,
-                            smiles TEXT NOT NULL,
-                            model_name TEXT NOT NULL,
-                            embedding TEXT NOT NULL,
-                            embedding_dim TEXT NOT NULL);
-                            '''
-            cursor.execute(table_creation)
+        table_creation = '''
+                        CREATE TABLE IF NOT EXISTS emb (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        smiles TEXT NOT NULL,
+                        embedding TEXT NOT NULL,
+                        embedding_dim TEXT NOT NULL);
+                        '''
+        cursor.execute(table_creation)
 
     def insert_embedding_data(self,
-                             table_name,
-                             model_name,
                              smiles,
-                             smiles_index,
                              embeddings: List,
                              embeddings_dim: List):
         """
@@ -306,7 +291,7 @@ class BioActivityEmbeddingData(object, metaclass=Singleton):
         :return:
         """
         cursor = self.conn.cursor()
-        
+
         # Add embedding
         logger.debug('Inserting benchmark data...')
         embedding = list(embeddings)
@@ -314,19 +299,16 @@ class BioActivityEmbeddingData(object, metaclass=Singleton):
 
         embedding_dim = list(embeddings_dim)
         embedding_dim = pickle.dumps(embedding_dim)
-        
+
         id = cursor.execute(
             '''
-            INSERT INTO ''' + table_name + '''(input_id, smiles, model_name, embedding, embedding_dim)
-            VALUES(?,?,?,?,?)
+            INSERT INTO emb(smiles,embedding, embedding_dim)
+            VALUES(?, ?, ?)
             ''',
-            [smiles_index, smiles, model_name, sqlite3.Binary(embedding), sqlite3.Binary(embedding_dim)])
+            [smiles, sqlite3.Binary(embedding), sqlite3.Binary(embedding_dim)])
         self.conn.commit()
 
-    def fetch_embedding_data(self,
-                            table_name,
-                            model_name,
-                            smiles):
+    def fetch_embedding_data(self, smiles):
         """
         Fetch the embedding data for a given dataset and smiles
         :param data:
@@ -338,16 +320,12 @@ class BioActivityEmbeddingData(object, metaclass=Singleton):
         cursor = self.conn.cursor()
         cursor.execute(
             '''
-            SELECT embedding, embedding_dim FROM ''' + table_name + '''
-            WHERE model_name=?
-                  AND smiles=?
-            ''',
-            [model_name, smiles])
+            SELECT embedding, embedding_dim FROM emb
+            WHERE smiles=?
+            ''', [smiles])
         embedding_results = cursor.fetchone()
 
         if not embedding_results:
             return None
 
         return embedding_results
-
-

@@ -9,8 +9,8 @@
 #
 
 ARG FROM_IMAGE=gpuci/miniconda-cuda
-ARG CUDA_VER=10.1
-ARG LINUX_VERSION=ubuntu18.04
+ARG CUDA_VER=11.2
+ARG LINUX_VERSION=ubuntu20.04
 ARG IMAGE_TYPE=devel
 FROM ${FROM_IMAGE}:${CUDA_VER}-${IMAGE_TYPE}-${LINUX_VERSION}
 
@@ -24,18 +24,16 @@ channels: \n\
   - defaults \n" > /conda/.condarc \
       && cat /conda/.condarc ;
 
-COPY cuchem/conda/env.yml /tmp
-
 # Create parabricks conda env and make default
 RUN source activate base
-RUN conda install -y gpuci-tools; \
-    conda env create --name cheminfo -f /tmp/env.yml; \
-    sed -i 's/conda activate base/conda activate cheminfo/g' ~/.bashrc; \
-    conda clean -afy && chmod -R ugo+w /opt/conda
+RUN conda create -n rapids-21.08 -c rapidsai -c nvidia -c conda-forge \
+    rapids-blazing=21.10 python=3.7 cudatoolkit=11.2
+RUN conda install -y -c conda-forge -n rapids rdkit==2020.09.1.0
+SHELL ["conda", "run", "-n", "rapids", "/bin/bash", "-c"]
 
 # ADD source dest
 # Create symlink for old scripts expecting `gdf` conda env
-RUN ln -s /opt/conda/envs/cheminfo /opt/conda/envs/gdf
+RUN ln -s /opt/conda/envs/rapids-21.08 /opt/conda/envs/gdf
 
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
 CMD [ "/bin/bash" ]

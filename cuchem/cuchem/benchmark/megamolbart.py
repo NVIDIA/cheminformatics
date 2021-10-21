@@ -31,22 +31,6 @@ from cuchem.benchmark.datasets.fingerprints import (ChEMBLApprovedDrugsFingerpri
                                                     MoleculeNetLipophilicityFingerprints )
 from cuchem.benchmark.datasets.bioactivity import (ExCAPEBioactivity, ExCAPEFingerprints)
 
-gene_list = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1A", "ADRA1D",
-             "ADRB1", "ADRB2", "ADRB3", "AKT1", "AKT2", "ALK", "ALOX5", "AR", "AURKA",
-             "AURKB", "BACE1", "CA1", "CA12", "CA2", "CA9", "CASP1", "CCKBR", "CCR2",
-             "CCR5", "CDK1", "CDK2", "CHEK1", "CHRM1", "CHRM2", "CHRM3", "CHRNA7", "CLK4",
-             "CNR1", "CNR2", "CRHR1", "CSF1R", "CTSK", "CTSS", "CYP19A1", "DHFR", "DPP4",
-             "DRD1", "DRD3", "DRD4", "DYRK1A", "EDNRA", "EGFR", "EPHX2", "ERBB2", "ESR1",
-             "ESR2", "F10", "F2", "FAAH", "FGFR1", "FLT1", "FLT3", "GHSR", "GNRHR", "GRM5",
-             "GSK3A", "GSK3B", "HDAC1", "HPGD", "HRH3", "HSD11B1", "HSP90AA1", "HTR2A",
-             "HTR2C", "HTR6", "HTR7", "IGF1R", "INSR", "ITK", "JAK2", "JAK3", "KCNH2",
-             "KDR", "KIT", "LCK", "MAOB", "MAPK14", "MAPK8", "MAPK9", "MAPKAPK2", "MC4R",
-             "MCHR1", "MET", "MMP1", "MMP13", "MMP2", "MMP3", "MMP9", "MTOR", "NPY5R",
-             "NR3C1", "NTRK1", "OPRD1", "OPRK1", "OPRL1", "OPRM1", "P2RX7", "PARP1", "PDE5A",
-             "PDGFRB", "PGR", "PIK3CA", "PIM1", "PIM2", "PLK1", "PPARA", "PPARD", "PPARG",
-             "PRKACA", "PRKCD", "PTGDR2", "PTGS2", "PTPN1", "REN", "ROCK1", "ROCK2", "S1PR1",
-             "SCN9A", "SIGMAR1", "SLC6A2", "SLC6A3", "SRC", "TACR1", "TRPV1", "VDR"]
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -57,6 +41,22 @@ def compute_fp(smiles, inferrer, max_len):
     emb = np.array(emb_result.embedding)
     emb = np.reshape(emb, emb_result.dim)
     return emb
+
+
+def wait_for_megamolbart_service(inferrer):
+    retry_count = 0
+    while retry_count < 30:
+        try:
+            # Wait for upto 5 min for the server to be up
+            iteration = inferrer.get_iteration()
+            break
+        except Exception as e:
+            logging.warning(f'Service not available. Retrying {retry_count}...')
+            time.sleep(10)
+            retry_count += 1
+            continue
+    logging.info(f'Service found after {retry_count} retries.')
+    return iteration
 
 
 def get_model():
@@ -125,11 +125,10 @@ def main(cfg):
     if cfg.metric.novelty.enabled == True:
         metric_list.append(Novelty(inferrer, sample_cache, smiles_dataset, training_data))
 
-    if cfg.metric.nearestNeighborCorrelation.enabled == True:
+    if cfg.metric.nearest_neighbor_correlation.enabled == True:
         metric_list.append(NearestNeighborCorrelation(inferrer, embedding_cache, smiles_dataset))
 
-    if cfg.metric.modelabilityBioActivity.enabled == True:
-
+    if cfg.metric.modelability.bio_activity.enabled == True:
         excape_bioactivity_dataset = ExCAPEBioactivity()
         excape_fingerprint_dataset = ExCAPEFingerprints()
 
@@ -148,7 +147,7 @@ def main(cfg):
                                             embedding_cache,
                                             excape_bioactivity_dataset))
 
-    if cfg.metric.modelabilityPhysChem.enabled == True:
+    if cfg.metric.modelability.phys_chem.enabled == True:
         physchem_dataset_list = [MoleculeNetESOLPhyschem(),
                                  MoleculeNetFreeSolvPhyschem(),
                                  MoleculeNetLipophilicityPhyschem()]
@@ -175,7 +174,6 @@ def main(cfg):
                                             embedding_cache,
                                             smiles_))
 
-
     # ML models
     model_dict = get_model()
 
@@ -197,18 +195,7 @@ def main(cfg):
     convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)
 
     iteration = None
-    retry_count = 0
-    while retry_count < 30:
-        try:
-            # Wait for upto 5 min for the server to be up
-            iteration = inferrer.get_iteration()
-            break
-        except Exception as e:
-            logging.warning(f'Service not available. Retrying {retry_count}...')
-            time.sleep(10)
-            retry_count += 1
-            continue
-    logging.info(f'Service found after {retry_count} retries.')
+    iteration = wait_for_megamolbart_service(inferrer)
 
     for metric in metric_list:
         logger.info(f'METRIC: {metric.name}')
@@ -241,7 +228,6 @@ def main(cfg):
             result['data_size'] = n_data
             result_list.append(result)
             save_metric_results(result_list, output_dir)
-
 
 if __name__ == '__main__':
     main()

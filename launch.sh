@@ -152,7 +152,6 @@ push() {
 pull() {
     docker pull ${CUCHEM_CONT}
     docker pull ${MEGAMOLBART_CONT}
-    exit
 }
 
 

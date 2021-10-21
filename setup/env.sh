@@ -174,15 +174,15 @@ download_model() {
     local MEGAMOLBART_MODEL_VERSION=$(echo ${MEGAMOLBART_MODEL} | cut -d ":" -f2)
 
     if [ -n "${ALT_MEGAMOLBART_MODEL}" ]; then
-        # This is an alternate path for developers to download from an 
-        # alternate/pre-release location. Please add 'ALT_MEGAMOLBART_MODEL' 
-        # to .env with the alternate path. ALT_MEGAMOLBART_MODEL can only be 
+        # This is an alternate path for developers to download from an
+        # alternate/pre-release location. Please add 'ALT_MEGAMOLBART_MODEL'
+        # to .env with the alternate path. ALT_MEGAMOLBART_MODEL can only be
         # an NGC model and will require NGC installed and configured.
         local MEGAMOLBART_MODEL_VERSION=$(echo ${ALT_MEGAMOLBART_MODEL} | cut -d ":" -f2)
 
         if [[ ! -e "${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}" ]]; then
             local DOWNLOAD_URL=${MEGAMOLBART_MODEL_URL}
-            mkdir -p ${MEGAMOLBART_MODEL_PATH}    
+            mkdir -p ${MEGAMOLBART_MODEL_PATH}
             ngc registry model download-version \
                 --dest ${MEGAMOLBART_MODEL_PATH} \
                 "${ALT_MEGAMOLBART_MODEL}"
@@ -199,13 +199,6 @@ download_model() {
         mkdir ${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
         unzip -q ${MEGAMOLBART_MODEL_PATH}/megamolbart_${MEGAMOLBART_MODEL_VERSION}.zip \
             -d ${MEGAMOLBART_MODEL_PATH}/megamolbart_v${MEGAMOLBART_MODEL_VERSION}
-    fi
-
-    local NUM_DIRS=`find ${MEGAMOLBART_MODEL_PATH} -type d -maxdepth 1 2>/dev/null | wc -l`
-    
-    if [[ $NUM_DIRS -gt 2 ]]; then
-        echo "${RED}Too many models at location ${MEGAMOLBART_MODEL_PATH}. Please delete models not required.${RESET}"
-        exit 1
     fi
 
     set +e

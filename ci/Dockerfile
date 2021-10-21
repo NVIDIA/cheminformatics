@@ -26,14 +26,14 @@ channels: \n\
 
 # Create parabricks conda env and make default
 RUN source activate base
-RUN conda create -n rapids-21.08 -c rapidsai -c nvidia -c conda-forge \
-    rapids-blazing=21.10 python=3.7 cudatoolkit=11.2
+RUN conda create -n rapids -c rapidsai -c nvidia -c conda-forge \
+    rapids-blazing=21.08 python=3.7 cudatoolkit=11.2
 RUN conda install -y -c conda-forge -n rapids rdkit==2020.09.1.0
 SHELL ["conda", "run", "-n", "rapids", "/bin/bash", "-c"]
 
 # ADD source dest
 # Create symlink for old scripts expecting `gdf` conda env
-RUN ln -s /opt/conda/envs/rapids-21.08 /opt/conda/envs/gdf
+RUN ln -s /opt/conda/envs/rapids /opt/conda/envs/gdf
 
 ENTRYPOINT [ "/usr/bin/tini", "--" ]
 CMD [ "/bin/bash" ]

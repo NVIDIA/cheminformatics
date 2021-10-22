@@ -233,10 +233,7 @@ cache() {
 test() {
     dbSetup "${DATA_PATH}"
     # run a container and start dash inside container.
-    ${DOCKER_CMD} -w /workspace/cuchem \
-        -e PYTHONPATH="${DEV_PYTHONPATH}" \
-        ${CUCHEM_CONT}  \
-        pytest tests
+    pytest tests
     exit
 }
 

@@ -165,11 +165,10 @@ def main(cfg):
                     physchem_fingerprint_list)
 
         # TODO: Ideally groups should be of sample_size size.
-        n_data = sample_size
         for (label, smiles_, fp_) in groups:
-            smiles_.data = smiles_.data.iloc[:n_data] # TODO for testing
-            smiles_.properties = smiles_.properties.iloc[:n_data]  # TODO for testing
-            fp_.data = fp_.data.iloc[:n_data]  # TODO for testing
+            smiles_.data = smiles_.data.iloc[:sample_size] # TODO for testing
+            smiles_.properties = smiles_.properties.iloc[:sample_size]  # TODO for testing
+            fp_.data = fp_.data.iloc[:sample_size]  # TODO for testing
 
             print(label, smiles_.data.head(n=1), smiles_.properties.head(n=1), fp_.data.head(n=1))
             metric_list.append(Modelability(inferrer,
@@ -182,18 +181,15 @@ def main(cfg):
     fingerprint_dataset = ZINC15TestSplitFingerprints()
 
     fingerprint_dataset.load(smiles_dataset.data.index)
-    n_data = cfg.samplingSpec.sample_size
-    if n_data <= 0:
-        n_data = len(smiles_dataset.data)
+    if sample_size <= 0:
+        sample_size = len(smiles_dataset.data)
 
     # Filter and rearrage data as expected by downstream components.
-    smiles_dataset.data = smiles_dataset.data.iloc[:n_data]
-    fingerprint_dataset.data = fingerprint_dataset.data.iloc[:n_data]
+    smiles_dataset.data = smiles_dataset.data.iloc[:sample_size]
+    fingerprint_dataset.data = fingerprint_dataset.data.iloc[:sample_size]
     smiles_dataset.data = smiles_dataset.data['canonical_smiles']
 
     # DEBUG
-    n_data = cfg.samplingSpec.sample_size
-
     convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)
 
     iteration = None
@@ -227,7 +223,7 @@ def main(cfg):
             run_time = convert_runtime(datetime.now() - start_time)
             result['iteration'] = iteration
             result['run_time'] = run_time
-            result['data_size'] = n_data
+            result['data_size'] = sample_size
             result_list.append(result)
             save_metric_results(result_list, output_dir)
 

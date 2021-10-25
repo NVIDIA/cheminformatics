@@ -6,8 +6,8 @@ import cupy
 import numpy as np
 import pandas as pd
 
-from cuml.metrics import pairwise_distances
 from sklearn.model_selection import ParameterGrid, KFold
+from cuml.metrics import pairwise_distances
 from cuml.metrics.regression import mean_squared_error
 from cuchem.utils.metrics import spearmanr
 from cuchem.utils.distance import tanimoto_calculate
@@ -142,6 +142,12 @@ class Modelability(BaseEmbeddingMetric):
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
         """Perform grid search with cross validation and return score"""
+        print('gpu_gridsearch_cv', xdata.shape, type(xdata), ydata.shape, type(ydata))
+
+        if xdata.shape[0] != ydata.shape[0]:
+            max_size = min(xdata.shape[0], ydata.shape[0])
+            xdata = xdata[:max_size]
+            ydata = ydata[:max_size]
 
         best_score = np.inf
         for param in ParameterGrid(param_dict):
@@ -154,7 +160,8 @@ class Modelability(BaseEmbeddingMetric):
                 xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
-                score = mean_squared_error(ypred, ytest).item() # NB: convert to negative MSE and maximize metric for SKLearn GridSearch
+                # NB: convert to negative MSE and maximize metric for SKLearn GridSearch
+                score = mean_squared_error(ypred, ytest).item()
                 metric_list.append(score)
 
             metric = np.array(metric_list).mean()
@@ -171,8 +178,10 @@ class Modelability(BaseEmbeddingMetric):
 
         for col in properties.columns:
             props = properties[col].astype(cupy.float32).to_array()
+
             embedding_error = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, props)
             fingerprint_error = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, props)
+
             ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
             metric_array.append(ratio)
             embedding_errors.append(embedding_error)
@@ -181,12 +190,6 @@ class Modelability(BaseEmbeddingMetric):
         return cupy.array(metric_array), cupy.array(fingerprint_errors), cupy.array(embedding_errors)
 
     def calculate(self, fingerprint_dataset, estimator, param_dict, **kwargs): # TODO FIX PROPERTIES CALL
-        # smiles_dataset = kwargs['smiles_dataset'] # TODO remove if not needed
-        # fingerprint_dataset = kwargs['fingerprint_dataset']
-        # properties = kwargs['properties']
-        # estimator = kwargs['estimator']
-        # param_dict = kwargs['param_dict']
-
         embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
         embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
 

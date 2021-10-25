@@ -109,8 +109,6 @@ def main(cfg):
 
     training_data = ZINC15TrainDataset()
 
-    # Create Datasets of size input_size. Initialy load 20% more then reduce to
-    # input_size after cleaning and preprocessing.
     smiles_dataset = ZINC15TestSplit(max_len=seq_len)
     smiles_dataset.load()
 
@@ -133,16 +131,19 @@ def main(cfg):
         excape_fingerprint_dataset = ExCAPEFingerprints()
 
         excape_bioactivity_dataset.load()
-        excape_fingerprint_dataset.load()
+        logger.info(f'Bioactivity dataset size: {excape_bioactivity_dataset.data.shape}')
+        excape_fingerprint_dataset.load(max_data_size=cfg.samplingSpec.sample_size)
+        logger.info(f'Bioactivity finger prt size: {excape_fingerprint_dataset.data.shape}')
 
+        excape_bioactivity_dataset.data.groupby(level=0)
         groups = zip(excape_bioactivity_dataset.data.groupby(level=0),
                      excape_bioactivity_dataset.properties.groupby(level=0),
                      excape_fingerprint_dataset.data.groupby(level=0))
+
         for (label, sm_), (_, prop_), (_, fp_) in groups:
-            excape_bioactivity_dataset.data = sm_ # This is a hack to reduce dataset size for testing
+            excape_bioactivity_dataset.data = sm_
             excape_bioactivity_dataset.properties = prop_
             excape_fingerprint_dataset.data = fp_
-
             metric_list.append(Modelability(inferrer,
                                             embedding_cache,
                                             excape_bioactivity_dataset))
@@ -163,7 +164,8 @@ def main(cfg):
                     physchem_dataset_list,
                     physchem_fingerprint_list)
 
-        n_data = 200
+        # TODO: Ideally groups should be of sample_size size.
+        n_data = sample_size
         for (label, smiles_, fp_) in groups:
             smiles_.data = smiles_.data.iloc[:n_data] # TODO for testing
             smiles_.properties = smiles_.properties.iloc[:n_data]  # TODO for testing
@@ -180,7 +182,7 @@ def main(cfg):
     fingerprint_dataset = ZINC15TestSplitFingerprints()
 
     fingerprint_dataset.load(smiles_dataset.data.index)
-    n_data = cfg.samplingSpec.input_size
+    n_data = cfg.samplingSpec.sample_size
     if n_data <= 0:
         n_data = len(smiles_dataset.data)
 
@@ -190,7 +192,7 @@ def main(cfg):
     smiles_dataset.data = smiles_dataset.data['canonical_smiles']
 
     # DEBUG
-    n_data = cfg.samplingSpec.input_size
+    n_data = cfg.samplingSpec.sample_size
 
     convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)
 

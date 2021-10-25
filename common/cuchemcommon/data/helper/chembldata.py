@@ -175,7 +175,7 @@ class ChEmblData(object, metaclass=Singleton):
             select_stmt = '''
                 SELECT cs.canonical_smiles,
                 di.max_phase_for_ind,
-                cp.* 
+                cp.*
             FROM
                 drug_indication AS di,
                 compound_structures AS cs,
@@ -241,6 +241,7 @@ class ChEmblData(object, metaclass=Singleton):
             return cur.fetchone()[0]
 
     def _meta_df(self, **transformation_kwargs):
+        print('-------------------_meta_df')
         transformation = self.fp_type(**transformation_kwargs)
 
         prop_meta = {'id': pandas.Series([], dtype='int64')}

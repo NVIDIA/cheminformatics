@@ -27,14 +27,13 @@ metric:
 
   modelability:
     bio_activity:
-      enabled: True
+      enabled: False
     phys_chem:
-      enabled: True
+      enabled: False
 
 samplingSpec:
-  input_size: 10
   seq_len: 512
-  sample_size: 10
+  sample_size: 20000
 
 output:
   path: /data/benchmark_output/

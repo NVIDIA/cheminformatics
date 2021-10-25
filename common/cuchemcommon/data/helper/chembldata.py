@@ -241,7 +241,6 @@ class ChEmblData(object, metaclass=Singleton):
             return cur.fetchone()[0]
 
     def _meta_df(self, **transformation_kwargs):
-        print('-------------------_meta_df')
         transformation = self.fp_type(**transformation_kwargs)
 
         prop_meta = {'id': pandas.Series([], dtype='int64')}

@@ -22,10 +22,15 @@ class BaseEmbeddingMetric():
     name = None
 
     """Base class for metrics based on embedding datasets"""
-    def __init__(self, inferrer, sample_cache, smiles_dataset):
+    def __init__(self,
+                 inferrer,
+                 sample_cache,
+                 smiles_dataset,
+                 fingerprint_dataset):
         self.inferrer = inferrer
         self.sample_cache = sample_cache
         self.smiles_dataset = smiles_dataset
+        self.fingerprint_dataset = fingerprint_dataset
 
     def variations(self):
         return NotImplemented
@@ -96,8 +101,8 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
     name = 'nearest neighbor correlation'
 
-    def __init__(self, inferrer, sample_cache, smiles_dataset):
-        super().__init__(inferrer, sample_cache, smiles_dataset)
+    def __init__(self, inferrer, sample_cache, smiles_dataset, fingerprint_dataset):
+        super().__init__(inferrer, sample_cache, smiles_dataset, fingerprint_dataset)
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.nearestNeighborCorrelation.top_k
@@ -112,16 +117,13 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         corr = spearmanr(fingerprints_dist, embeddings_dist, top_k=top_k)
         return corr
 
-    def calculate(self, fingerprint_dataset, top_k=None, **kwargs):
-        # smiles_dataset = kwargs['smiles_dataset'] # TODO remove
-        # fingerprint_dataset = kwargs['fingerprint_dataset']
-        # top_k = kwargs['top_k']
+    def calculate(self, top_k=None, **kwargs):
 
         embeddings = self.encode_many(zero_padded_vals=True,
                                       average_tokens=False)
 
         # Calculate pairwise distances for fingerprints
-        fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
+        fingerprints = cupy.fromDlpack(self.fingerprint_dataset.data.to_dlpack())
         fingerprints = cupy.asarray(fingerprints, order='C')
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
@@ -134,8 +136,8 @@ class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, inferrer, sample_cache, smiles_dataset):
-        super().__init__(inferrer, sample_cache, smiles_dataset)
+    def __init__(self, inferrer, sample_cache, smiles_dataset, fingerprint_dataset):
+        super().__init__(inferrer, sample_cache, smiles_dataset, fingerprint_dataset)
 
     def variations(self, cfg, model_dict=None):
         return model_dict.keys()
@@ -189,11 +191,11 @@ class Modelability(BaseEmbeddingMetric):
 
         return cupy.array(metric_array), cupy.array(fingerprint_errors), cupy.array(embedding_errors)
 
-    def calculate(self, fingerprint_dataset, estimator, param_dict, **kwargs): # TODO FIX PROPERTIES CALL
+    def calculate(self, estimator, param_dict, **kwfargs): # TODO FIX PROPERTIES CALL
         embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
         embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
 
-        fingerprints = cupy.fromDlpack(fingerprint_dataset.data.to_dlpack())
+        fingerprints = cupy.fromDlpack(self.fingerprint_dataset.data.to_dlpack())
         fingerprints = cupy.asarray(fingerprints, order='C', dtype=cupy.float32)
 
         metric, fingerprint_errors, embedding_errors = self._calculate_metric(embeddings,

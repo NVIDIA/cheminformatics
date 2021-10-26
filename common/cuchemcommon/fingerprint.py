@@ -26,6 +26,7 @@ def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles'):
     mf = MorganFingerprint()
     fp = mf.transform(dataframe, col_name=smiles_col)
     fp = pd.DataFrame(fp)
+    fp = pd.DataFrame(fp, columns=pd.RangeIndex(start=0, stop=len(mf))).astype('float32')
     fp.index = dataframe.index
     return fp
 
@@ -66,7 +67,7 @@ class MorganFingerprint(BaseTransformation):
             fp = self.func(m, **self.kwargs)
             return list(fp.ToBitString())
         else:
-            return None
+            return [0 for _ in range(self.kwargs['nBits'])]
 
     def transform(self, data, col_name='transformed_smiles'):
         """Single threaded processing of list"""

@@ -5,8 +5,6 @@ import logging
 import hydra
 import pandas as pd
 
-import cupy
-import dask.dataframe as dd
 import numpy as np
 
 from datetime import datetime
@@ -94,7 +92,7 @@ def main(cfg):
 
     output_dir = cfg.output.path
     seq_len = int(cfg.samplingSpec.seq_len) # Import from MegaMolBART codebase?
-    sample_size = int(cfg.samplingSpec.sample_size)
+    input_size = int(cfg.samplingSpec.input_size)
 
     if cfg.model.name == 'MegaMolBART':
         inferrer = MegatronMolBART()
@@ -124,29 +122,36 @@ def main(cfg):
         metric_list.append(Novelty(inferrer, sample_cache, smiles_dataset, training_data))
 
     if cfg.metric.nearest_neighbor_correlation.enabled == True:
-        metric_list.append(NearestNeighborCorrelation(inferrer, embedding_cache, smiles_dataset))
+        fingerprint_dataset = ZINC15TestSplitFingerprints()
+        fingerprint_dataset.load(smiles_dataset.data.index)
+        fingerprint_dataset.data = fingerprint_dataset.data.iloc[:input_size]
+
+        metric_list.append(NearestNeighborCorrelation(inferrer,
+                                                      embedding_cache,
+                                                      smiles_dataset,
+                                                      fingerprint_dataset))
 
     if cfg.metric.modelability.bio_activity.enabled == True:
         excape_bioactivity_dataset = ExCAPEBioactivity()
         excape_fingerprint_dataset = ExCAPEFingerprints()
 
         excape_bioactivity_dataset.load()
-        logger.info(f'Bioactivity dataset size: {excape_bioactivity_dataset.data.shape}')
-        excape_fingerprint_dataset.load(max_data_size=cfg.samplingSpec.sample_size)
-        logger.info(f'Bioactivity finger prt size: {excape_fingerprint_dataset.data.shape}')
+        excape_fingerprint_dataset.load(max_data_size=input_size)
 
-        excape_bioactivity_dataset.data.groupby(level=0)
         groups = zip(excape_bioactivity_dataset.data.groupby(level=0),
                      excape_bioactivity_dataset.properties.groupby(level=0),
                      excape_fingerprint_dataset.data.groupby(level=0))
 
+        import cupy
         for (label, sm_), (_, prop_), (_, fp_) in groups:
             excape_bioactivity_dataset.data = sm_
             excape_bioactivity_dataset.properties = prop_
             excape_fingerprint_dataset.data = fp_
+
             metric_list.append(Modelability(inferrer,
                                             embedding_cache,
-                                            excape_bioactivity_dataset))
+                                            excape_bioactivity_dataset,
+                                            excape_fingerprint_dataset))
 
     if cfg.metric.modelability.phys_chem.enabled == True:
         physchem_dataset_list = [MoleculeNetESOLPhyschem(),
@@ -166,32 +171,26 @@ def main(cfg):
 
         # TODO: Ideally groups should be of sample_size size.
         for (label, smiles_, fp_) in groups:
-            smiles_.data = smiles_.data.iloc[:sample_size] # TODO for testing
-            smiles_.properties = smiles_.properties.iloc[:sample_size]  # TODO for testing
-            fp_.data = fp_.data.iloc[:sample_size]  # TODO for testing
+            smiles_.data = smiles_.data.iloc[:input_size] # TODO for testing
+            smiles_.properties = smiles_.properties.iloc[:input_size]  # TODO for testing
+            fp_.data = fp_.data.iloc[:input_size]  # TODO for testing
 
             print(label, smiles_.data.head(n=1), smiles_.properties.head(n=1), fp_.data.head(n=1))
             metric_list.append(Modelability(inferrer,
                                             embedding_cache,
-                                            smiles_))
+                                            smiles_,
+                                            fp_))
 
     # ML models
     model_dict = get_model()
 
-    fingerprint_dataset = ZINC15TestSplitFingerprints()
-
-    fingerprint_dataset.load(smiles_dataset.data.index)
-    if sample_size <= 0:
-        sample_size = len(smiles_dataset.data)
+    if input_size <= 0:
+        input_size = len(smiles_dataset.data)
 
     # Filter and rearrage data as expected by downstream components.
-    smiles_dataset.data = smiles_dataset.data.iloc[:sample_size]
-    fingerprint_dataset.data = fingerprint_dataset.data.iloc[:sample_size]
-    smiles_dataset.data = smiles_dataset.data['canonical_smiles']
+    smiles_dataset.data = smiles_dataset.data.iloc[:input_size]['canonical_smiles']
 
-    # DEBUG
     convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)
-
     iteration = None
     iteration = wait_for_megamolbart_service(inferrer)
 
@@ -213,17 +212,16 @@ def main(cfg):
             if iter_val in model_dict:
                 estimator, param_dict = model_dict[iter_val]
 
-            result = metric.calculate(fingerprint_dataset=fingerprint_dataset,
-                                      top_k=iter_val, # TODO IS THIS A BUG
+            result = metric.calculate(top_k=iter_val, # TODO IS THIS A BUG
                                       estimator=estimator,
                                       param_dict=param_dict,
-                                      num_samples=sample_size,
+                                      num_samples=cfg.samplingSpec.sample_size,
                                       radius=iter_val)
 
             run_time = convert_runtime(datetime.now() - start_time)
             result['iteration'] = iteration
             result['run_time'] = run_time
-            result['data_size'] = sample_size
+            result['data_size'] = input_size
             result_list.append(result)
             save_metric_results(result_list, output_dir)
 

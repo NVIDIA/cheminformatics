@@ -33,7 +33,8 @@ metric:
 
 samplingSpec:
   seq_len: 512
-  sample_size: 20000
+  input_size: 5000
+  sample_size: 10
 
 output:
   path: /data/benchmark_output/

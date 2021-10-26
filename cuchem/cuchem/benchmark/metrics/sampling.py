@@ -16,7 +16,10 @@ class BaseSampleMetric():
     name = None
 
     """Base class for metrics based on sampling for a single SMILES string"""
-    def __init__(self, inferrer, sample_cache, smiles_dataset):
+    def __init__(self,
+                 inferrer,
+                 sample_cache,
+                 smiles_dataset):
         self.inferrer = inferrer
         self.sample_cache = sample_cache
         self.smiles_dataset = smiles_dataset

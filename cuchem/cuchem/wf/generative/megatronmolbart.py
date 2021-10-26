@@ -65,7 +65,6 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                               numRequested=num_requested,
                               forceUnique=force_unique,
                               sanitize=sanitize)
-
         result = self.stub.FindSimilars(spec)
         generatedSmiles = result.generatedSmiles
         embeddings = []

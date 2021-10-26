@@ -142,13 +142,13 @@ def main(cfg):
                      excape_bioactivity_dataset.properties.groupby(level=0),
                      excape_fingerprint_dataset.data.groupby(level=0))
 
-        import cupy
         for (label, sm_), (_, prop_), (_, fp_) in groups:
             excape_bioactivity_dataset.data = sm_
             excape_bioactivity_dataset.properties = prop_
             excape_fingerprint_dataset.data = fp_
 
-            metric_list.append(Modelability(inferrer,
+            metric_list.append(Modelability('modelability-bio_activity',
+                                            inferrer,
                                             embedding_cache,
                                             excape_bioactivity_dataset,
                                             excape_fingerprint_dataset))
@@ -176,7 +176,8 @@ def main(cfg):
             fp_.data = fp_.data.iloc[:input_size]  # TODO for testing
 
             print(label, smiles_.data.head(n=1), smiles_.properties.head(n=1), fp_.data.head(n=1))
-            metric_list.append(Modelability(inferrer,
+            metric_list.append(Modelability('modelability-phys_chem',
+                                            inferrer,
                                             embedding_cache,
                                             smiles_,
                                             fp_))

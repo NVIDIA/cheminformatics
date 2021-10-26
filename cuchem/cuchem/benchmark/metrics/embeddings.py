@@ -31,6 +31,7 @@ class BaseEmbeddingMetric():
         self.sample_cache = sample_cache
         self.smiles_dataset = smiles_dataset
         self.fingerprint_dataset = fingerprint_dataset
+        self.name = self.__class__.__name__
 
     def variations(self):
         return NotImplemented
@@ -98,11 +99,11 @@ class BaseEmbeddingMetric():
 
 class NearestNeighborCorrelation(BaseEmbeddingMetric):
     """Sperman's Rho for correlation of pairwise Tanimoto distances vs Euclidean distance from embeddings"""
-
     name = 'nearest neighbor correlation'
 
     def __init__(self, inferrer, sample_cache, smiles_dataset, fingerprint_dataset):
         super().__init__(inferrer, sample_cache, smiles_dataset, fingerprint_dataset)
+        self.name = NearestNeighborCorrelation.name
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.nearestNeighborCorrelation.top_k
@@ -136,8 +137,9 @@ class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, inferrer, sample_cache, smiles_dataset, fingerprint_dataset):
+    def __init__(self, name, inferrer, sample_cache, smiles_dataset, fingerprint_dataset):
         super().__init__(inferrer, sample_cache, smiles_dataset, fingerprint_dataset)
+        self.name = name
 
     def variations(self, cfg, model_dict=None):
         return model_dict.keys()

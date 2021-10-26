@@ -136,7 +136,7 @@ def main(cfg):
         excape_fingerprint_dataset = ExCAPEFingerprints()
 
         excape_bioactivity_dataset.load()
-        excape_fingerprint_dataset.load(max_data_size=input_size)
+        excape_fingerprint_dataset.load()
 
         groups = zip(excape_bioactivity_dataset.data.groupby(level=0),
                      excape_bioactivity_dataset.properties.groupby(level=0),

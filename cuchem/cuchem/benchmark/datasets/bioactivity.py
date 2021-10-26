@@ -79,9 +79,7 @@ class ExCAPEBioactivity(ExCAPEDataset):
 
         if filter_len:
             data = data[data['canonical_smiles'].str.len() <= filter_len]
-            self.max_len = filter_len
-        else:
-            self.max_len = data['canonical_smiles'].str.len().max()
+
         self.data = data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
         self.properties = data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])
 
@@ -105,9 +103,6 @@ class ExCAPEFingerprints(ExCAPEDataset):
 
         if filter_len:
             data = data[data['canonical_smiles'].str.len() <= filter_len]
-
-        if max_data_size:
-            data = data.iloc[:max_data_size, :]
 
         # very few repeated SMILES, so probably not worth making unique and then merging
         fp = calc_morgan_fingerprints(data)

@@ -146,7 +146,7 @@ class Modelability(BaseEmbeddingMetric):
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
         """Perform grid search with cross validation and return score"""
-
+        logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
         best_score = np.inf

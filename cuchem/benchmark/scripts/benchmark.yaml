@@ -27,9 +27,9 @@ metric:
 
   modelability:
     bio_activity:
-      enabled: True
+      enabled: False
     phys_chem:
-      enabled: True
+      enabled: False
 
 samplingSpec:
   seq_len: 512

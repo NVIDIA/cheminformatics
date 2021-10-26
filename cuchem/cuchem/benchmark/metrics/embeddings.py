@@ -144,12 +144,8 @@ class Modelability(BaseEmbeddingMetric):
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
         """Perform grid search with cross validation and return score"""
-        print('gpu_gridsearch_cv', xdata.shape, type(xdata), ydata.shape, type(ydata))
 
-        if xdata.shape[0] != ydata.shape[0]:
-            max_size = min(xdata.shape[0], ydata.shape[0])
-            xdata = xdata[:max_size]
-            ydata = ydata[:max_size]
+        assert xdata.shape[0] == ydata.shape[0]
 
         best_score = np.inf
         for param in ParameterGrid(param_dict):

@@ -16,10 +16,14 @@ class BaseSampleMetric():
     name = None
 
     """Base class for metrics based on sampling for a single SMILES string"""
-    def __init__(self, inferrer, sample_cache, smiles_dataset):
+    def __init__(self,
+                 inferrer,
+                 sample_cache,
+                 smiles_dataset):
         self.inferrer = inferrer
         self.sample_cache = sample_cache
         self.smiles_dataset = smiles_dataset
+        self.name = self.__class__.__name__
 
     def _find_similars_smiles(self,
                               smiles,
@@ -89,7 +93,7 @@ class BaseSampleMetric():
         metric_array = self.sample_many(self.smiles_dataset, num_samples, radius)
         metric = self._calculate_metric(metric_array, num_samples)
 
-        return pd.Series({'name': self.__class__.name,
+        return pd.Series({'name': self.name,
                           'value': metric,
                           'radius': radius,
                           'num_samples': num_samples})
@@ -100,6 +104,7 @@ class Validity(BaseSampleMetric):
 
     def __init__(self, inferrer, sample_cache, smiles_dataset):
         super().__init__(inferrer, sample_cache, smiles_dataset)
+        self.name = Validity.name
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.validity.radius
@@ -124,6 +129,7 @@ class Unique(BaseSampleMetric):
 
     def __init__(self, inferrer, sample_cache, smiles_dataset):
         super().__init__(inferrer, sample_cache, smiles_dataset)
+        self.name = Unique.name
 
     def variations(self, cfg, model_dict=None):
         return cfg.metric.unique.radius
@@ -144,6 +150,7 @@ class Novelty(BaseSampleMetric):
 
     def __init__(self, inferrer, sample_cache, smiles_dataset, training_data):
         super().__init__(inferrer, sample_cache, smiles_dataset)
+        self.name = Novelty.name
         self.training_data = training_data
 
     def variations(self, cfg, model_dict=None):

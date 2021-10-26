@@ -1,8 +1,6 @@
 import logging
 import cudf
 
-from cuchemcommon.utils.singleton import Singleton
-
 logger = logging.getLogger(__name__)
 
 

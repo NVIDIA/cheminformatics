@@ -1,11 +1,9 @@
 import logging
 import os
-import pathlib
 import pandas as pd
 import dask.dataframe as dd
 import cudf
 
-from .base import GenericCSVDataset
 from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
@@ -81,9 +79,6 @@ class ExCAPEBioactivity(ExCAPEDataset):
 
         if filter_len:
             data = data[data['canonical_smiles'].str.len() <= filter_len]
-            self.max_len = filter_len
-        else:
-            self.max_len = data['canonical_smiles'].str.len().max()
 
         self.data = data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
         self.properties = data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])
@@ -98,7 +93,7 @@ class ExCAPEFingerprints(ExCAPEDataset):
         self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
         self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
 
-    def load(self, filter_len=None):
+    def load(self, filter_len=None, max_data_size=None):
         if os.path.exists(self.filter_data_path):
             data = pd.read_csv(self.filter_data_path)
             data = data.set_index('index')

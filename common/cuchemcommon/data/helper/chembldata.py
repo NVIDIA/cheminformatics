@@ -175,7 +175,7 @@ class ChEmblData(object, metaclass=Singleton):
             select_stmt = '''
                 SELECT cs.canonical_smiles,
                 di.max_phase_for_ind,
-                cp.* 
+                cp.*
             FROM
                 drug_indication AS di,
                 compound_structures AS cs,

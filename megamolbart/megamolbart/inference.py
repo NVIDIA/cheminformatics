@@ -173,7 +173,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   force_unique=False,
                                   sanitize=True):
         distance = self._compute_radius(scaled_radius)
-        logger.info(f'Computing with distance {distance}...')
+        logger.info(f'Sampling {num_requested} around {smiles} with distance {distance}...')
 
         embedding, pad_mask = self.smiles2embedding(smiles)
 

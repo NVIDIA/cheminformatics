@@ -35,3 +35,7 @@ chemportal/frontend/node_modules/
 chemportal/outputs/
 outputs/
 **/*.onnx
+
+data/
+models/
+

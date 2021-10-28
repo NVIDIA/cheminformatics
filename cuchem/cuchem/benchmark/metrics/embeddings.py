@@ -105,8 +105,10 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         super().__init__(inferrer, sample_cache, smiles_dataset, fingerprint_dataset)
         self.name = NearestNeighborCorrelation.name
 
-    def variations(self, cfg, model_dict=None):
-        return cfg.metric.nearestNeighborCorrelation.top_k
+    def variations(self, cfg, **kwargs):
+        top_k_list = list(cfg.metric.nearest_neighbor_correlation.top_k)
+        top_k_list = [int(x) for x in top_k_list]
+        return {'top_k': top_k_list}
 
     def _calculate_metric(self, embeddings, fingerprints, top_k=None):
         embeddings_dist = pairwise_distances(embeddings)
@@ -141,71 +143,58 @@ class Modelability(BaseEmbeddingMetric):
         super().__init__(inferrer, sample_cache, smiles_dataset, fingerprint_dataset)
         self.name = name
 
-    def variations(self, cfg, model_dict=None):
-        return model_dict.keys()
+    def variations(self, model_dict, **kwargs):
+        return {'model': list(model_dict.keys())}
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
         """Perform grid search with cross validation and return score"""
         logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
-        best_score = np.inf
+        best_score, best_param = np.inf, None
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
-            metric_list = []
-
+            
             # Generate CV folds
             kfold_gen = KFold(n_splits=n_splits, shuffle=True, random_state=0)
+            kfold_mse = []
             for train_idx, test_idx in kfold_gen.split(xdata, ydata):
                 xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
-                # NB: convert to negative MSE and maximize metric for SKLearn GridSearch
-                score = mean_squared_error(ypred, ytest).item()
-                metric_list.append(score)
+                mse = mean_squared_error(ypred, ytest).item() # NOTE: convert to negative MSE and maximize metric if SKLearn GridSearch is ever used
+                kfold_mse.append(mse)
 
-            metric = np.array(metric_list).mean()
-            best_score = min(metric, best_score)
-        return best_score
+            avg_mse = np.nanmean(np.array(kfold_mse))
+            if avg_mse < best_score:
+                best_score, best_param = avg_mse, param
+        return best_score, best_param
 
     def _calculate_metric(self, embeddings, fingerprints, estimator, param_dict):
         """Perform grid search for each metric and calculate ratio"""
-
-        metric_array = []
-        embedding_errors = []
-        fingerprint_errors = []
         properties = self.smiles_dataset.properties
+        assert len(properties.columns) == 1
+        prop_name = properties.columns[0]
+        properties = properties[prop_name].astype(cupy.float32).to_array()
 
-        for col in properties.columns:
-            props = properties[col].astype(cupy.float32).to_array()
+        embedding_error, embedding_param = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
+        fingerprint_error, fingerprint_param = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
+        ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
+        return ratio, fingerprint_error, embedding_error, fingerprint_param, embedding_param
 
-            embedding_error = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, props)
-            fingerprint_error = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, props)
-
-            ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
-            metric_array.append(ratio)
-            embedding_errors.append(embedding_error)
-            fingerprint_errors.append(fingerprint_error)
-
-        return cupy.array(metric_array), cupy.array(fingerprint_errors), cupy.array(embedding_errors)
-
-    def calculate(self, estimator, param_dict, **kwfargs): # TODO FIX PROPERTIES CALL
+    def calculate(self, estimator, param_dict, **kwargs):
         embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
         embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
 
         fingerprints = cupy.fromDlpack(self.fingerprint_dataset.data.to_dlpack())
         fingerprints = cupy.asarray(fingerprints, order='C', dtype=cupy.float32)
 
-        metric, fingerprint_errors, embedding_errors = self._calculate_metric(embeddings,
-                                                                              fingerprints,
-                                                                              estimator,
-                                                                              param_dict)
-        logger.info(f'{type(metric)}  {type(fingerprint_errors)} {type(embedding_errors)}')
-        metric = cupy.nanmean(metric)
-        fingerprint_errors = cupy.nanmean(fingerprint_errors)
-        embedding_errors = cupy.nanmean(embedding_errors)
-
-        return pd.Series({'name': self.name,
-                          'value': metric,
-                          'fingerprint_error': fingerprint_errors,
-                          'embedding_error': embedding_errors})
+        results = self._calculate_metric(embeddings,
+                                         fingerprints,
+                                         estimator,
+                                         param_dict)
+        ratio, fingerprint_error, embedding_error, fingerprint_param, embedding_param = results
+        property_name = self.smiles_dataset.properties.columns[0]
+        return pd.Series({'name': self.name, 'value': ratio, 'property': property_name,
+                          'fingerprint_error': fingerprint_error, 'embedding_error': embedding_error,
+                          'fingerprint_param': fingerprint_param, 'embedding_param': embedding_param})

@@ -69,7 +69,7 @@ class BaseSampleMetric():
         total_samples = len(metric_array) * num_samples
         return np.nansum(metric_array) / float(total_samples)
 
-    def variations(self, cfg, model_dict=None):
+    def variations(self):
         return NotImplemented
 
     def sample(self):
@@ -86,10 +86,7 @@ class BaseSampleMetric():
 
         return np.array(metric_result)
 
-    def calculate(self, **kwargs):
-        num_samples = kwargs['num_samples']
-        radius = kwargs['radius']
-
+    def calculate(self, radius, num_samples, **kwargs):
         metric_array = self.sample_many(self.smiles_dataset, num_samples, radius)
         metric = self._calculate_metric(metric_array, num_samples)
 
@@ -106,8 +103,10 @@ class Validity(BaseSampleMetric):
         super().__init__(inferrer, sample_cache, smiles_dataset)
         self.name = Validity.name
 
-    def variations(self, cfg, model_dict=None):
-        return cfg.metric.validity.radius
+    def variations(self, cfg, **kwargs):
+        radius_list = list(cfg.metric.validity.radius)
+        radius_list = [float(x) for x in radius_list]
+        return {'radius': radius_list}
 
     def sample(self, smiles, num_samples, radius):
         generated_smiles = self._find_similars_smiles(smiles,
@@ -125,14 +124,16 @@ class Validity(BaseSampleMetric):
 
 
 class Unique(BaseSampleMetric):
-    name = 'uniqueness'
+    name = 'unique'
 
     def __init__(self, inferrer, sample_cache, smiles_dataset):
         super().__init__(inferrer, sample_cache, smiles_dataset)
         self.name = Unique.name
 
-    def variations(self, cfg, model_dict=None):
-        return cfg.metric.unique.radius
+    def variations(self, cfg, **kwargs):
+        radius_list = list(cfg.metric.unique.radius)
+        radius_list = [float(x) for x in radius_list]
+        return {'radius': radius_list}
 
     def sample(self, smiles, num_samples, radius):
         generated_smiles = self._find_similars_smiles(smiles,
@@ -140,7 +141,7 @@ class Unique(BaseSampleMetric):
                                                       scaled_radius=radius,
                                                       force_unique=False,
                                                       sanitize=False)
-        # Get the unquie ones
+        # Get the unique ones
         generated_smiles = set(generated_smiles[1:])
         return len(generated_smiles)
 
@@ -153,8 +154,10 @@ class Novelty(BaseSampleMetric):
         self.name = Novelty.name
         self.training_data = training_data
 
-    def variations(self, cfg, model_dict=None):
-        return cfg.metric.novelty.radius
+    def variations(self, cfg, **kwargs):
+        radius_list = list(cfg.metric.novelty.radius)
+        radius_list = [float(x) for x in radius_list]
+        return {'radius': radius_list}
 
     def smiles_in_train(self, smiles):
         in_train = self.training_data.is_known_smiles(smiles)

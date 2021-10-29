@@ -25,7 +25,7 @@ from cuchem.benchmark.datasets.fingerprints import (ChEMBLApprovedDrugsFingerpri
 from cuchem.benchmark.datasets.bioactivity import (ExCAPEBioactivity, ExCAPEFingerprints)
 
 # Data caches
-from cuchem.benchmark.data import PhysChemEmbeddingData, SampleCacheData, ZINC15TrainDataset
+from cuchem.benchmark.data import PhysChemEmbeddingData, BioActivityEmbeddingData, SampleCacheData, ZINC15TrainDataset
 
 # Metrics
 from cuchem.benchmark.metrics.sampling import Validity, Unique, Novelty
@@ -36,10 +36,12 @@ from cuml.ensemble.randomforestregressor import RandomForestRegressor
 from cuml import LinearRegression, ElasticNet
 from cuml.svm import SVR
 
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+def convert_runtime(time_): 
+    return time_.seconds + (time_.microseconds / 1.0e6)
 
 def wait_for_megamolbart_service(inferrer):
     retry_count = 0
@@ -88,12 +90,18 @@ def save_metric_results(metric_list, output_dir):
 @hydra.main(config_path=".", config_name="benchmark")
 def main(cfg):
     logger.info(cfg)
-    os.makedirs(cfg.output.path, exist_ok=True)
 
     output_dir = cfg.output.path
-    seq_len = int(cfg.sampling.seq_len) # TODO: pull from MegaMolBART
-    input_size = int(cfg.sampling.input_size)
+    os.makedirs(output_dir, exist_ok=True)
 
+    input_size = None
+    if cfg.sampling.input_size:
+        i_size_ = int(cfg.sampling.input_size)
+        input_size = i_size_ if i_size_ > 0 else input_size
+
+    max_seq_len = int(cfg.sampling.max_seq_len) # TODO: pull from inferrer
+
+    # Inferrer (DL model)
     if cfg.model.name == 'MegaMolBART':
         inferrer = MegatronMolBART()
     elif cfg.model.name == 'CDDD':
@@ -102,41 +110,33 @@ def main(cfg):
         logger.error(f'Model {cfg.model.name} not supported')
         sys.exit(1)
 
-    sample_cache = SampleCacheData()
-    embedding_cache = PhysChemEmbeddingData()
-
-    training_data = ZINC15TrainDataset()
-
-    smiles_dataset = ZINC15TestSplit(max_len=seq_len)
-    smiles_dataset.load()
-
     # Metrics
-    # for sampling_metric in [Validity, Unique, Novelty]:
-    # name = sampling_metric.name
-    # if eval(f'cfg.metric.{name}.enabled'):
-    #     param_list = [inferrer, sample_cache, smiles_dataset]
-    #     if name == 'novelty':
-    #         param_list += training_data
-    #     metric_list.append({name: sampling_metric(*param_list)})
-    # # TODO move datasets down here
-
     metric_list = []
-    if cfg.metric.validity.enabled:
-        name = 'validity'
-        metric_list.append({name: Validity(inferrer, sample_cache, smiles_dataset)})
 
-    if cfg.metric.unique.enabled:
-        name = 'unique'
-        metric_list.append({name: Unique(inferrer, sample_cache, smiles_dataset)})
+    for sampling_metric in [Validity, Unique, Novelty]:
+        name = sampling_metric.name
 
-    if cfg.metric.novelty.enabled:
-        name = 'novelty'
-        metric_list.append({name: Novelty(inferrer, sample_cache, smiles_dataset, training_data)})
+        if eval(f'cfg.metric.{name}.enabled'):
+            smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
+            smiles_dataset.load(data_len=input_size)
+            sample_cache = SampleCacheData()
+
+            param_list = [inferrer, sample_cache, smiles_dataset]
+            if name == 'novelty':
+                training_data = ZINC15TrainDataset()
+                param_list += [training_data]
+            metric_list.append({name: sampling_metric(*param_list)})
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
-        fingerprint_dataset = ZINC15TestSplitFingerprints()
+        name = 'nearest neighbor correlation'
+
+        smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len) # TODO FIX THIS ChEMBLApprovedDrugsPhyschem(max_seq_len=max_seq_len)
+        smiles_dataset.load(data_len=input_size)
+        fingerprint_dataset = ZINC15TestSplitFingerprints() # TODO FIX THIS ChEMBLApprovedDrugsFingerprints()
         fingerprint_dataset.load(smiles_dataset.data.index)
-        fingerprint_dataset.data = fingerprint_dataset.data.iloc[:input_size]
+        assert len(smiles_dataset.data) == len(fingerprint_dataset.data)
+
+        embedding_cache = PhysChemEmbeddingData() # TODO FIX THIS
 
         metric_list.append({name: NearestNeighborCorrelation(inferrer,
                                                       embedding_cache,
@@ -144,48 +144,47 @@ def main(cfg):
                                                       fingerprint_dataset)})
 
     if cfg.metric.modelability.bioactivity.enabled:
-        excape_bioactivity_dataset = ExCAPEBioactivity()
-        excape_fingerprint_dataset = ExCAPEFingerprints()
+        smiles_dataset = ExCAPEBioactivity(max_seq_len=max_seq_len)
+        fingerprint_dataset = ExCAPEFingerprints()
+        embedding_cache = PhysChemEmbeddingData() # TODO FIX THIS BioActivityEmbeddingData()
 
-        excape_bioactivity_dataset.load()
-        excape_fingerprint_dataset.load()
+        smiles_dataset.load(data_len=input_size)
+        fingerprint_dataset.load(smiles_dataset.data.index)
 
-        groups = zip(excape_bioactivity_dataset.data.groupby(level=0),
-                     excape_bioactivity_dataset.properties.groupby(level=0),
-                     excape_fingerprint_dataset.data.groupby(level=0))
+        groups = list(zip(smiles_dataset.data.groupby(level=0),
+                     smiles_dataset.properties.groupby(level=0),
+                     fingerprint_dataset.data.groupby(level=0)))
 
         for (label, sm_), (_, prop_), (_, fp_) in groups:
-            excape_bioactivity_dataset.data = sm_
-            excape_bioactivity_dataset.properties = prop_
-            excape_fingerprint_dataset.data = fp_
+            smiles_dataset.data = sm_ # TODO ensure this isn't overwriting the original dataset
+            smiles_dataset.properties = prop_
+            fingerprint_dataset.data = fp_
 
             metric_list.append({label: Modelability('modelability-bioactivity',
                                             inferrer,
                                             embedding_cache,
-                                            excape_bioactivity_dataset,
-                                            excape_fingerprint_dataset)})
+                                            smiles_dataset,
+                                            fingerprint_dataset)})
 
     if cfg.metric.modelability.physchem.enabled:
-        physchem_dataset_list = [MoleculeNetESOLPhyschem(),
-                                 MoleculeNetFreeSolvPhyschem(),
-                                 MoleculeNetLipophilicityPhyschem()]
-        physchem_fingerprint_list = [MoleculeNetESOLFingerprints(),
+        smiles_dataset_list = [MoleculeNetESOLPhyschem(max_seq_len=max_seq_len),
+                                 MoleculeNetFreeSolvPhyschem(max_seq_len=max_seq_len),
+                                 MoleculeNetLipophilicityPhyschem(max_seq_len=max_seq_len)]
+        fingerprint_dataset_list = [MoleculeNetESOLFingerprints(),
                                      MoleculeNetFreeSolvFingerprints(),
                                      MoleculeNetLipophilicityFingerprints()]
-        for x in physchem_dataset_list:
-            x.load()
-        for x in physchem_fingerprint_list:
-            x.load()
+        
+        embedding_cache = PhysChemEmbeddingData()
+        
+        for smdata, fpdata in zip(smiles_dataset_list, fingerprint_dataset_list):
+            smdata.load(data_len=input_size)
+            fpdata.load(smdata.data.index)
 
-        groups = zip([x.table_name for x in physchem_dataset_list],
-                    physchem_dataset_list,
-                    physchem_fingerprint_list)
+        groups = zip([x.table_name for x in smiles_dataset_list],
+                    smiles_dataset_list,
+                    fingerprint_dataset_list)
 
-        # TODO: Ideally groups should be of sample_size size.
         for (label, smiles_, fp_) in groups:
-            smiles_.data = smiles_.data.iloc[:input_size] # TODO for testing
-            smiles_.properties = smiles_.properties.iloc[:input_size]  # TODO for testing
-            fp_.data = fp_.data.iloc[:input_size]  # TODO for testing
             metric_list.append({label: Modelability(f'modelability-physchem',
                                             inferrer,
                                             embedding_cache,
@@ -193,15 +192,8 @@ def main(cfg):
                                             fp_)})
 
     # ML models
-    model_dict = get_model()
+    model_dict = get_model() # TODO move this to metrics
 
-    if input_size <= 0:
-        input_size = len(smiles_dataset.data)
-
-    # Filter and rearrage data as expected by downstream components.
-    smiles_dataset.data = smiles_dataset.data.iloc[:input_size]['canonical_smiles'] # TODO REMOVE THIS
-
-    convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)
     iteration = None
     iteration = wait_for_megamolbart_service(inferrer)
 

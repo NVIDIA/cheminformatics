@@ -1,22 +1,53 @@
 #!/usr/bin/env python3
 
 import logging
-
-import cupy
-import numpy as np
 import pandas as pd
-
+import numpy as np
 from sklearn.model_selection import ParameterGrid, KFold
-from cuml.metrics import pairwise_distances
-from cuml.metrics.regression import mean_squared_error
-from cuchem.utils.metrics import spearmanr
-from cuchem.utils.distance import tanimoto_calculate
+
+try:
+    import cuml # TODO is there a better way to check for RAPIDS?
+except:
+    import numpy as xpy
+    from sklearn.metrics import pairwise_distances, mean_squared_error
+    from sklearn.linear_model import LinearRegression, ElasticNet
+    from sklearn.svm import SVR
+    from sklearn.ensemble import RandomForestRegressor
+    from cuchem.utils.metrics import spearmanr # Replace with CPU version: https://github.com/NVIDIA/cheminformatics/blob/daf2989fdcdc9ef349605484d3b96586846396dc/cuchem/tests/test_metrics.py#L235
+    from cuchem.utils.distance import tanimoto_calculate # Replace with similar to CPU version: rdkit.DataManip.Metric.rdMetricMatrixCalc.GetTanimotoDistMat
+else:
+    import cupy as xpy
+    from cuml.metrics import pairwise_distances, mean_squared_error
+    from cuml.linear_model import LinearRegression, ElasticNet
+    from cuml.svm import SVR
+    from cuml.ensemble import RandomForestRegressor
+    from cuchem.utils.metrics import spearmanr # CPU version: https://github.com/NVIDIA/cheminformatics/blob/daf2989fdcdc9ef349605484d3b96586846396dc/cuchem/tests/test_metrics.py#L235
+    from cuchem.utils.distance import tanimoto_calculate # CPU version: rdkit.DataManip.Metric.rdMetricMatrixCalc.GetTanimotoDistMat
 
 
 logger = logging.getLogger(__name__)
 
 __all__ = ['NearestNeighborCorrelation', 'Modelability']
 
+
+def get_model_dict():
+        lr_estimator = LinearRegression(normalize=True)
+        lr_param_dict = {'normalize': [True]}
+
+        en_estimator = ElasticNet(normalize=True)
+        en_param_dict = {'alpha': [0.001, 0.01, 0.1, 1.0, 10.0, 100],
+                         'l1_ratio': [0.1, 0.5, 1.0, 10.0]}
+
+        sv_estimator = SVR(kernel='rbf')
+        sv_param_dict = {'C': [0.01, 0.1, 1.0, 10], 'degree': [3,5,7,9]}
+
+        rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0)
+        rf_param_dict = {'n_estimators': [10, 50]}
+
+        return {'linear_regression': [lr_estimator, lr_param_dict],
+                'elastic_net': [en_estimator, en_param_dict],
+                'support_vector_machine': [sv_estimator, sv_param_dict],
+                'random_forest': [rf_estimator, rf_param_dict]}
 
 class BaseEmbeddingMetric():
     name = None
@@ -62,7 +93,7 @@ class BaseEmbeddingMetric():
         """Encode a single SMILES to embedding from model"""
         embedding, dim = self._find_embedding(smiles, max_seq_len)
 
-        embedding = cupy.array(embedding).reshape(dim).squeeze()
+        embedding = xpy.array(embedding).reshape(dim).squeeze()
         assert embedding.ndim == 2, "Metric calculation code currently only works with 2D data (embeddings, not batched)"
 
         if zero_padded_vals:
@@ -89,9 +120,9 @@ class BaseEmbeddingMetric():
         for smiles in self.smiles_dataset.data['canonical_smiles']:
             # smiles = self.smiles_dataset.data.loc[smiles_index]
             embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_seq_len=max_seq_len)
-            embeddings.append(cupy.array(embedding))
+            embeddings.append(xpy.array(embedding))
 
-        return cupy.asarray(embeddings)
+        return xpy.asarray(embeddings)
 
     def calculate(self):
         raise NotImplementedError
@@ -126,10 +157,10 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
                                       average_tokens=False)
 
         # Calculate pairwise distances for fingerprints
-        fingerprints = cupy.asarray(self.fingerprint_dataset.data)
+        fingerprints = xpy.asarray(self.fingerprint_dataset.data)
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
-        metric = cupy.nanmean(metric)
+        metric = xpy.nanmean(metric)
         top_k = embeddings.shape[0] - 1 if not top_k else top_k
         return pd.Series({'name': self.name, 'value': metric, 'top_k':top_k})
 
@@ -141,9 +172,12 @@ class Modelability(BaseEmbeddingMetric):
     def __init__(self, name, inferrer, sample_cache, smiles_dataset, fingerprint_dataset):
         super().__init__(inferrer, sample_cache, smiles_dataset, fingerprint_dataset)
         self.name = name
+        self.model_dict = get_model_dict()
 
-    def variations(self, model_dict, **kwargs):
-        return {'model': list(model_dict.keys())}
+    def variations(self, model_dict=None, **kwargs):
+        if model_dict:
+            self.model_dict = model_dict
+        return {'model': list(self.model_dict.keys())}
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
         """Perform grid search with cross validation and return score"""
@@ -174,7 +208,7 @@ class Modelability(BaseEmbeddingMetric):
         properties = self.smiles_dataset.properties
         assert len(properties.columns) == 1
         prop_name = properties.columns[0]
-        properties = cupy.asarray(properties[prop_name], dtype=cupy.float32)
+        properties = xpy.asarray(properties[prop_name], dtype=xpy.float32)
 
         embedding_error, embedding_param = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
         fingerprint_error, fingerprint_param = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
@@ -183,8 +217,8 @@ class Modelability(BaseEmbeddingMetric):
 
     def calculate(self, estimator, param_dict, **kwargs):
         embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
-        embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
-        fingerprints = cupy.asarray(self.fingerprint_dataset.data.values, dtype=cupy.float32)
+        embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
+        fingerprints = xpy.asarray(self.fingerprint_dataset.data.values, dtype=xpy.float32)
 
         results = self._calculate_metric(embeddings,
                                          fingerprints,

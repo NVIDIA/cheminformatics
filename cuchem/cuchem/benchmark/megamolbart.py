@@ -213,7 +213,7 @@ def main(cfg):
                 estimator, param_dict = model_dict[iter_val]
                 kwargs.update({'estimator': estimator, 'param_dict': param_dict})
                 if metric.name.endswith('bioactivity'):
-                    kwargs['gene'] = iter_label
+                    kwargs['gene'] = metric_key
             
             if metric.name in ['validity', 'unique', 'novelty']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)

@@ -15,7 +15,7 @@ class ChEMBLApprovedDrugsFingerprints(GenericFingerprintDataset):
         self.index_col = index_col
         self.data = None
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'fingerprints_ChEMBL_approved_drugs_physchem.csv')
         assert os.path.exists(self.data_path)
 
@@ -26,7 +26,7 @@ class MoleculeNetLipophilicityFingerprints(GenericFingerprintDataset):
         self.index_col = index_col
         self.data = None
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'fingerprints_MoleculeNet_Lipophilicity.csv')
         assert os.path.exists(self.data_path)
 
@@ -37,7 +37,7 @@ class MoleculeNetESOLFingerprints(GenericFingerprintDataset):
         self.index_col = index_col
         self.data = None
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'fingerprints_MoleculeNet_ESOL.csv')
         assert os.path.exists(self.data_path)
 
@@ -48,7 +48,7 @@ class MoleculeNetFreeSolvFingerprints(GenericFingerprintDataset):
         self.index_col = index_col
         self.data = None
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'fingerprints_MoleculeNet_FreeSolv.csv')
         assert os.path.exists(self.data_path)
 
@@ -60,7 +60,7 @@ class ZINC15TestSplitFingerprints(GenericFingerprintDataset):
         self.index_col = index_col
         self.data = None
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'fingerprints_ZINC15_test_split.csv')
         assert os.path.exists(self.data_path)
 
@@ -73,6 +73,6 @@ class ChEMBL20KFingerprints(GenericFingerprintDataset):
         self.index_col = index_col
         self.data = None
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'fingerprints_ChEMBL_random_sampled_drugs.csv')
         assert os.path.exists(self.data_path)

@@ -32,7 +32,7 @@ class ChEMBLApprovedDrugsPhyschem(GenericCSVDataset):
                                 'qed_weighted', 'mw_monoisotopic', 'hba_lipinski', 'hbd_lipinski',
                                 'num_lipinski_ro5_violations']
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'benchmark_ChEMBL_approved_drugs_physchem.csv')
         assert os.path.exists(self.data_path)
 
@@ -49,7 +49,7 @@ class MoleculeNetLipophilicityPhyschem(GenericCSVDataset):
         self.table_name = 'lipophilicity'
         self.properties_cols = ['logD']
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'benchmark_MoleculeNet_Lipophilicity.csv')
         assert os.path.exists(self.data_path)
 
@@ -69,7 +69,7 @@ class MoleculeNetESOLPhyschem(GenericCSVDataset):
         self.table_name = 'esol'
         self.properties_cols = ['log_solubility_(mol_per_L)']
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'benchmark_MoleculeNet_ESOL.csv')
         assert os.path.exists(self.data_path)
 
@@ -89,7 +89,7 @@ class MoleculeNetFreeSolvPhyschem(GenericCSVDataset):
         self.table_name = 'freesolv'
         self.properties_cols = ['hydration_free_energy']
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'benchmark_MoleculeNet_FreeSolv.csv')
         assert os.path.exists(self.data_path)
 
@@ -110,7 +110,7 @@ class ZINC15TestSplit(GenericCSVDataset):
         self.properties_cols = ['logp', 'mw']
         self.index_col = 'index'
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'benchmark_ZINC15_test_split.csv')
         assert os.path.exists(self.data_path)
 
@@ -126,6 +126,6 @@ class ChEMBL20KSamples(GenericCSVDataset):
         logger.warn(f'Class {self.name} is deprecated.')
         self.index_col = 'molregno'
         self.data_path = os.path.join(pathlib.Path(__file__).parent.parent.absolute(),
-                                      'data',
+                                      'csv_data',
                                       'benchmark_ChEMBL_random_sampled_drugs.csv')
         assert os.path.exists(self.data_path)

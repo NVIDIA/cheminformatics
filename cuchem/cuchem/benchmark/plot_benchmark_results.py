@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO cleanup and / or remove as appropriate
+
 import argparse
 import logging
 import os

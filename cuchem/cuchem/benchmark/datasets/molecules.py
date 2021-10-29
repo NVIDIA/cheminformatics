@@ -36,10 +36,14 @@ class ChEMBLApprovedDrugsPhyschem(GenericCSVDataset):
                                       'benchmark_ChEMBL_approved_drugs_physchem.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, columns=['canonical_smiles']):
+    def load(self, columns=['canonical_smiles'], data_len=None):
         data, properties = self._load_csv(columns)
         properties = properties[self.properties_cols]
         self.data, self.properties = data, properties
+
+        if data_len:
+            self.data = self.data.iloc[:data_len]
+            self.properties = self.properties.iloc[:data_len]
 
 
 class MoleculeNetLipophilicityPhyschem(GenericCSVDataset):
@@ -53,13 +57,17 @@ class MoleculeNetLipophilicityPhyschem(GenericCSVDataset):
                                       'benchmark_MoleculeNet_Lipophilicity.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, columns=['smiles']):
+    def load(self, columns=['smiles'], data_len=None):
         orig_property_name = ['exp']
         data, properties = self._load_csv(columns)
         data = data.rename(columns={columns[0]: 'canonical_smiles'})
         properties = properties.rename(columns=dict(zip(orig_property_name, self.properties_cols)))
         properties = properties[self.properties_cols]
         self.data, self.properties = data, properties
+
+        if data_len:
+            self.data = self.data.iloc[:data_len]
+            self.properties = self.properties.iloc[:data_len]
 
 
 class MoleculeNetESOLPhyschem(GenericCSVDataset):
@@ -73,13 +81,17 @@ class MoleculeNetESOLPhyschem(GenericCSVDataset):
                                       'benchmark_MoleculeNet_ESOL.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, columns=['smiles']):
+    def load(self, columns=['smiles'], data_len=None):
         orig_property_name = ['measured log solubility in mols per litre']
         data, properties = self._load_csv(columns)
         data = data.rename(columns={columns[0]: 'canonical_smiles'})
         properties = properties.rename(columns=dict(zip(orig_property_name, self.properties_cols)))
         properties = properties[self.properties_cols]
         self.data, self.properties = data, properties
+
+        if data_len:
+            self.data = self.data.iloc[:data_len]
+            self.properties = self.properties.iloc[:data_len]
 
 
 class MoleculeNetFreeSolvPhyschem(GenericCSVDataset):
@@ -93,13 +105,17 @@ class MoleculeNetFreeSolvPhyschem(GenericCSVDataset):
                                       'benchmark_MoleculeNet_FreeSolv.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, columns=['smiles']):
+    def load(self, columns=['smiles'], data_len=None):
         orig_property_name = ['y']
         data, properties = self._load_csv(columns)
         data = data.rename(columns={columns[0]: 'canonical_smiles'})
         properties = properties.rename(columns=dict(zip(orig_property_name, self.properties_cols)))
         properties = properties[self.properties_cols]
         self.data, self.properties = data, properties
+
+        if data_len:
+            self.data = self.data.iloc[:data_len]
+            self.properties = self.properties.iloc[:data_len]
 
 
 class ZINC15TestSplit(GenericCSVDataset):
@@ -114,8 +130,14 @@ class ZINC15TestSplit(GenericCSVDataset):
                                       'benchmark_ZINC15_test_split.csv')
         assert os.path.exists(self.data_path)
 
-    def load(self, columns=['canonical_smiles'], length_column='length'):
+    def load(self, columns=['canonical_smiles'], length_column='length', data_len=None):
         self.data, _ = self._load_csv(columns, length_column, return_remaining=False)
+
+        if data_len:
+            self.data = self.data.iloc[:data_len]
+
+        if self.data.shape[-1] == 1:
+            self.data = self.data[columns[0]]
 
 
 ### DEPRECATED ###

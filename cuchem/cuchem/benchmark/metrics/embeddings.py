@@ -38,14 +38,14 @@ class BaseEmbeddingMetric():
 
     def _find_embedding(self,
                         smiles,
-                        max_len):
+                        max_seq_len):
 
         # Check db for results from a previous run
         embedding_results = self.sample_cache.fetch_embedding_data(smiles)
         if not embedding_results:
             # Generate new samples and update the database
             embedding_results = self.inferrer.smiles_to_embedding(smiles,
-                                                                  max_len + 2)
+                                                                  max_seq_len + 2)
             embedding = embedding_results.embedding
             embedding_dim = embedding_results.dim
 
@@ -58,9 +58,9 @@ class BaseEmbeddingMetric():
 
         return embedding, embedding_dim
 
-    def encode(self, smiles, zero_padded_vals, average_tokens, max_len=None):
+    def encode(self, smiles, zero_padded_vals, average_tokens, max_seq_len=None):
         """Encode a single SMILES to embedding from model"""
-        embedding, dim = self._find_embedding(smiles, max_len)
+        embedding, dim = self._find_embedding(smiles, max_seq_len)
 
         embedding = cupy.array(embedding).reshape(dim).squeeze()
         assert embedding.ndim == 2, "Metric calculation code currently only works with 2D data (embeddings, not batched)"
@@ -79,16 +79,16 @@ class BaseEmbeddingMetric():
     def _calculate_metric(self):
         raise NotImplementedError
 
-    def encode_many(self, max_len=None, zero_padded_vals=True, average_tokens=False):
+    def encode_many(self, max_seq_len=None, zero_padded_vals=True, average_tokens=False):
         # Calculate pairwise distances for embeddings
 
-        if not max_len:
-            max_len = self.smiles_dataset.max_len
+        if not max_seq_len:
+            max_seq_len = self.smiles_dataset.max_seq_len
 
         embeddings = []
         for smiles in self.smiles_dataset.data['canonical_smiles'].to_arrow().to_pylist():
             # smiles = self.smiles_dataset.data.loc[smiles_index]
-            embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_len=max_len)
+            embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_seq_len=max_seq_len)
             embeddings.append(cupy.array(embedding))
 
         return cupy.asarray(embeddings)

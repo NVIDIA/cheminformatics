@@ -82,7 +82,7 @@ def save_metric_results(metric_list, output_dir):
     logger.info(metric_df)
     metric = metric_df['name'].iloc[0].replace(' ', '_')
     iteration = metric_df['iteration'].iloc[0]
-    metric_df.to_csv(os.path.join(output_dir, f'{metric}_{iteration}.csv'), index=False)
+    metric_df.to_csv(os.path.join(output_dir, f'{metric}_iteration{iteration}.csv'), index=False)
 
 
 @hydra.main(config_path=".", config_name="benchmark")
@@ -111,25 +111,37 @@ def main(cfg):
     smiles_dataset.load()
 
     # Metrics
+    # for sampling_metric in [Validity, Unique, Novelty]:
+    # name = sampling_metric.name
+    # if eval(f'cfg.metric.{name}.enabled'):
+    #     param_list = [inferrer, sample_cache, smiles_dataset]
+    #     if name == 'novelty':
+    #         param_list += training_data
+    #     metric_list.append({name: sampling_metric(*param_list)})
+    # # TODO move datasets down here
+
     metric_list = []
     if cfg.metric.validity.enabled:
-        metric_list.append(Validity(inferrer, sample_cache, smiles_dataset))
+        name = 'validity'
+        metric_list.append({name: Validity(inferrer, sample_cache, smiles_dataset)})
 
     if cfg.metric.unique.enabled:
-        metric_list.append(Unique(inferrer, sample_cache, smiles_dataset))
+        name = 'unique'
+        metric_list.append({name: Unique(inferrer, sample_cache, smiles_dataset)})
 
     if cfg.metric.novelty.enabled:
-        metric_list.append(Novelty(inferrer, sample_cache, smiles_dataset, training_data))
+        name = 'novelty'
+        metric_list.append({name: Novelty(inferrer, sample_cache, smiles_dataset, training_data)})
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
         fingerprint_dataset = ZINC15TestSplitFingerprints()
         fingerprint_dataset.load(smiles_dataset.data.index)
         fingerprint_dataset.data = fingerprint_dataset.data.iloc[:input_size]
 
-        metric_list.append(NearestNeighborCorrelation(inferrer,
+        metric_list.append({name: NearestNeighborCorrelation(inferrer,
                                                       embedding_cache,
                                                       smiles_dataset,
-                                                      fingerprint_dataset))
+                                                      fingerprint_dataset)})
 
     if cfg.metric.modelability.bioactivity.enabled:
         excape_bioactivity_dataset = ExCAPEBioactivity()
@@ -147,11 +159,11 @@ def main(cfg):
             excape_bioactivity_dataset.properties = prop_
             excape_fingerprint_dataset.data = fp_
 
-            metric_list.append(Modelability('modelability-bioactivity',
+            metric_list.append({label: Modelability('modelability-bioactivity',
                                             inferrer,
                                             embedding_cache,
                                             excape_bioactivity_dataset,
-                                            excape_fingerprint_dataset))
+                                            excape_fingerprint_dataset)})
 
     if cfg.metric.modelability.physchem.enabled:
         physchem_dataset_list = [MoleculeNetESOLPhyschem(),
@@ -174,11 +186,11 @@ def main(cfg):
             smiles_.data = smiles_.data.iloc[:input_size] # TODO for testing
             smiles_.properties = smiles_.properties.iloc[:input_size]  # TODO for testing
             fp_.data = fp_.data.iloc[:input_size]  # TODO for testing
-            metric_list.append(Modelability(f'modelability-physchem-{label}',
+            metric_list.append({label: Modelability(f'modelability-physchem',
                                             inferrer,
                                             embedding_cache,
                                             smiles_,
-                                            fp_))
+                                            fp_)})
 
     # ML models
     model_dict = get_model()
@@ -187,20 +199,20 @@ def main(cfg):
         input_size = len(smiles_dataset.data)
 
     # Filter and rearrage data as expected by downstream components.
-    smiles_dataset.data = smiles_dataset.data.iloc[:input_size]['canonical_smiles']
+    smiles_dataset.data = smiles_dataset.data.iloc[:input_size]['canonical_smiles'] # TODO REMOVE THIS
 
     convert_runtime = lambda x: x.seconds + (x.microseconds / 1.0e6)
     iteration = None
     iteration = wait_for_megamolbart_service(inferrer)
 
-    for metric in metric_list:
+    for metric_dict in metric_list:
+        metric_key, metric = list(metric_dict.items())[0]
         logger.info(f'Metric name: {metric.name}')
-        result_list = []
 
         iter_dict = metric.variations(cfg=cfg, model_dict=model_dict)
-        iter_label = list(iter_dict.keys())[0]
-        iter_vals = list(iter_dict[iter_label])
+        iter_label, iter_vals = list(iter_dict.items())[0]
         
+        result_list = []
         for iter_val in iter_vals:
             start_time = datetime.now()
             
@@ -208,6 +220,8 @@ def main(cfg):
             if metric.name.startswith('modelability'):
                 estimator, param_dict = model_dict[iter_val]
                 kwargs.update({'estimator': estimator, 'param_dict': param_dict})
+                if metric.name.endswith('bioactivity'):
+                    kwargs['gene'] = iter_label
             
             if metric.name in ['validity', 'unique', 'novelty']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
@@ -218,8 +232,12 @@ def main(cfg):
             result['iteration'] = iteration
             result['run_time'] = run_time
             result['data_size'] = min(input_size, metric.smiles_dataset.data.shape[0])
-            _ = kwargs.pop('estimator', None)
-            result.update(kwargs)
+            
+            if 'model' in kwargs:
+                result['model'] = kwargs['model']
+            if 'gene' in kwargs:
+                result['gene'] = kwargs['gene']
+
             result_list.append(result)
             save_metric_results(result_list, output_dir)
 

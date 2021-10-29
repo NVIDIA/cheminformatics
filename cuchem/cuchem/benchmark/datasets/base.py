@@ -10,11 +10,12 @@ class GenericCSVDataset():
                  properties_cols=None,
                  index_col=None,
                  index_selection=None,
-                 data_path=None):
+                 data_path=None,
+                 max_seq_len=None):
         self.name = name
         self.data_path = data_path
         self.data = None
-        self.max_len = None
+        self.max_seq_len = max_seq_len
         self.properties = None
 
         self.properties_cols = properties_cols # TODO most of these should be passed during load
@@ -34,9 +35,9 @@ class GenericCSVDataset():
             data = data.loc[self.index_selection]
 
         if length_column:
-            self.max_len = data[length_column].max()
+            self.max_seq_len = data[length_column].max()
         elif len(columns) == 1:
-            self.max_len = data[columns[0]].str.len().max()
+            self.max_seq_len = data[columns[0]].str.len().max()
 
         cleaned_data = data[columns]
 
@@ -50,8 +51,10 @@ class GenericCSVDataset():
             other_data = None
         return cleaned_data, other_data
 
-    def load(self, columns=['canonical_smiles'], length_column='length'):
+    def load(self, columns=['canonical_smiles'], length_column='length', data_len=None):
         self.data, _ = self._load_csv(columns, length_column)
+        if data_len:
+            self.data = self.data.iloc[:data_len]
 
 
 class GenericFingerprintDataset():

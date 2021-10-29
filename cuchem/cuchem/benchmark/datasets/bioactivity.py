@@ -34,12 +34,12 @@ class ExCAPEDataset():
                  name = 'ExCAPE',
                  table_name = 'excape',
                  properties_cols = ['pXC50'],
-                 max_len = None,
+                 max_seq_len = None,
                  ):
         self.name = name
         self.table_name = table_name
         self.properties_cols = properties_cols
-        self.max_len = max_len
+        self.max_seq_len = max_seq_len
         self.raw_data_path = os.path.join(data_dir, 'raw_data.csv')
         self.filter_data_path = os.path.join(data_dir, 'filtered_data.csv')
 
@@ -62,15 +62,16 @@ class ExCAPEDataset():
 
 
 class ExCAPEBioactivity(ExCAPEDataset):
-    def __init__(self, data_dir='/data/ExCAPE'):
+    def __init__(self, data_dir='/data/ExCAPE', max_seq_len=None):
         super().__init__(data_dir=data_dir,
                          name = 'ExCAPE Bioactivity',
                          table_name = 'excape_activity')
 
         self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
         self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
+        self.max_seq_len = max_seq_len
 
-    def load(self, filter_len=None):
+    def load(self, max_seq_len=None):
         if os.path.exists(self.filter_data_path):
             data = cudf.read_csv(self.filter_data_path)
             data = data.set_index('index')
@@ -78,11 +79,11 @@ class ExCAPEBioactivity(ExCAPEDataset):
             logger.info('Filtered data not found, loading from RAW data')
             data = self.filter_data()
 
-        if filter_len:
-            data = data[data['canonical_smiles'].str.len() <= filter_len]
-            self.max_len = filter_len
+        if max_seq_len:
+            data = data[data['canonical_smiles'].str.len() <= max_seq_len]
+            self.max_seq_len = max_seq_len
         else:
-            self.max_len = data['canonical_smiles'].str.len().max()
+            self.max_seq_len = data['canonical_smiles'].str.len().max()
 
         self.data = data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
         self.properties = data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])

@@ -126,8 +126,7 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
                                       average_tokens=False)
 
         # Calculate pairwise distances for fingerprints
-        fingerprints = cupy.fromDlpack(self.fingerprint_dataset.data.to_dlpack())
-        fingerprints = cupy.asarray(fingerprints, order='C')
+        fingerprints = cupy.asarray(self.fingerprint_dataset.data)
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
         metric = cupy.nanmean(metric)

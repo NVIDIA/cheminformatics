@@ -4,7 +4,6 @@ import time
 import logging
 import hydra
 import pandas as pd
-import numpy as np
 from datetime import datetime
 
 # DL Models supported
@@ -12,7 +11,6 @@ from cuchem.wf.generative import MegatronMolBART
 from cuchem.wf.generative import Cddd
 
 # Dataset classess
-from cuchem.benchmark.datasets.fingerprints import ZINC15TestSplitFingerprints
 from cuchem.benchmark.datasets.molecules import ZINC15TestSplit
 from cuchem.benchmark.datasets.molecules import (ChEMBLApprovedDrugsPhyschem,
                                                  MoleculeNetESOLPhyschem,
@@ -25,16 +23,11 @@ from cuchem.benchmark.datasets.fingerprints import (ChEMBLApprovedDrugsFingerpri
 from cuchem.benchmark.datasets.bioactivity import (ExCAPEBioactivity, ExCAPEFingerprints)
 
 # Data caches
-from cuchem.benchmark.data import PhysChemEmbeddingData, BioActivityEmbeddingData, SampleCacheData, ZINC15TrainDataset
+from cuchem.benchmark.data import (PhysChemEmbeddingData, BioActivityEmbeddingData, 
+                                    SampleCacheData, ZINC15TrainDataset, ChEMBLApprovedDrugsEmbeddingData)
 
 # Metrics
-from cuchem.benchmark.metrics.sampling import Validity, Unique, Novelty
-from cuchem.benchmark.metrics.embeddings import NearestNeighborCorrelation, Modelability
-
-# ML models supported
-from cuml.ensemble.randomforestregressor import RandomForestRegressor
-from cuml import LinearRegression, ElasticNet
-from cuml.svm import SVR
+from cuchem.benchmark.metrics import Validity, Unique, Novelty, NearestNeighborCorrelation, Modelability
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,6 +35,7 @@ logger = logging.getLogger(__name__)
 
 def convert_runtime(time_): 
     return time_.seconds + (time_.microseconds / 1.0e6)
+
 
 def wait_for_megamolbart_service(inferrer):
     retry_count = 0
@@ -59,32 +53,12 @@ def wait_for_megamolbart_service(inferrer):
     return iteration
 
 
-def get_model():
-        lr_estimator = LinearRegression(normalize=True)
-        lr_param_dict = {'normalize': [True]}
-
-        en_estimator = ElasticNet(normalize=True)
-        en_param_dict = {'alpha': [0.001, 0.01, 0.1, 1.0, 10.0, 100],
-                         'l1_ratio': [0.1, 0.5, 1.0, 10.0]}
-
-        sv_estimator = SVR(kernel='rbf')
-        sv_param_dict = {'C': [0.01, 0.1, 1.0, 10], 'degree': [3,5,7,9]}
-
-        rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0)
-        rf_param_dict = {'n_estimators': [10, 50]}
-
-        return {'linear_regression': [lr_estimator, lr_param_dict],
-                'elastic_net': [en_estimator, en_param_dict],
-                'support_vector_machine': [sv_estimator, sv_param_dict],
-                'random_forest': [rf_estimator, rf_param_dict]}
-
-
 def save_metric_results(metric_list, output_dir):
     metric_df = pd.concat(metric_list, axis=1).T
     logger.info(metric_df)
     metric = metric_df['name'].iloc[0].replace(' ', '_')
     iteration = metric_df['iteration'].iloc[0]
-    metric_df.to_csv(os.path.join(output_dir, f'{metric}_iteration{iteration}.csv'), index=False)
+    metric_df.to_csv(os.path.join(output_dir, f'{metric}_iteration{iteration}.csv'), index=False, mode='a')
 
 
 @hydra.main(config_path=".", config_name="benchmark")
@@ -118,8 +92,9 @@ def main(cfg):
 
         if eval(f'cfg.metric.{name}.enabled'):
             smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
-            smiles_dataset.load(data_len=input_size)
             sample_cache = SampleCacheData()
+
+            smiles_dataset.load(data_len=input_size)
 
             param_list = [inferrer, sample_cache, smiles_dataset]
             if name == 'novelty':
@@ -128,15 +103,15 @@ def main(cfg):
             metric_list.append({name: sampling_metric(*param_list)})
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
-        name = 'nearest neighbor correlation'
+        name = NearestNeighborCorrelation.name
 
-        smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len) # TODO FIX THIS ChEMBLApprovedDrugsPhyschem(max_seq_len=max_seq_len)
+        smiles_dataset = ChEMBLApprovedDrugsPhyschem(max_seq_len=max_seq_len)
+        fingerprint_dataset = ChEMBLApprovedDrugsFingerprints()
+        embedding_cache = ChEMBLApprovedDrugsEmbeddingData()
+
         smiles_dataset.load(data_len=input_size)
-        fingerprint_dataset = ZINC15TestSplitFingerprints() # TODO FIX THIS ChEMBLApprovedDrugsFingerprints()
         fingerprint_dataset.load(smiles_dataset.data.index)
         assert len(smiles_dataset.data) == len(fingerprint_dataset.data)
-
-        embedding_cache = PhysChemEmbeddingData() # TODO FIX THIS
 
         metric_list.append({name: NearestNeighborCorrelation(inferrer,
                                                       embedding_cache,
@@ -145,21 +120,23 @@ def main(cfg):
 
     if cfg.metric.modelability.bioactivity.enabled:
         smiles_dataset = ExCAPEBioactivity(max_seq_len=max_seq_len)
-        fingerprint_dataset = ExCAPEFingerprints()
-        embedding_cache = PhysChemEmbeddingData() # TODO FIX THIS BioActivityEmbeddingData()
+        fingerprint_dataset = ExCAPEFingerprints(max_seq_len=max_seq_len)
+        embedding_cache = BioActivityEmbeddingData()
 
-        smiles_dataset.load(data_len=input_size)
-        fingerprint_dataset.load(smiles_dataset.data.index)
+        smiles_dataset.load(data_len=input_size) # Length restriction probably best applied per-gene
+        fingerprint_dataset.load(data_len=input_size) # TODO improve homogeneity with other dataclasses
+        assert len(smiles_dataset.data) == len(fingerprint_dataset.data)
 
-        groups = list(zip(smiles_dataset.data.groupby(level=0),
-                     smiles_dataset.properties.groupby(level=0),
-                     fingerprint_dataset.data.groupby(level=0)))
+        groups = list(zip(smiles_dataset.data.groupby(level='gene'),
+                     smiles_dataset.properties.groupby(level='gene'),
+                     fingerprint_dataset.data.groupby(level='gene')))
 
         for (label, sm_), (_, prop_), (_, fp_) in groups:
             smiles_dataset.data = sm_ # TODO ensure this isn't overwriting the original dataset
             smiles_dataset.properties = prop_
             fingerprint_dataset.data = fp_
 
+            # TODO: check file creation 
             metric_list.append({label: Modelability('modelability-bioactivity',
                                             inferrer,
                                             embedding_cache,
@@ -167,6 +144,7 @@ def main(cfg):
                                             fingerprint_dataset)})
 
     if cfg.metric.modelability.physchem.enabled:
+        # Could concat datasets to make prep similar to bioactivity
         smiles_dataset_list = [MoleculeNetESOLPhyschem(max_seq_len=max_seq_len),
                                  MoleculeNetFreeSolvPhyschem(max_seq_len=max_seq_len),
                                  MoleculeNetLipophilicityPhyschem(max_seq_len=max_seq_len)]
@@ -185,14 +163,11 @@ def main(cfg):
                     fingerprint_dataset_list)
 
         for (label, smiles_, fp_) in groups:
-            metric_list.append({label: Modelability(f'modelability-physchem',
+            metric_list.append({label: Modelability('modelability-physchem',
                                             inferrer,
                                             embedding_cache,
                                             smiles_,
                                             fp_)})
-
-    # ML models
-    model_dict = get_model() # TODO move this to metrics
 
     iteration = None
     iteration = wait_for_megamolbart_service(inferrer)
@@ -200,8 +175,8 @@ def main(cfg):
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]
         logger.info(f'Metric name: {metric.name}')
-
-        iter_dict = metric.variations(cfg=cfg, model_dict=model_dict)
+       
+        iter_dict = metric.variations(cfg=cfg)
         iter_label, iter_vals = list(iter_dict.items())[0]
         
         result_list = []
@@ -210,7 +185,7 @@ def main(cfg):
             
             kwargs = {iter_label: iter_val}
             if metric.name.startswith('modelability'):
-                estimator, param_dict = model_dict[iter_val]
+                estimator, param_dict = metric.model_dict[iter_val]
                 kwargs.update({'estimator': estimator, 'param_dict': param_dict})
                 if metric.name.endswith('bioactivity'):
                     kwargs['gene'] = metric_key
@@ -223,7 +198,7 @@ def main(cfg):
 
             result['iteration'] = iteration
             result['run_time'] = run_time
-            result['data_size'] = min(input_size, metric.smiles_dataset.data.shape[0])
+            result['data_size'] = len(metric.smiles_dataset.data)
             
             if 'model' in kwargs:
                 result['model'] = kwargs['model']

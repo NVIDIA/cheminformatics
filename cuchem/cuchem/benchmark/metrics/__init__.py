@@ -1,2 +1,2 @@
-from .embeddings import *
+from .embedding import *
 from .sampling import *

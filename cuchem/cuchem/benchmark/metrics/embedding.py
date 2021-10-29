@@ -45,7 +45,7 @@ class BaseEmbeddingMetric():
         if not embedding_results:
             # Generate new samples and update the database
             embedding_results = self.inferrer.smiles_to_embedding(smiles,
-                                                                  max_seq_len + 2)
+                                                                  max_seq_len)
             embedding = embedding_results.embedding
             embedding_dim = embedding_results.dim
 
@@ -86,7 +86,7 @@ class BaseEmbeddingMetric():
             max_seq_len = self.smiles_dataset.max_seq_len
 
         embeddings = []
-        for smiles in self.smiles_dataset.data['canonical_smiles'].to_arrow().to_pylist():
+        for smiles in self.smiles_dataset.data['canonical_smiles']:
             # smiles = self.smiles_dataset.data.loc[smiles_index]
             embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_seq_len=max_seq_len)
             embeddings.append(cupy.array(embedding))
@@ -175,7 +175,7 @@ class Modelability(BaseEmbeddingMetric):
         properties = self.smiles_dataset.properties
         assert len(properties.columns) == 1
         prop_name = properties.columns[0]
-        properties = properties[prop_name].astype(cupy.float32).to_array()
+        properties = cupy.asarray(properties[prop_name], dtype=cupy.float32)
 
         embedding_error, embedding_param = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
         fingerprint_error, fingerprint_param = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
@@ -185,9 +185,7 @@ class Modelability(BaseEmbeddingMetric):
     def calculate(self, estimator, param_dict, **kwargs):
         embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
         embeddings = cupy.asarray(embeddings, dtype=cupy.float32)
-
-        fingerprints = cupy.fromDlpack(self.fingerprint_dataset.data.to_dlpack())
-        fingerprints = cupy.asarray(fingerprints, order='C', dtype=cupy.float32)
+        fingerprints = cupy.asarray(self.fingerprint_dataset.data.values, dtype=cupy.float32)
 
         results = self._calculate_metric(embeddings,
                                          fingerprints,

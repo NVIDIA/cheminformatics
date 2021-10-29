@@ -14,6 +14,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logger = logging.getLogger(__name__)
 
 
+# TODO should split up fingerprint and CDDD classes to eliminate TF requirement
 def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles'):
     """Calculate Morgan fingerprints on SMILES strings
 
@@ -67,7 +68,8 @@ class MorganFingerprint(BaseTransformation):
             fp = self.func(m, **self.kwargs)
             return list(fp.ToBitString())
         else:
-            return [0 for _ in range(self.kwargs['nBits'])]
+            return None # [0 for _ in range(self.kwargs['nBits'])] 
+            # TODO RAJESH I'm concerned about silent errors here if a string of 0's is returned
 
     def transform(self, data, col_name='transformed_smiles'):
         """Single threaded processing of list"""

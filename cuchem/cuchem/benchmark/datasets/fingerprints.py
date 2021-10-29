@@ -1,7 +1,6 @@
 import logging
 import os
 import pathlib
-import cudf
 from .base import GenericFingerprintDataset
 
 __all__ = ['ChEMBLApprovedDrugsFingerprints', 'MoleculeNetLipophilicityFingerprints', 'MoleculeNetESOLFingerprints', 'MoleculeNetFreeSolvFingerprints', 'ZINC15TestSplitFingerprints']

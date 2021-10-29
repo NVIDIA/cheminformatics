@@ -9,6 +9,7 @@ from cuchemcommon.context import Context
 
 logger = logging.getLogger(__name__)
 
+__all__ = ['ChEMBLApprovedDrugsEmbeddingData', 'PhysChemEmbeddingData', 'BioActivityEmbeddingData']
 
 class EmbeddingData(object, metaclass=Singleton):
 
@@ -86,6 +87,13 @@ class EmbeddingData(object, metaclass=Singleton):
         embedding = pickle.loads(embedding)
         embedding_dim = pickle.loads(embedding_dim)
         return (embedding, embedding_dim)
+
+
+class ChEMBLApprovedDrugsEmbeddingData(EmbeddingData):
+
+    def __init__(self, sql_path='db/chembl_approved_drugs.sqlite3'):
+        super().__init__(sql_path=sql_path)
+        logger.info(f'ChEMBL approved drugs database {self.db_file}...')
 
 
 class PhysChemEmbeddingData(EmbeddingData):

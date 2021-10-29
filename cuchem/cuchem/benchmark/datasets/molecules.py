@@ -136,7 +136,7 @@ class ZINC15TestSplit(GenericCSVDataset):
         if data_len:
             self.data = self.data.iloc[:data_len]
 
-        if self.data.shape[-1] == 1:
+        if self.data.shape[-1] == 1: # TODO this is a fix for an issue with SQL data cache, should improve datacache
             self.data = self.data[columns[0]]
 
 

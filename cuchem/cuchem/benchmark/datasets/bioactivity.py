@@ -2,7 +2,6 @@ import logging
 import os
 import pandas as pd
 import dask.dataframe as dd
-import cudf
 
 from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
@@ -58,47 +57,9 @@ class ExCAPEDataset():
         # Save for later use.
         logger.info('Saving filtered database records...')
         filtered_df.reset_index().to_csv(self.filter_data_path, index=False)
-        return cudf.from_pandas(filtered_df)
+        return filtered_df
 
-
-class ExCAPEBioactivity(ExCAPEDataset):
-    def __init__(self, data_dir='/data/ExCAPE', max_seq_len=None):
-        super().__init__(data_dir=data_dir,
-                         name = 'ExCAPE Bioactivity',
-                         table_name = 'excape_activity')
-
-        self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
-        self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
-        self.max_seq_len = max_seq_len
-
-    def load(self, max_seq_len=None):
-        if os.path.exists(self.filter_data_path):
-            data = cudf.read_csv(self.filter_data_path)
-            data = data.set_index('index')
-        else:
-            logger.info('Filtered data not found, loading from RAW data')
-            data = self.filter_data()
-
-        if max_seq_len:
-            data = data[data['canonical_smiles'].str.len() <= max_seq_len]
-            self.max_seq_len = max_seq_len
-        else:
-            self.max_seq_len = data['canonical_smiles'].str.len().max()
-
-        self.data = data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
-        self.properties = data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])
-
-
-class ExCAPEFingerprints(ExCAPEDataset):
-    def __init__(self, data_dir='/data/ExCAPE'):
-        super().__init__(data_dir=data_dir,
-                         name = 'ExCAPE Fingerprints',
-                         table_name = 'excape_fp')
-
-        self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
-        self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
-
-    def load(self, filter_len=None, max_data_size=None):
+    def load(self, data_len=None):
         if os.path.exists(self.filter_data_path):
             data = pd.read_csv(self.filter_data_path)
             data = data.set_index('index')
@@ -106,10 +67,45 @@ class ExCAPEFingerprints(ExCAPEDataset):
             logger.info('Filtered data not found, loading from RAW data')
             data = self.filter_data()
 
-        if filter_len:
-            data = data[data['canonical_smiles'].str.len() <= filter_len]
+        if self.max_seq_len:
+            data = data[data['canonical_smiles'].str.len() <= self.max_seq_len]
+        else:
+            self.max_seq_len = data['canonical_smiles'].str.len().max()
+
+        if data_len:
+            data = data.iloc[:data_len]
+
+        self.data = data
+
+class ExCAPEBioactivity(ExCAPEDataset):
+    def __init__(self, data_dir='/data/ExCAPE', max_seq_len=None):
+        super().__init__(data_dir=data_dir,
+                         name = 'ExCAPE Bioactivity',
+                         table_name = 'excape_activity',
+                         max_seq_len = max_seq_len)
+
+        self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
+        self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
+
+    def load(self, data_len=None):
+        super().load(data_len=data_len)
+        self.properties = self.data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])
+        self.data = self.data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
+
+class ExCAPEFingerprints(ExCAPEDataset):
+    def __init__(self, data_dir='/data/ExCAPE', max_seq_len=None):
+        super().__init__(data_dir=data_dir,
+                         name = 'ExCAPE Fingerprints',
+                         table_name = 'excape_fp',
+                         max_seq_len = max_seq_len)
+
+        self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
+        self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
+
+    def load(self, data_len=None):
+        super().load(data_len=data_len)
 
         # very few repeated SMILES, so probably not worth making unique and then merging
-        fp = calc_morgan_fingerprints(data)
-        fp['gene'] = data['gene'] # TODO may remove this if grouping will be by index from other dataframe
-        self.data = cudf.DataFrame(fp).reset_index().set_index(['gene', 'index'])
+        fp = calc_morgan_fingerprints(self.data, smiles_col='canonical_smiles')
+        fp['gene'] = self.data['gene'] # TODO may remove this if grouping will be by index from other dataframe
+        self.data = pd.DataFrame(fp).reset_index().set_index(['gene', 'index'])

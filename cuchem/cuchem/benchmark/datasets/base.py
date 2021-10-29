@@ -34,10 +34,17 @@ class GenericCSVDataset():
         if self.index_selection:
             data = data.loc[self.index_selection]
 
-        if length_column:
-            self.max_seq_len = data[length_column].max()
-        elif len(columns) == 1:
-            self.max_seq_len = data[columns[0]].str.len().max()
+        if self.max_seq_len:
+            if length_column:
+                mask = data[length_column] <= self.max_seq_len
+            elif len(columns) == 1:
+                mask = data[columns[0]].str.len() <= self.max_seq_len
+            data = data[mask]
+        else:
+            if length_column:
+                self.max_seq_len = data[length_column].max()
+            elif len(columns) == 1:
+                self.max_seq_len = data[columns[0]].str.len().max()
 
         cleaned_data = data[columns]
 

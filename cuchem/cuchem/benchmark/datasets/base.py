@@ -1,5 +1,5 @@
 import logging
-import cudf
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ class GenericCSVDataset():
 
     def _load_csv(self, columns, length_column=None, return_remaining=True):
         columns = [columns] if not isinstance(columns, list) else columns
-        data = cudf.read_csv(self.data_path)
+        data = pd.read_csv(self.data_path)
 
         if self.index_col:
             data = data.set_index(self.index_col).sort_index()
@@ -72,7 +72,7 @@ class GenericFingerprintDataset():
         self.data_path = None
 
     def load(self, index=None):
-        data = cudf.read_csv(self.data_path)
+        data = pd.read_csv(self.data_path)
         if self.index_col:
             data = data.set_index(self.index_col).sort_index()
 

@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import logging
-import pickle
 from typing import List
 
 from cuchemcommon.utils.singleton import Singleton

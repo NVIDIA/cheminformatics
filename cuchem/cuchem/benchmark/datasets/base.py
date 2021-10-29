@@ -36,7 +36,7 @@ class GenericCSVDataset():
         if length_column:
             self.max_len = data[length_column].max()
         elif len(columns) == 1:
-            self.max_len = data[columns[0]].to_pandas().map(len).max()
+            self.max_len = data[columns[0]].str.len().max()
 
         cleaned_data = data[columns]
 

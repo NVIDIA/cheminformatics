@@ -58,7 +58,7 @@ class BaseEmbeddingMetric():
 
         return embedding, embedding_dim
 
-    def encode(self, smiles, max_len, zero_padded_vals, average_tokens):
+    def encode(self, smiles, zero_padded_vals, average_tokens, max_len=None):
         """Encode a single SMILES to embedding from model"""
         embedding, dim = self._find_embedding(smiles, max_len)
 
@@ -88,7 +88,7 @@ class BaseEmbeddingMetric():
         embeddings = []
         for smiles in self.smiles_dataset.data['canonical_smiles'].to_arrow().to_pylist():
             # smiles = self.smiles_dataset.data.loc[smiles_index]
-            embedding = self.encode(smiles, max_len, zero_padded_vals, average_tokens)
+            embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_len=max_len)
             embeddings.append(cupy.array(embedding))
 
         return cupy.asarray(embeddings)

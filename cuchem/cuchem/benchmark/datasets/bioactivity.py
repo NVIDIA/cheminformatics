@@ -33,12 +33,13 @@ class ExCAPEDataset():
                  data_dir='/data/ExCAPE',
                  name = 'ExCAPE',
                  table_name = 'excape',
-                 properties_cols = ['pXC50']
+                 properties_cols = ['pXC50'],
+                 max_len = None,
                  ):
         self.name = name
         self.table_name = table_name
         self.properties_cols = properties_cols
-
+        self.max_len = max_len
         self.raw_data_path = os.path.join(data_dir, 'raw_data.csv')
         self.filter_data_path = os.path.join(data_dir, 'filtered_data.csv')
 
@@ -79,6 +80,9 @@ class ExCAPEBioactivity(ExCAPEDataset):
 
         if filter_len:
             data = data[data['canonical_smiles'].str.len() <= filter_len]
+            self.max_len = filter_len
+        else:
+            self.max_len = data['canonical_smiles'].str.len().max()
 
         self.data = data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
         self.properties = data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])

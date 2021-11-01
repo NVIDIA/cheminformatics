@@ -13,16 +13,16 @@ except:
     from sklearn.linear_model import LinearRegression, ElasticNet
     from sklearn.svm import SVR
     from sklearn.ensemble import RandomForestRegressor
-    from cuchem.utils.metrics import spearmanr # Replace with CPU version: https://github.com/NVIDIA/cheminformatics/blob/daf2989fdcdc9ef349605484d3b96586846396dc/cuchem/tests/test_metrics.py#L235
-    from cuchem.utils.distance import tanimoto_calculate # Replace with similar to CPU version: rdkit.DataManip.Metric.rdMetricMatrixCalc.GetTanimotoDistMat
+    from cuchem.utils.metrics import spearmanr # Replace this with CPU version: https://github.com/NVIDIA/cheminformatics/blob/daf2989fdcdc9ef349605484d3b96586846396dc/cuchem/tests/test_metrics.py#L235
+    from cuchem.utils.distance import tanimoto_calculate # Replace this with similar to CPU version: rdkit.DataManip.Metric.rdMetricMatrixCalc.GetTanimotoDistMat
 else:
     import cupy as xpy
     from cuml.metrics import pairwise_distances, mean_squared_error
     from cuml.linear_model import LinearRegression, ElasticNet
     from cuml.svm import SVR
     from cuml.ensemble import RandomForestRegressor
-    from cuchem.utils.metrics import spearmanr # CPU version: https://github.com/NVIDIA/cheminformatics/blob/daf2989fdcdc9ef349605484d3b96586846396dc/cuchem/tests/test_metrics.py#L235
-    from cuchem.utils.distance import tanimoto_calculate # CPU version: rdkit.DataManip.Metric.rdMetricMatrixCalc.GetTanimotoDistMat
+    from cuchem.utils.metrics import spearmanr
+    from cuchem.utils.distance import tanimoto_calculate
 
 
 logger = logging.getLogger(__name__)

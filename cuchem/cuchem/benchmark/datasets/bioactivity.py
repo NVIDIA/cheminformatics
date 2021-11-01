@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import dask.dataframe as dd
 
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from .utils import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
@@ -107,5 +107,5 @@ class ExCAPEFingerprints(ExCAPEDataset):
 
         # very few repeated SMILES, so probably not worth making unique and then merging
         fp = calc_morgan_fingerprints(self.data, smiles_col='canonical_smiles')
-        fp['gene'] = self.data['gene'] # TODO may remove this if grouping will be by index from other dataframe
+        fp['gene'] = self.data['gene']
         self.data = pd.DataFrame(fp).reset_index().set_index(['gene', 'index'])

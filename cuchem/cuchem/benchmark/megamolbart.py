@@ -58,7 +58,9 @@ def save_metric_results(metric_list, output_dir):
     logger.info(metric_df)
     metric = metric_df['name'].iloc[0].replace(' ', '_')
     iteration = metric_df['iteration'].iloc[0]
-    metric_df.to_csv(os.path.join(output_dir, f'{metric}_iteration{iteration}.csv'), index=False, mode='a')
+    csv_file_path = os.path.join(output_dir, f'{metric}_iteration{iteration}.csv')
+    write_header = False if os.path.exists(csv_file_path) else True
+    metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
 @hydra.main(config_path=".", config_name="benchmark")
@@ -206,7 +208,7 @@ def main(cfg):
                 result['gene'] = kwargs['gene']
 
             result_list.append(result)
-            save_metric_results(result_list, output_dir)
+        save_metric_results(result_list, output_dir)
 
 if __name__ == '__main__':
     main()

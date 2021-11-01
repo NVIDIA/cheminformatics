@@ -19,7 +19,7 @@ import os
 import numpy as np
 import pandas as pd
 from cuchemcommon.data.helper.chembldata import ChEmblData
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchemcommon.fingerprint import calc_morgan_fingerprints # TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
 
 DATA_BENCHMARK_DIR = '/workspace/cuchem/cuchem/cheminformatics/data'
 DEFAULT_MAX_SEQ_LEN = 512

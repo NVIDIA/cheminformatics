@@ -26,6 +26,7 @@ class ChEMBLApprovedDrugsPhyschem(GenericCSVDataset):
         super().__init__(kwargs)
         self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
         self.table_name = 'chembl'
+        self.index_col = 'index'
         self.properties_cols = ['max_phase_for_ind', 'mw_freebase',
                                 'alogp', 'hba', 'hbd', 'psa', 'rtb', 'ro3_pass', 'num_ro5_violations',
                                 'cx_logp', 'cx_logd', 'full_mwt', 'aromatic_rings', 'heavy_atoms',

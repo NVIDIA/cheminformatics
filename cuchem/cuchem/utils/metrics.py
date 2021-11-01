@@ -119,7 +119,7 @@ def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=Fals
     elif (data.ndim == 2) & (axis == 1) & (not is_symmetric):
         data = data.T
 
-    ranks = cudf.DataFrame(data).rank(axis=0, method=method, na_option=na_option)
+    ranks = cudf.DataFrame(data).rank(axis=0, method=method, na_option=na_option) # TODO RAJESH this is where the bug with nearest neighbor search is
     ranks = ranks.values
 
     if axis == 1:

@@ -15,13 +15,14 @@
 # limitations under the License.
 
 import os
-
-# import cudf
+import logging
 import numpy as np
 import pandas as pd
 import pathlib
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.fingerprint import calc_morgan_fingerprints # TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
+
+logger = logging.getLogger(__name__)
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent,
                                 'data')
@@ -46,10 +47,13 @@ if __name__ == '__main__':
     for col in fp.columns:
         fp[col] = fp[col].astype(np.float32)
     fp.index = benchmark_df.index.astype(np.int64)
-    fp.index.rename('index')
-    fp = fp.reset_index()
+
+    assert len(benchmark_df) == len(fp)
+    assert benchmark_df.index.equals(fp.index)
     
     # Write results
+    benchmark_df = benchmark_df.reset_index()
+    fp = fp.reset_index()
     benchmark_df.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_ChEMBL_approved_drugs_physchem.csv'), index=False)
     fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_ChEMBL_approved_drugs_physchem.csv'), index=False)
     # fp_hdf5 = cudf.DataFrame(fp)

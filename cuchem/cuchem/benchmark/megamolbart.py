@@ -114,36 +114,12 @@ def main(cfg):
         smiles_dataset.load(data_len=input_size)
         fingerprint_dataset.load(smiles_dataset.data.index)
         assert len(smiles_dataset.data) == len(fingerprint_dataset.data)
+        assert smiles_dataset.data.index.equals(fingerprint_dataset.data.index)
 
         metric_list.append({name: NearestNeighborCorrelation(inferrer,
                                                       embedding_cache,
                                                       smiles_dataset,
                                                       fingerprint_dataset)})
-
-    if cfg.metric.modelability.bioactivity.enabled:
-        smiles_dataset = ExCAPEBioactivity(max_seq_len=max_seq_len)
-        fingerprint_dataset = ExCAPEFingerprints(max_seq_len=max_seq_len)
-        embedding_cache = BioActivityEmbeddingData()
-
-        smiles_dataset.load(data_len=input_size) # Length restriction probably best applied per-gene
-        fingerprint_dataset.load(data_len=input_size) # TODO improve homogeneity with other dataclasses
-        assert len(smiles_dataset.data) == len(fingerprint_dataset.data)
-
-        groups = list(zip(smiles_dataset.data.groupby(level='gene'),
-                     smiles_dataset.properties.groupby(level='gene'),
-                     fingerprint_dataset.data.groupby(level='gene')))
-
-        for (label, sm_), (_, prop_), (_, fp_) in groups:
-            smiles_dataset.data = sm_ # TODO ensure this isn't overwriting the original dataset
-            smiles_dataset.properties = prop_
-            fingerprint_dataset.data = fp_
-
-            # TODO: check file creation 
-            metric_list.append({label: Modelability('modelability-bioactivity',
-                                            inferrer,
-                                            embedding_cache,
-                                            smiles_dataset,
-                                            fingerprint_dataset)})
 
     if cfg.metric.modelability.physchem.enabled:
         # Could concat datasets to make prep similar to bioactivity
@@ -153,12 +129,13 @@ def main(cfg):
         fingerprint_dataset_list = [MoleculeNetESOLFingerprints(),
                                      MoleculeNetFreeSolvFingerprints(),
                                      MoleculeNetLipophilicityFingerprints()]
-        
         embedding_cache = PhysChemEmbeddingData()
         
         for smdata, fpdata in zip(smiles_dataset_list, fingerprint_dataset_list):
             smdata.load(data_len=input_size)
             fpdata.load(smdata.data.index)
+            assert len(smdata.data) == len(fpdata.data)
+            assert smdata.data.index.equals(fpdata.data.index)
 
         groups = zip([x.table_name for x in smiles_dataset_list],
                     smiles_dataset_list,
@@ -170,6 +147,33 @@ def main(cfg):
                                             embedding_cache,
                                             smiles_,
                                             fp_)})
+
+    if cfg.metric.modelability.bioactivity.enabled:
+        smiles_dataset = ExCAPEBioactivity(max_seq_len=max_seq_len)
+        fingerprint_dataset = ExCAPEFingerprints(max_seq_len=max_seq_len)
+        embedding_cache = BioActivityEmbeddingData()
+
+        smiles_dataset.load(data_len=input_size) # TODO Length restriction probably best applied per-gene
+        fingerprint_dataset.load(data_len=input_size) # TODO improve homogeneity with other dataclasses
+        smiles_dataset.remove_invalids_by_index(fingerprint_dataset)
+
+        assert len(smiles_dataset.data) == len(fingerprint_dataset.data)
+        assert smiles_dataset.data.index.equals(fingerprint_dataset.data.index)
+
+        groups = list(zip(smiles_dataset.data.groupby(level='gene'),
+                     smiles_dataset.properties.groupby(level='gene'),
+                     fingerprint_dataset.data.groupby(level='gene')))
+
+        for (label, sm_), (_, prop_), (_, fp_) in groups:
+            smiles_dataset.data = sm_ # TODO ensure this isn't overwriting the original dataset
+            smiles_dataset.properties = prop_
+            fingerprint_dataset.data = fp_
+
+            metric_list.append({label: Modelability('modelability-bioactivity',
+                                            inferrer,
+                                            embedding_cache,
+                                            smiles_dataset,
+                                            fingerprint_dataset)})
 
     iteration = None
     iteration = wait_for_megamolbart_service(inferrer)

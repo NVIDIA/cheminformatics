@@ -10,8 +10,49 @@ from cuchem.utils.data_peddler import download_cddd_models
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logger = logging.getLogger(__name__)
+
+try:
+    import cupy # TODO is there a better way to check for RAPIDS?
+except:
+    logger.info('RAPIDS installation not found. Numpy and pandas will be used instead.')
+    import numpy as xpy
+    import pandas as xdf
+else:
+    logger.info('RAPIDS installation found. Using cupy and cudf where possible.')
+    import cupy as xpy
+    import cudf as xdf
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+
+def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_invalid=True):
+    """Calculate Morgan fingerprints on SMILES strings
+
+    Args:
+        dataframe (pandas/cudf.DataFrame): dataframe containing a SMILES column for calculation
+        remove_invalid (bool): remove fingerprints from failed SMILES conversion, default: True
+
+    Returns:
+        pandas/cudf.DataFrame: new dataframe containing fingerprints
+    """
+    mf = MorganFingerprint()
+    fp = mf.transform(dataframe, col_name=smiles_col)
+    fp = xdf.DataFrame(fp)
+    fp.index = dataframe.index
+
+    # Check for invalid smiles
+    # Prune molecules which failed to convert or throw error and exit
+    valid_molecule_mask = (fp.sum(axis=1) > 0)
+    num_invalid_molecules = int(valid_molecule_mask.shape[0] - valid_molecule_mask.sum())
+    if num_invalid_molecules > 0:
+        logger.warn(f'WARNING: Found {num_invalid_molecules} invalid fingerprints due to invalid SMILES during fingerprint creation')
+        if remove_invalid:
+            logger.info(f'Removing {num_invalid_molecules} invalid fingerprints due to invalid SMILES during fingerprint creation')
+            fp = fp[valid_molecule_mask]
+
+    return fp
+
 
 class TransformationDefaults(Enum):
     MorganFingerprint = {'radius': 2, 'nBits': 512}
@@ -42,30 +83,34 @@ class MorganFingerprint(BaseTransformation):
         self.kwargs.update(kwargs)
         self.func = AllChem.GetMorganFingerprintAsBitVect
 
-    def transform_single(self, mol):
+    def transform_single(self, smiles):
         """Process single molecule"""
-        m = Chem.MolFromSmiles(mol)
-        if m:
-            fp = self.func(m, **self.kwargs)
-            return np.frombuffer(fp.ToBitString().encode(), 'u1') - ord('0') # NB this is the correct  & fastest way to transform bitstring
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            fp = self.func(mol, **self.kwargs)
+            fp = np.frombuffer(fp.ToBitString().encode(), 'u1') - ord('0')
         else:
-            return None # [0 for _ in range(self.kwargs['nBits'])] 
-            # TODO RAJESH I'm concerned about silent errors here if a list of 0's is returned
+            logger.warn(f'WARNING: Invalid SMILES identified {smiles}')
+            fp = np.array([0 for _ in range(self.kwargs['nBits'])], dtype=np.uint8)
+
+        fp = xpy.asarray(fp)
+        return fp
 
     def transform(self, data, col_name='transformed_smiles'):
         """Single threaded processing of list"""
         data = data[col_name]
         fp_array = []
-        for mol in data:
-            fp = self.transform_single(mol)
+        for smiles in data:
+            fp = self.transform_single(smiles)
             fp_array.append(fp)
-        fp_array = np.asarray(fp_array)
+        fp_array = xpy.stack(fp_array)
         return fp_array
 
     def __len__(self):
         return self.kwargs['nBits']
 
 
+# TODO RAJESH this will have to be moved to a different file during refactor due to TensorFlow requirement
 class Embeddings(BaseTransformation):
 
     def __init__(self, use_gpu=True, cpu_threads=5, model_dir=None, **kwargs):

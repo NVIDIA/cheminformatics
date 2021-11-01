@@ -5,17 +5,21 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import ParameterGrid, KFold
 
+logger = logging.getLogger(__name__)
+
 try:
     import cuml # TODO is there a better way to check for RAPIDS?
 except:
+    logger.info('RAPIDS installation not found. Numpy and pandas will be used instead.')
     import numpy as xpy
     from sklearn.metrics import pairwise_distances, mean_squared_error
     from sklearn.linear_model import LinearRegression, ElasticNet
     from sklearn.svm import SVR
     from sklearn.ensemble import RandomForestRegressor
-    from cuchem.utils.metrics import spearmanr # Replace this with CPU version: https://github.com/NVIDIA/cheminformatics/blob/daf2989fdcdc9ef349605484d3b96586846396dc/cuchem/tests/test_metrics.py#L235
-    from cuchem.utils.distance import tanimoto_calculate # Replace this with similar to CPU version: rdkit.DataManip.Metric.rdMetricMatrixCalc.GetTanimotoDistMat
+    from cuchem.utils.metrics import spearmanr # TODO RAJESH Replace this with CPU version: https://github.com/NVIDIA/cheminformatics/blob/daf2989fdcdc9ef349605484d3b96586846396dc/cuchem/tests/test_metrics.py#L235
+    from cuchem.utils.distance import tanimoto_calculate # TODO RAJESH Replace this with similar to CPU version: rdkit.DataManip.Metric.rdMetricMatrixCalc.GetTanimotoDistMat
 else:
+    logger.info('RAPIDS installation found. Using cupy and cudf where possible.')
     import cupy as xpy
     from cuml.metrics import pairwise_distances, mean_squared_error
     from cuml.linear_model import LinearRegression, ElasticNet
@@ -23,9 +27,6 @@ else:
     from cuml.ensemble import RandomForestRegressor
     from cuchem.utils.metrics import spearmanr
     from cuchem.utils.distance import tanimoto_calculate
-
-
-logger = logging.getLogger(__name__)
 
 __all__ = ['NearestNeighborCorrelation', 'Modelability']
 

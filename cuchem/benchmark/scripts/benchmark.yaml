@@ -33,6 +33,7 @@ metric:
 
 sampling:
   max_seq_len: 512
+  input_size: 5000
   sample_size: 10
 
 output:

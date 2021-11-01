@@ -35,10 +35,10 @@ if __name__ == '__main__':
     # TODO: benchmark SMILES have not been canonicalized. Should this be done?
     fp = calc_morgan_fingerprints(benchmark_df)
     fp.columns = fp.columns.astype(np.int64)
-    fp.index = benchmark_df.index.astype(np.int64)
+    fp.index = benchmark_df.index.astype(np.int64) # TODO is this needed?
     
     for col in fp.columns:
-        fp[col] = fp[col].astype(np.int)
+        fp[col] = fp[col].astype(np.int) # TODO is this needed?
         # fp[col] = fp[col].astype(np.float32)
 
     assert len(benchmark_df) == len(fp)

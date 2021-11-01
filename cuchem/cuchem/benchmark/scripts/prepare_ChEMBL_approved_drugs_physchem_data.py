@@ -25,7 +25,7 @@ from cuchemcommon.fingerprint import calc_morgan_fingerprints
 logger = logging.getLogger(__name__)
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent,
-                                'data')
+                                'csv_data')
 columns = ['molregno', 'canonical_smiles', 'max_phase_for_ind'] 
 physchem_columns = ['mw_freebase', 'alogp', 'hba', 'hbd', 'psa', 'rtb', \
                     'ro3_pass', 'num_ro5_violations', 'cx_logp', 'cx_logd', \
@@ -37,16 +37,19 @@ if __name__ == '__main__':
     benchmark_df = pd.DataFrame(results[0], columns=results[1])
     benchmark_df = benchmark_df[columns + physchem_columns]
     benchmark_df = benchmark_df.rename(columns={'molregno': 'index'})
+    benchmark_df = benchmark_df.set_index('index')
 
     keep_mask = benchmark_df['alogp'].notnull()
     benchmark_df = benchmark_df[keep_mask]
 
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?
     fp = calc_morgan_fingerprints(benchmark_df)
-    fp.columns = fp.columns.astype(np.int64)
-    for col in fp.columns:
+    fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
+    for col in fp.columns: # TODO why are these floats
         fp[col] = fp[col].astype(np.float32)
     fp.index = benchmark_df.index.astype(np.int64)
+    if not isinstance(fp, pd.DataFrame):
+        fp = fp.to_pandas()
 
     assert len(benchmark_df) == len(fp)
     assert benchmark_df.index.equals(fp.index)

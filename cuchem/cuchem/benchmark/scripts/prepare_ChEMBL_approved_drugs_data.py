@@ -33,9 +33,9 @@ if __name__ == '__main__':
 
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?
     fp = calc_morgan_fingerprints(benchmark_df)
-    fp.columns = fp.columns.astype(np.int64)
     fp.index = benchmark_df.index.astype(np.int64)
-    for col in fp.columns:
+    fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
+    for col in fp.columns: # TODO why are these floats
         fp[col] = fp[col].astype(np.float32)
 
     assert len(benchmark_df) == len(fp)

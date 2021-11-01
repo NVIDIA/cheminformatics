@@ -15,10 +15,13 @@
 # limitations under the License.
 
 import os
+import logging
 import numpy as np
 import pandas as pd
 import pathlib
 from cuchemcommon.fingerprint import calc_morgan_fingerprints # TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
+
+logger = logging.getLogger(__name__)
 
 # Data location: https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/Lipophilicity.csv
 # Download to DATA_BENCHMARK_DIR
@@ -38,8 +41,10 @@ if __name__ == '__main__':
     for col in fp.columns:
         fp[col] = fp[col].astype(np.float32)
     fp.index = benchmark_df.index.astype(np.int64)
-    fp.index.rename('index')
-    fp = fp.reset_index()
+
+    assert len(benchmark_df) == len(fp)
+    assert benchmark_df.index.equals(fp.index)
     
     # Write results
+    fp = fp.reset_index()
     fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_MoleculeNet_Lipophilicity.csv'), index=False)

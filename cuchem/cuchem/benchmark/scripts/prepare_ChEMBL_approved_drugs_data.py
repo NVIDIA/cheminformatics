@@ -15,13 +15,14 @@
 # limitations under the License.
 
 import os
-
-# import cudf
+import logging
 import numpy as np
 import pandas as pd
 import pathlib
 from cuchemcommon.data.helper.chembldata import ChEmblData
-from cuchemcommon.fingerprint import calc_morgan_fingerprints# TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
+from cuchemcommon.fingerprint import calc_morgan_fingerprints
+
+logger = logging.getLogger(__name__)
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent.parent,
                                   'tests', 'data')
@@ -33,12 +34,17 @@ if __name__ == '__main__':
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?
     fp = calc_morgan_fingerprints(benchmark_df)
     fp.columns = fp.columns.astype(np.int64)
-    fp.index = fp.index.astype(np.int64)
+    fp.index = benchmark_df.index.astype(np.int64)
     for col in fp.columns:
         fp[col] = fp[col].astype(np.float32)
 
+    assert len(benchmark_df) == len(fp)
+    assert benchmark_df.index.equals(fp.index)
+
     # Write results
-    benchmark_df.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_approved_drugs.csv'))
-    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_approved_drugs.csv'))
+    benchmark_df = benchmark_df.reset_index()
+    fp = fp.reset_index()
+    benchmark_df.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'benchmark_approved_drugs.csv'), index=False)
+    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_approved_drugs.csv'), index=False)
     # fp_hdf5 = cudf.DataFrame(fp)
     # fp_hdf5.to_hdf(os.path.join(DATA_BENCHMARK_DIR, 'filter_00.h5', 'fingerprints', format='table'))

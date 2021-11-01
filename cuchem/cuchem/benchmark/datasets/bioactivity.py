@@ -62,10 +62,11 @@ class ExCAPEDataset():
     def load(self, data_len=None):
         if os.path.exists(self.filter_data_path):
             data = pd.read_csv(self.filter_data_path)
-            data = data.set_index('index')
         else:
             logger.info('Filtered data not found, loading from RAW data')
             data = self.filter_data()
+
+        data = data.set_index(['gene', 'index'])
 
         if self.max_seq_len:
             data = data[data['canonical_smiles'].str.len() <= self.max_seq_len]
@@ -73,7 +74,11 @@ class ExCAPEDataset():
             self.max_seq_len = data['canonical_smiles'].str.len().max()
 
         if data_len:
-            data = data.iloc[:data_len]
+            data = data.groupby(level='gene', as_index=False).apply(lambda x: x.iloc[:data_len])
+            index_names = data.index.names
+            if len(index_names) > 2: # pandas adds dummy index
+                droplevel = index_names.index(None)
+                data = data.droplevel(droplevel)     
 
         self.data = data
 
@@ -89,8 +94,8 @@ class ExCAPEBioactivity(ExCAPEDataset):
 
     def load(self, data_len=None):
         super().load(data_len=data_len)
-        self.properties = self.data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])
-        self.data = self.data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
+        self.properties = self.data[['pXC50']]
+        self.data = self.data[['canonical_smiles']]
 
     def remove_invalids_by_index(self, fingerprint_dataset):
         mask = self.data.index.isin(fingerprint_dataset.data.index)
@@ -115,11 +120,7 @@ class ExCAPEFingerprints(ExCAPEDataset):
 
         # very few repeated SMILES, so probably not worth making unique and then merging
         fp = calc_morgan_fingerprints(self.data, smiles_col='canonical_smiles', remove_invalid=False)
-
-        index_name = self.data.index.name
-        fp[index_name] = self.data.index.values
-        fp['gene'] = self.data['gene']
-        fp = fp.set_index(['gene', index_name])
+        fp.index = self.data.index
 
         # Prune molecules which failed to convert
         valid_molecule_mask = (fp.sum(axis=1) > 0)

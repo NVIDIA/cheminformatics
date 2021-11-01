@@ -25,7 +25,7 @@ else:
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-
+# TODO RAJESH the morgan fingerprint class and this function will need to be separated from those which require TF here
 def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_invalid=True):
     """Calculate Morgan fingerprints on SMILES strings
 

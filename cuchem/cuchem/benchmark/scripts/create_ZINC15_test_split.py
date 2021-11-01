@@ -63,10 +63,10 @@ if __name__ == '__main__':
     benchmark_df.index.name = 'index'
 
     fp = calc_morgan_fingerprints(benchmark_df[['canonical_smiles']])
-    fp.columns = fp.columns.astype(np.int64)
     fp.index = fp.index.astype(np.int64)
     fp.index.name = 'index'
-    for col in fp.columns:
+    fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
+    for col in fp.columns: # TODO why are these floats
         fp[col] = fp[col].astype(np.float32)
 
     # Write results

@@ -18,7 +18,7 @@ import os
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchemcommon.fingerprint import calc_morgan_fingerprints # TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
 
 # Data location: https://deepchemdata.s3.us-west-1.amazonaws.com/datasets/freesolv.csv.gz
 # Download to DATA_BENCHMARK_DIR

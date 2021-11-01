@@ -13,25 +13,6 @@ from rdkit.Chem import AllChem
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logger = logging.getLogger(__name__)
 
-
-# TODO should split up fingerprint and CDDD classes to eliminate TF requirement
-def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles'):
-    """Calculate Morgan fingerprints on SMILES strings
-
-    Args:
-        dataframe (pd.DataFrame): dataframe containing a SMILES column for calculation
-
-    Returns:
-        pd.DataFrame: new dataframe containing fingerprints
-    """
-    mf = MorganFingerprint()
-    fp = mf.transform(dataframe, col_name=smiles_col)
-    fp = pd.DataFrame(fp)
-    fp = pd.DataFrame(fp, columns=pd.RangeIndex(start=0, stop=len(mf))).astype('float32')
-    fp.index = dataframe.index
-    return fp
-
-
 class TransformationDefaults(Enum):
     MorganFingerprint = {'radius': 2, 'nBits': 512}
     Embeddings = {}
@@ -66,10 +47,10 @@ class MorganFingerprint(BaseTransformation):
         m = Chem.MolFromSmiles(mol)
         if m:
             fp = self.func(m, **self.kwargs)
-            return list(fp.ToBitString())
+            return np.frombuffer(fp.ToBitString().encode(), 'u1') - ord('0') # NB this is the correct  & fastest way to transform bitstring
         else:
             return None # [0 for _ in range(self.kwargs['nBits'])] 
-            # TODO RAJESH I'm concerned about silent errors here if a string of 0's is returned
+            # TODO RAJESH I'm concerned about silent errors here if a list of 0's is returned
 
     def transform(self, data, col_name='transformed_smiles'):
         """Single threaded processing of list"""

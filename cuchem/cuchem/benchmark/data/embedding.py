@@ -109,25 +109,3 @@ class BioActivityEmbeddingData(EmbeddingData):
         super().__init__(sql_path=sql_path)
         logger.info(f'Bioactivities properties database {self.db_file}...')
         # TODO how to handle fingerprints -- store in table since there's so many?
-
-    # def fetch_embedding_data(self, smiles): # TODO THIS IS PROBABLY WRONG -- remove it
-    #     """
-    #     Fetch the embedding data for a given dataset and smiles
-    #     :param data:
-    #     :return:
-    #     """
-
-    #     logger.debug('Fetching embedding data...')
-
-    #     cursor = self.conn.cursor()
-    #     cursor.execute(
-    #         '''
-    #         SELECT embedding, embedding_dim FROM emb
-    #         WHERE smiles=?
-    #         ''', [smiles])
-    #     embedding_results = cursor.fetchone()
-
-    #     if not embedding_results:
-    #         return None
-
-    #     return embedding_results

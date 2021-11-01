@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import pathlib
 from cuchemcommon.data.helper.chembldata import ChEmblData
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchemcommon.fingerprint import calc_morgan_fingerprints# TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent.parent,
                                   'tests', 'data')

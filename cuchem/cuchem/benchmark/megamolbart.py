@@ -153,7 +153,7 @@ def main(cfg):
         fingerprint_dataset = ExCAPEFingerprints(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
 
-        smiles_dataset.load(data_len=input_size) # TODO Length restriction probably best applied per-gene
+        smiles_dataset.load(data_len=input_size)
         fingerprint_dataset.load(data_len=input_size) # TODO improve homogeneity with other dataclasses
         smiles_dataset.remove_invalids_by_index(fingerprint_dataset)
 
@@ -165,7 +165,7 @@ def main(cfg):
                      fingerprint_dataset.data.groupby(level='gene')))
 
         for (label, sm_), (_, prop_), (_, fp_) in groups:
-            smiles_dataset.data = sm_ # TODO ensure this isn't overwriting the original dataset
+            smiles_dataset.data = sm_
             smiles_dataset.properties = prop_
             fingerprint_dataset.data = fp_
 

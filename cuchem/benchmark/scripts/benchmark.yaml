@@ -32,8 +32,7 @@ metric:
       enabled: True
 
 sampling:
-  seq_len: 512
-  input_size: 5000
+  max_seq_len: 512
   sample_size: 10
 
 output:

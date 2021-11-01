@@ -20,7 +20,7 @@ import pandas as pd
 import numpy as np
 import multiprocessing as mp
 
-from cuchemcommon.fingerprint import calc_morgan_fingerprints # TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
+from cuchemcommon.fingerprint import calc_morgan_fingerprints
 from cuchem.utils.dataset import ZINC_TRIE_DIR
 
 from rdkit.Chem.Crippen import MolLogP

@@ -19,7 +19,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchemcommon.fingerprint import calc_morgan_fingerprints # TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
+from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 

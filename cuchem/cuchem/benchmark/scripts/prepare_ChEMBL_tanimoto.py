@@ -18,8 +18,8 @@ import os
 import logging
 import numpy as np
 import pandas as pd
-from cuchemcommon.data.helper.chembldata import ChEmblData
-from cuchemcommon.fingerprint import calc_morgan_fingerprints # TODO RAJESH convert to calc_morgan_fingerprints from datasets.utils
+from cuchemcommon.data.helper.chembldata import ChEmblData # TODO RAJESH if this is problematic to refactor, let's talk. Could skip porting the scripts.
+from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 

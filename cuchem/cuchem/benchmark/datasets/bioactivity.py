@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import dask.dataframe as dd
 
-from .utils import calc_morgan_fingerprints
+from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +92,14 @@ class ExCAPEBioactivity(ExCAPEDataset):
         self.properties = self.data[['pXC50', 'gene']].reset_index().set_index(['gene', 'index'])
         self.data = self.data[['canonical_smiles', 'gene']].reset_index().set_index(['gene', 'index'])
 
+    def remove_invalids_by_index(self, fingerprint_dataset):
+        mask = self.data.index.isin(fingerprint_dataset.data.index)
+        num_invalid_molecules = len(self.data) - mask.sum()
+        if num_invalid_molecules > 0:
+            logger.info(f'Removing {num_invalid_molecules} entry from dataset based on index matching.')
+            self.data = self.data[mask]
+            self.properties = self.properties[mask]
+
 class ExCAPEFingerprints(ExCAPEDataset):
     def __init__(self, data_dir='/data/ExCAPE', max_seq_len=None):
         super().__init__(data_dir=data_dir,
@@ -106,6 +114,20 @@ class ExCAPEFingerprints(ExCAPEDataset):
         super().load(data_len=data_len)
 
         # very few repeated SMILES, so probably not worth making unique and then merging
-        fp = calc_morgan_fingerprints(self.data, smiles_col='canonical_smiles')
+        fp = calc_morgan_fingerprints(self.data, smiles_col='canonical_smiles', remove_invalid=False)
+
+        index_name = self.data.index.name
+        fp[index_name] = self.data.index.values
         fp['gene'] = self.data['gene']
-        self.data = pd.DataFrame(fp).reset_index().set_index(['gene', 'index'])
+        fp = fp.set_index(['gene', index_name])
+
+        # Prune molecules which failed to convert
+        valid_molecule_mask = (fp.sum(axis=1) > 0)
+        num_invalid_molecules = int(valid_molecule_mask.shape[0] - valid_molecule_mask.sum())
+        if num_invalid_molecules > 0:
+            logger.warn(f'WARNING: fingerprint dataset length does not match that of SMILES dataset. Run `remove_invalids_by_index` on SMILES dataset to ensure they match.')
+            fp = fp[valid_molecule_mask]
+
+        if not isinstance(fp, pd.DataFrame):
+            fp = fp.to_pandas()
+        self.data = fp

@@ -20,6 +20,7 @@ import shutil
 import logging
 import argparse
 import pathlib
+from subprocess import run
 
 import grpc
 import generativesampler_pb2_grpc
@@ -80,19 +81,35 @@ class Launcher(object):
         Fetch the model path from the model server.
         """
         checkpoints = sorted(pathlib.Path(search_loc).glob('**/megamolbart_checkpoint.nemo'))
-        logger.info(f'Found {len(checkpoints)} checkpoints in {search_loc}')
-        
-        if not checkpoints or len(checkpoints) == 0:
-            raise Exception('Model not found')
-        else:
-            checkpoint_dir = checkpoints[-1].absolute().parent.as_posix()
 
-            # TODO: This is a hack to place the vocab file where the model is expecting it.
-            vocab_path = '/workspace/nemo/nemo/collections/chem/vocab/'
-            os.makedirs(vocab_path, exist_ok=True)
-            shutil.copy(os.path.join(checkpoint_dir, 'bart_vocab.txt'), 
-                        os.path.join(vocab_path, 'megamolbart_pretrain_vocab.txt'))
-            return checkpoint_dir
+        if not checkpoints or len(checkpoints) == 0:
+            logger.info(f'Model not found. Downloading...')
+            self.download_megamolbart_model()
+            checkpoints = sorted(pathlib.Path(search_loc).glob('**/megamolbart_checkpoint.nemo'))
+        logger.info(f'Found {len(checkpoints)} checkpoints in {search_loc}')
+
+        checkpoint_dir = checkpoints[-1].absolute().parent.as_posix()
+
+        # TODO: This is a hack to place the vocab file where the model is expecting it.
+        vocab_path = '/workspace/nemo/nemo/collections/chem/vocab/'
+        os.makedirs(vocab_path, exist_ok=True)
+        shutil.copy(os.path.join(checkpoint_dir, 'bart_vocab.txt'),
+                    os.path.join(vocab_path, 'megamolbart_pretrain_vocab.txt'))
+        return checkpoint_dir
+
+    def download_megamolbart_model(self):
+        """
+        Downloads MegaMolBART model from NGC.
+        """
+        download_script = '/opt/nvidia/cuchemcommon/launch'
+        if os.path.exists(download_script):
+            logger.info('Triggering model download...')
+            result = run(['bash', '-c',
+                          'cd /opt/nvidia/cuchemcommon/ && /opt/nvidia/cuchemcommon/launch download_model'])
+            logger.info(f'Model download result: {result.stdout}')
+            logger.info(f'Model download result: {result.stderr}')
+            if result.returncode != 0:
+                raise Exception('Error downloading model')
 
 def main():
     Launcher()

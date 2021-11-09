@@ -72,20 +72,24 @@ source env.sh
 
 
 start() {
+    validate_docker
     # run a container and start dash inside container.
     echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
-<<<<<<< HEAD
-=======
+
     export ADDITIONAL_PARAM="$@"
->>>>>>> 67db0ad... Remove the need to login to ngc to download containers.
 
     download_model
     dbSetup ${DATA_PATH}
 
     export CUCHEM_UI_START_CMD="./launch.sh start $@"
-    export MEGAMOLBART_CMD="python3 launch.py"
-    export CUCHEM_PATH=/opt/nvidia/cheminfomatics
-    export MEGAMOLBART_PATH=/opt/nvidia/megamolbart
+    export MEGAMOLBART_CMD="python3 -m megamolbart"
+    export UID=$(id -u)
+    export GID=$(id -g)
+
+    # Working directory for the individual containers.
+    export WORKING_DIR_CUCHEMUI=/opt/nvidia/cheminfomatics
+    export WORKING_DIR_MEGAMOLBART=/opt/nvidia/megamolbart
+
     docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \
@@ -122,6 +126,9 @@ case $1 in
         ;;
     stop)
         ;&
+    download_model)
+        $@
+        ;;
     cache)
         $@
         ;;

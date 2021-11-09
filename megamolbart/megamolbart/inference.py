@@ -2,13 +2,11 @@
 
 import logging
 from functools import partial
-from pathlib import Path
 from typing import List
 from rdkit import Chem
 
 import torch
 import pandas as pd
-from omegaconf import OmegaConf
 from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 
 from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMolBARTModel
@@ -40,7 +38,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         self.device = 'cuda'  # Megatron arg loading seems to only work with GPU
         self.min_jitter_radius = 1.0
-        self.model = self.load_model(model_dir)
+        self.model, self.version = self.load_model(model_dir)
         self.max_model_position_embeddings = self.model.max_seq_len
         self.tokenizer = self.model.tokenizer
 
@@ -56,7 +54,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
         model = MegaMolBARTModel.restore_from(checkpoint_path)
         model = model.cuda()
         model.eval()
-        return model
+
+        # TODO: get version from model (self.megamolbart.model)
+        return model, '0.2.0'
 
     def smiles2embedding(self, smiles, pad_length=None):
         """Calculate embedding and padding mask for smiles with optional extra padding
@@ -250,8 +250,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
             embeddings = []
             for interpolated_embedding in interpolated_embeddings:
                 embeddings.append(interpolated_embedding.flatten().tolist())
-
-            logger.info(f'-------------- {type(interpolated_mol[0])} {type(embeddings[0])}  {dims}   {type(dims[0])} ')
 
             interp_df = pd.DataFrame({'SMILES': interpolated_mol,
                                       'embeddings': embeddings,

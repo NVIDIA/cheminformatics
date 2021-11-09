@@ -5,7 +5,7 @@ import pandas as pd
 from typing import List
 
 from generativesampler_pb2_grpc import GenerativeSamplerStub
-from generativesampler_pb2 import GenerativeSpec, EmbeddingList, GenerativeModel, google_dot_protobuf_dot_empty__pb2
+from generativesampler_pb2 import GenerativeSpec, EmbeddingList, GenerativeModel
 
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
@@ -15,18 +15,24 @@ from cuchemcommon.workflow import BaseGenerativeWorkflow
 logger = logging.getLogger(__name__)
 
 
-class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
+class MegatronMolBART(BaseGenerativeWorkflow):
+    __metaclass__ = Singleton
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(None)) -> None:
         super().__init__(dao)
 
         self.min_jitter_radius = 1
-        channel = grpc.insecure_channel('megamolbart:50051')
-        self.stub = GenerativeSamplerStub(channel)
+        self.channel = grpc.insecure_channel('megamolbart:50051')
+        self.stub = GenerativeSamplerStub(self.channel)
 
-    def get_iteration(self):
-        result = self.stub.GetIteration(google_dot_protobuf_dot_empty__pb2.Empty())
-        return result.iteration
+    def is_ready(self, timeout: int = 10) -> bool:
+        try:
+            grpc.channel_ready_future(self.channel).result(timeout=timeout)
+            logger.info('Megatron MolBART is ready')
+            return True
+        except grpc.FutureTimeoutError:
+            logger.warning('Megatron MolBART is not reachable.')
+            return False
 
     def smiles_to_embedding(self,
                             smiles: str,

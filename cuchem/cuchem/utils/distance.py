@@ -16,7 +16,12 @@
 
 import math
 
-import cupy
+try:
+    import cupy as xpy
+except ModuleNotFoundError as e:
+    import numpy as xpy
+
+
 from numba import cuda
 
 
@@ -109,18 +114,19 @@ def compute_rdkit_tanimoto_similarity_matrix(data, dist_array):
     dist_array[i][j] = intersections / float(total - intersections)
 
 
+#TODO: Make sure to test this function outside RAPIDS
 def tanimoto_calculate(fp, calc_distance=False):
     """Calculate tanimoto similarity or distance
 
     Args:
-        fp (cupy array or cudf dataframe): fingerprints with samples in rows
+        fp (array or dataframe): fingerprints with samples in rows
         calc_distance (bool, optional): Calculate distance metric. Defaults to False.
 
     Returns:
         array: pairwise tanimoto distance
     """
 
-    dist_array = cupy.zeros((fp.shape[0], fp.shape[0]), cupy.float32)
+    dist_array = xpy.zeros((fp.shape[0], fp.shape[0]), xpy.float32)
     compute_rdkit_tanimoto_similarity_matrix.forall(fp.shape[0] * fp.shape[0], 1)(fp, dist_array)
 
     if calc_distance:

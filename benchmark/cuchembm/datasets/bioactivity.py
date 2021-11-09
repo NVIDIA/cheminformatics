@@ -3,11 +3,12 @@ import os
 import pandas as pd
 import dask.dataframe as dd
 
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchembm.metrics.utils import calculate_morgan_fingerprint
+
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['ExCAPEBioactivity', 'ExCAPEFingerprints', 'BIOACTIVITY_TABLE_LIST']
+__all__ = ['ExCAPEDataset', 'BIOACTIVITY_TABLE_LIST']
 BIOACTIVITY_TABLE_LIST = ['excape_activity', 'excape_fp']
 
 GENE_SYMBOLS = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1A", "ADRA1D",
@@ -39,10 +40,43 @@ class ExCAPEDataset():
         self.table_name = table_name
         self.properties_cols = properties_cols
         self.max_seq_len = max_seq_len
-        self.raw_data_path = os.path.join(data_dir, 'raw_data.csv')
-        self.filter_data_path = os.path.join(data_dir, 'filtered_data.csv')
+
+        # All directories and files to be used for ExCAPE DB.
+        self.excape_dir = data_dir
+        self.raw_data_path = os.path.join(self.excape_dir, 'publication_inchi_smiles_v2.tsv')
+        self.filter_data_path = os.path.join(self.excape_dir, 'filtered_data.csv')
+        if not os.path.exists(self.excape_dir):
+            os.makedirs(self.excape_dir)
+
+        # Relavent data loaded and computed using input ExCAPE DB.
+        self.smiles = None
+        self.properties = None
+        self.fingerprints = None
+
+    def _download(self):
+        """
+        Download ExCAPE database if not already downloaded.
+        """
+        if not os.path.exists(self.raw_data_path):
+            excape_file = os.path.join(self.excape_dir, 'publication_inchi_smiles_v2.tsv.xz')
+            if not os.path.exists(excape_file):
+                logger.info('Downloading ExCAPE data...')
+                os.system(f'wget -O {excape_file} https://zenodo.org/record/2543724/files/pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv.xz?download=1')
+
+            logger.info(f'Extracting ExCAPE db {excape_file}...')
+            os.system(f'cd {self.excape_dir} && xz -k -d {excape_file}')
 
     def filter_data(self, filter_col='Gene_Symbol', filter_list=GENE_SYMBOLS):
+        """
+        Filter ExCAPE data to only include genes of interest.
+        """
+
+        if os.path.exists(self.filter_data_path):
+            logger.debug('Using existing filtered ExCAPE data...')
+            return pd.read_csv(self.filter_data_path, nrows=1000)
+
+        self._download()
+        logger.info(f'Loading ExCAPE file from {self.raw_data_path}...')
         data = dd.read_csv(self.raw_data_path,
                             delimiter='\t',
                             usecols=['SMILES', filter_col] + self.properties_cols)
@@ -59,13 +93,24 @@ class ExCAPEDataset():
         filtered_df.reset_index().to_csv(self.filter_data_path, index=False)
         return filtered_df
 
-    def load(self, data_len=None):
-        if os.path.exists(self.filter_data_path):
-            data = pd.read_csv(self.filter_data_path)
-        else:
-            logger.info('Filtered data not found, loading from RAW data')
-            data = self.filter_data()
+    def _remove_invalids_by_index(self):
 
+        if self.fingerprints is None:
+            raise ValueError('Fingerprint data not loaded. Run `load` first.')
+
+        mask = self.smiles.index.isin(self.fingerprints.index)
+        num_invalid_molecules = len(self.smiles) - mask.sum()
+
+        if num_invalid_molecules > 0:
+            logger.info(f'Removing {num_invalid_molecules} entry from dataset based on index matching.')
+            self.smiles = self.smiles[mask]
+            self.properties = self.properties[mask]
+
+    def load(self, data_len=None):
+        """
+        Load ExCAPE data.
+        """
+        data = self.filter_data()
         data = data.set_index(['gene', 'index'])
 
         if self.max_seq_len:
@@ -78,49 +123,16 @@ class ExCAPEDataset():
             index_names = data.index.names
             if len(index_names) > 2: # pandas adds dummy index
                 droplevel = index_names.index(None)
-                data = data.droplevel(droplevel)     
+                data = data.droplevel(droplevel)
 
-        self.data = data
+        # Bioactivity data.
+        logger.info('Setting properties and smiles...')
+        self.properties = data[['pXC50']]
+        self.smiles = data[['canonical_smiles']]
 
-class ExCAPEBioactivity(ExCAPEDataset):
-    def __init__(self, data_dir='/data/ExCAPE', max_seq_len=None):
-        super().__init__(data_dir=data_dir,
-                         name = 'ExCAPE Bioactivity',
-                         table_name = 'excape_activity',
-                         max_seq_len = max_seq_len)
-
-        self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
-        self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
-
-    def load(self, data_len=None):
-        super().load(data_len=data_len)
-        self.properties = self.data[['pXC50']]
-        self.data = self.data[['canonical_smiles']]
-
-    def remove_invalids_by_index(self, fingerprint_dataset):
-        mask = self.data.index.isin(fingerprint_dataset.data.index)
-        num_invalid_molecules = len(self.data) - mask.sum()
-        if num_invalid_molecules > 0:
-            logger.info(f'Removing {num_invalid_molecules} entry from dataset based on index matching.')
-            self.data = self.data[mask]
-            self.properties = self.properties[mask]
-
-class ExCAPEFingerprints(ExCAPEDataset):
-    def __init__(self, data_dir='/data/ExCAPE', max_seq_len=None):
-        super().__init__(data_dir=data_dir,
-                         name = 'ExCAPE Fingerprints',
-                         table_name = 'excape_fp',
-                         max_seq_len = max_seq_len)
-
-        self.raw_data_path = os.path.join(data_dir, 'pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv')
-        self.filter_data_path = os.path.join(data_dir, 'ExCAPE_filtered_data.csv')
-
-    def load(self, data_len=None):
-        super().load(data_len=data_len)
-
-        # very few repeated SMILES, so probably not worth making unique and then merging
-        fp = calc_morgan_fingerprints(self.data, smiles_col='canonical_smiles', remove_invalid=False)
-        fp.index = self.data.index
+        # Fingerprint data.
+        fp = calculate_morgan_fingerprint(data['canonical_smiles'].values, 2, 512)
+        fp = pd.DataFrame(fp, index=data.index)
 
         # Prune molecules which failed to convert
         valid_molecule_mask = (fp.sum(axis=1) > 0)
@@ -131,4 +143,9 @@ class ExCAPEFingerprints(ExCAPEDataset):
 
         if not isinstance(fp, pd.DataFrame):
             fp = fp.to_pandas()
-        self.data = fp
+
+        self.fingerprints = fp
+        self._remove_invalids_by_index()
+
+        assert len(self.smiles) == len(self.fingerprints)
+        assert self.smiles.index.equals(self.fingerprints.index)

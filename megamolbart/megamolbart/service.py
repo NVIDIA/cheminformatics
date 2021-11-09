@@ -1,7 +1,7 @@
 import logging
 import torch
 
-from generativesampler_pb2 import EmbeddingList, SmilesList, IterationVal
+from generativesampler_pb2 import EmbeddingList, SmilesList, Version
 import generativesampler_pb2_grpc
 from megamolbart.inference import MegaMolBART
 
@@ -18,12 +18,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
         model_dir = kwargs['model_dir'] if 'model_dir' in kwargs else None
         self.megamolbart = MegaMolBART(model_dir=model_dir + '/megamolbart_checkpoint.nemo')
 
-        try:
-            iteration = int(self.megamolbart.iteration)
-        except:
-            iteration = 0
-        self.iteration = iteration
-        logger.info(f'Loaded iteration {self.iteration}')
+        logger.info(f'Loaded Version {self.megamolbart.version}')
 
     # TODO update to accept batched input if similes2embedding does
     # TODO how to handle length overrun for batch processing --> see also MegaMolBART.load_model in inference.py
@@ -84,5 +79,5 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
             force_unique=False)
         return SmilesList(generatedSmiles=generated_smiles)
 
-    def GetIteration(self, spec, context):
-        return IterationVal(iteration=self.iteration)
+    def GetVersion(self, spec, context):
+        return Version(version='0.1.0_' + self.megamolbart.version)

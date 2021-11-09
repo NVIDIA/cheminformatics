@@ -25,7 +25,7 @@ service GenerativeSampler {
   rpc EmbeddingToSmiles(EmbeddingList) returns (SmilesList) {};
   rpc FindSimilars(GenerativeSpec) returns (SmilesList) {};
   rpc Interpolate(GenerativeSpec) returns (SmilesList) {};
-  rpc GetIteration(google.protobuf.Empty) returns (IterationVal) {};
+  rpc GetVersion(google.protobuf.Empty) returns (Version) {};
 }
 
 
@@ -53,6 +53,6 @@ message EmbeddingList{
 }
 
 
-message IterationVal{
-  int32 iteration = 1;
+message Version{
+  string version = 1;
 }

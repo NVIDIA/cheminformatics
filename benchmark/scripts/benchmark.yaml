@@ -1,3 +1,15 @@
+formatters:
+  simple:
+    format: '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: simple
+    stream: ext://sys.stdout
+
+root:
+  handlers: [console]
+
 model:
   name: MegaMolBART
   params:
@@ -27,13 +39,13 @@ metric:
 
   modelability:
     bioactivity:
-      enabled: False
+      enabled: True
     physchem:
       enabled: True
 
 sampling:
   max_seq_len: 512
-  input_size: 5000
+  input_size: 1000
   sample_size: 10
 
 output:

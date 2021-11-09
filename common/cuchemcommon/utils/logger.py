@@ -65,7 +65,10 @@ class MetricsLogger(object):
         context = Context()
 
         runtime = datetime.now() - self.start_time
-        logger.info('### Runtime {} time (hh:mm:ss.ms) {}'.format(self.task_name, runtime))
+        logger.info(f'### Runtime {self.task_name} time (hh:mm:ss.ms) {runtime} -->{context.is_benchmark}')
+        if not context.is_benchmark:
+            return
+
         n_workers = len(context.dask_client.cluster.workers)
 
         if self.metric_func and context.is_benchmark:

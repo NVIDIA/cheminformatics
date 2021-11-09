@@ -35,7 +35,7 @@ launch.sh [command]
 
 Getting Started tl;dr
 ----------------------------------------
-
+    ./launch config
     ./launch build
     ./launch start
     navigate browser to http://localhost:5000
@@ -53,39 +53,28 @@ variables:
         cheminformatics_demo:latest
     MEGAMOLBART_CONT
         container image for MegaMolBART service, prepended with registry.
+    MEGAMOLBART_MODEL
+        MegaMolBART model and the version to use.
     CONTENT_PATH
         path to repository. e.g.,
         /home/user/projects/cheminformatics
     DATA_PATH
         path to data directory. e.g.,
         /scratch/data/cheminformatics
-    REGISTRY_ACCESS_TOKEN
-        container registry access token. e.g.,
-        Ckj53jGK...
-    REGISTRY_USER
-        container registry username. e.g.,
-        astern
-    REGISTRY
-        container registry URL. e.g.,
-        server.com/registry:5005
 
 EOF
-    exit
 }
 
 source setup/env.sh
-DEV_PYTHONPATH="/workspace/cuchem:/workspace/common:/workspace/common/generated/"
-
+CHEMINFO_DIR='/workspace'
 if [ -e /workspace/cuchem/startdash.py ]; then
-    # When inside container in dev mode
-    CUCHEM_LOC="/workspace/cuchem/"
+    # When inside container in dev/test mode
+    CHEMINFO_DIR='/workspace'
 elif [ -e /opt/nvidia/cheminfomatics/cuchem/startdash.py ]; then
     # When inside container in prod mode
-    CUCHEM_LOC="/opt/nvidia/cheminfomatics/cuchem/"
-else
-    # On baremetal
-    CUCHEM_LOC="./"
+    CHEMINFO_DIR="/opt/nvidia/cheminfomatics"
 fi
+PYTHONPATH_CUCHEM="${CHEMINFO_DIR}/cuchem:${CHEMINFO_DIR}/common:${CHEMINFO_DIR}/common/generated/"
 
 build() {
     local IMG_OPTION=$1
@@ -104,7 +93,7 @@ build() {
     if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "2" ]]; then
         IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
         echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
-        docker build --no-cache --network host \
+        docker build --network host \
             --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
             -t ${MEGAMOLBART_CONT_BASENAME}:latest \
             -t ${MEGAMOLBART_CONT} \
@@ -112,7 +101,6 @@ build() {
     fi
 
     set +e
-    exit
 }
 
 
@@ -167,43 +155,49 @@ dev() {
 
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
+        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:/workspace/megamolbart:/opt/MolBART/megatron_molbart/"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/megamolbart:/workspace/benchmark"
         CONT=${MEGAMOLBART_CONT}
     else
         DOCKER_CMD="${DOCKER_CMD} --privileged"
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
+        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 
     ${DOCKER_CMD} -it ${CONT} bash
-
-    exit
 }
 
 
 start() {
+    validate_docker
+
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-        PYTHONPATH=/opt/nvidia/cheminfomatics/common/generated:/opt/nvidia/cheminfomatics/common:/opt/nvidia/cheminfomatics/cuchem:/opt/nvidia/cheminfomatics/chemportal
+        PYTHONPATH=${PYTHONPATH_CUCHEM}
         dbSetup "${DATA_MOUNT_PATH}"
-        cd ${CUCHEM_LOC}; python3 ${CUCHEM_LOC}/startdash.py analyze $@
+        cd ${CHEMINFO_DIR}/cuchem/; python3 startdash.py analyze $@
     else
         # run a container and start dash inside container.
         setup
 
         export CUCHEM_UI_START_CMD="./launch.sh start $@"
-        export MEGAMOLBART_CMD="python3 launch.py"
-        export CUCHEM_PATH=/workspace
-        export MEGAMOLBART_PATH=/workspace/megamolbart
-        export WORKSPACE_DIR='.'
+        export MEGAMOLBART_CMD="python3 -m megamolbart"
+        export UID=$(id -u)
+        export GID=$(id -g)
+
+        # Working directory for the individual containers.
+        export WORKING_DIR_CUCHEMUI=/workspace
+        export WORKING_DIR_MEGAMOLBART=/workspace/megamolbart
+        export PYTHONPATH_MEGAMOLBART="${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
+
         docker-compose --env-file .env  \
                 -f setup/docker_compose.yml \
                 --project-directory . \
                 up
     fi
-    exit
 }
 
 
@@ -220,21 +214,26 @@ cache() {
         set -x
         # Executed within container or a managed env.
         dbSetup "${DATA_MOUNT_PATH}"
-        cd ${CUCHEM_LOC}; python3 startdash.py cache $@
+        cd ${CHEMINFO_DIR}/cuchem/; python3 startdash.py cache $@
     else
         dbSetup "${DATA_PATH}"
         # run a container and start dash inside container.
         ${DOCKER_CMD} -it ${CUCHEM_CONT} ./launch.sh cache $@
     fi
-    exit
 }
 
 
 test() {
     dbSetup "${DATA_PATH}"
     # run a container and start dash inside container.
-    pytest tests
-    exit
+    if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
+        pytest tests
+    else
+        ${DOCKER_CMD} -w /workspace/cuchem \
+            -e PYTHONPATH="${PYTHONPATH_CUCHEM}" \
+            ${CUCHEM_CONT}  \
+            pytest tests
+    fi
 }
 
 
@@ -246,13 +245,15 @@ jupyter() {
         --NotebookApp.password=\"\" \
         --NotebookApp.token=\"\" \
         --NotebookApp.password_required=False
-    exit
 }
 
 
 case $1 in
     build)
         $@
+        ;;
+    config)
+        config 1
         ;;
     push)
         ;&

@@ -68,11 +68,6 @@ EOF
     exit
 }
 
-if [ ! -x "$(command -v ngc)" ]; then
-    echo "${RED}Please install NGC CLI. https://docs.nvidia.com/dgx/ngc-registry-cli-user-guide/index.html${RESET}"
-    exit 1
-fi
-
 
 source env.sh
 
@@ -88,7 +83,7 @@ start() {
     export ADDITIONAL_PARAM="$@"
     export CUCHEM_PATH=/opt/nvidia/cheminfomatics
     export MEGAMOLBART_PATH=/opt/nvidia/megamolbart
-    docker-compose --env-file .env  \
+    ./docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \
         up
@@ -96,7 +91,7 @@ start() {
 
 
 stop() {
-    docker-compose --env-file .env  \
+    ./docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \
         down

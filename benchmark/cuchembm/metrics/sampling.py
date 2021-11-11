@@ -22,7 +22,7 @@ class BaseSampleMetric():
                  smiles_dataset):
         self.inferrer = inferrer
         self.sample_cache = sample_cache
-        self.smiles_dataset = smiles_dataset
+        self.dataset = smiles_dataset
         self.name = self.__class__.__name__
 
     def _find_similars_smiles(self,
@@ -32,6 +32,7 @@ class BaseSampleMetric():
                               force_unique,
                               sanitize):
         # Check db for results from a previous run
+        logger.debug(f'Checking cache for {smiles}...')
         generated_smiles = self.sample_cache.fetch_sampling_data(self.inferrer.__class__.__name__,
                                                                    smiles,
                                                                    num_samples,
@@ -39,6 +40,7 @@ class BaseSampleMetric():
                                                                    force_unique,
                                                                    sanitize)
         if not generated_smiles:
+            logger.debug(f'Sampling for {smiles}...')
             # Generate new samples and update the database
             result = self.inferrer.find_similars_smiles(smiles,
                                                         num_samples,
@@ -78,8 +80,8 @@ class BaseSampleMetric():
     def sample_many(self, smiles_dataset, num_samples, radius):
         metric_result = list()
 
-        for index in range(len(smiles_dataset.data)):
-            smiles = smiles_dataset.data.iloc[index]
+        for index in range(len(smiles_dataset.smiles)):
+            smiles = smiles_dataset.smiles.iloc[index]
             logger.debug(f'Sampling around {smiles}...')
             result = self.sample(smiles, num_samples, radius)
             metric_result.append(result)
@@ -87,7 +89,7 @@ class BaseSampleMetric():
         return np.array(metric_result)
 
     def calculate(self, radius, num_samples, **kwargs):
-        metric_array = self.sample_many(self.smiles_dataset, num_samples, radius)
+        metric_array = self.sample_many(self.dataset, num_samples, radius)
         metric = self._calculate_metric(metric_array, num_samples)
 
         return pd.Series({'name': self.name,

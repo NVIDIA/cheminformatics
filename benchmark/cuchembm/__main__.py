@@ -28,13 +28,6 @@ from cuchembm.metrics import (Validity,
                               NearestNeighborCorrelation,
                               Modelability)
 
-# LOGGING_LEVEL = logging.DEBUG
-# logging.basicConfig(level=LOGGING_LEVEL, filename='/logs/benchmark.log')
-# console = logging.StreamHandler()
-# console.setLevel(LOGGING_LEVEL)
-# console.setFormatter(logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s'))
-# logging.getLogger("").addHandler(console)
-
 
 log = logging.getLogger(__name__)
 
@@ -111,13 +104,9 @@ def main(cfg):
         name = NearestNeighborCorrelation.name
 
         smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
-        # fingerprint_dataset = ChEMBLApprovedDrugs()
         embedding_cache = ChEMBLApprovedDrugsEmbeddingData()
 
         smiles_dataset.load(data_len=input_size)
-        # fingerprint_dataset.load(smiles_dataset.data.index)
-        # assert len(smiles_dataset.data) == len(fingerprint_dataset.data)
-        # assert smiles_dataset.data.index.equals(fingerprint_dataset.data.index)
 
         metric_list.append({name: NearestNeighborCorrelation(inferrer,
                                                              embedding_cache,

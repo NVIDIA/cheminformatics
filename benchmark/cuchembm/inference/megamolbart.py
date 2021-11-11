@@ -13,8 +13,7 @@ from megamolbart.inference import MegaMolBART
 logger = logging.getLogger(__name__)
 
 
-class MegaMolBARTWrapper():
-    __metaclass__ = Singleton
+class MegaMolBARTWrapper(metaclass=Singleton):
 
     def __init__(self) -> None:
         self.min_jitter_radius = 1

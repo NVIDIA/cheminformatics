@@ -40,7 +40,6 @@ class GenericCSVDataset():
         self.fp_index_col = index_col
 
         # Data
-        self.data = None
         self.smiles = None
         self.properties = None
         self.fingerprints = None
@@ -62,28 +61,16 @@ class GenericCSVDataset():
             data = data.loc[self.index_selection]
 
         if self.max_seq_len:
-            # if length_column:
-            #     mask = data[length_column].str.len() <= self.max_seq_len
-            # elif len(columns) == 1:
-            #     mask = data[columns[0]].str.len() <= self.max_seq_len
             mask = data[columns[0]].str.len() <= self.max_seq_len
             data = data[mask]
         else:
-            # if length_column:
-            #     self.max_seq_len = data[length_column].str.len().max()
-            # elif len(columns) == 1:
-            #     self.max_seq_len = data[columns[0]].str.len().max()
             self.max_seq_len = data[columns[0]].str.len().max()
 
-        cleaned_data = data[columns]
         if data_len:
-            cleaned_data = cleaned_data.iloc[:data_len]
+            data = data.iloc[:data_len]
 
+        cleaned_data = data[columns]
         if return_remaining:
-            # if length_column:
-            #     remain_columns = [x for x in data.columns if (x not in columns) & (x not in [length_column])]
-            # else:
-            #     remain_columns = [x for x in data.columns if (x not in columns)]
             remain_columns = [x for x in data.columns if (x not in columns)]
             other_data = data[remain_columns]
         else:
@@ -96,13 +83,11 @@ class GenericCSVDataset():
              length_column='length',
              data_len=None):
         # Load phyChem properties
-        logger.info(f'Loading phyChem properties from {self.prop_data_path}')
-        self.data, self.properties = self._load_csv(columns, length_column, data_len=data_len)
+        logger.info(f'Loading physChem properties from {self.prop_data_path}')
+        self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len)
 
         if self.smiles_col is not None:
-            self.smiles = self.data.rename(columns={columns[self.smiles_col]: 'canonical_smiles'})
-        else:
-            self.smiles = self.data
+            self.smiles = self.smiles.rename(columns={columns[self.smiles_col]: 'canonical_smiles'})
 
         if self.orig_property_name:
             self.properties = self.properties.rename(columns=dict(zip(self.orig_property_name,

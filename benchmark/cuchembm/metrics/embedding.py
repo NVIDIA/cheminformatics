@@ -188,12 +188,13 @@ class Modelability(BaseEmbeddingMetric):
             self.model_dict = model_dict
         return {'model': list(self.model_dict.keys())}
 
-    def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
+    def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=4):
         """Perform grid search with cross validation and return score"""
         logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
         best_score, best_param = np.inf, None
+        # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
 

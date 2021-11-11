@@ -20,7 +20,6 @@ metric:
     enabled: True
     radius:
       - 1
-      - 2
 
   unique:
     enabled: True

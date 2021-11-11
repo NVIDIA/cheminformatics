@@ -1,4 +1,6 @@
 import logging
+
+from cuchemcommon.utils.singleton import Singleton
 from .base import GenericCSVDataset
 
 
@@ -69,7 +71,8 @@ class MoleculeNetFreeSolv(GenericCSVDataset):
         self.orig_property_name = ['y']
 
 
-class ZINC15TestSplit(GenericCSVDataset):
+class ZINC15TestSplit(GenericCSVDataset, metaclass=Singleton):
+
     def __init__(self, **kwargs):
         super().__init__(data_filename='benchmark_ZINC15_test_split.csv',
                          fp_filename='fingerprints_ZINC15_test_split.csv',
@@ -80,10 +83,11 @@ class ZINC15TestSplit(GenericCSVDataset):
         self.index_col = 'index'
 
     def load(self, columns=['canonical_smiles'], length_column='length', data_len=None):
-        self.data, _ = self._load_csv(columns, length_column, return_remaining=False, data_len=None)
+        if self.smiles is not None:
+            logger.info('Already loaded.')
+            return
+        self.smiles, _ = self._load_csv(columns, length_column, return_remaining=False, data_len=data_len)
+        logger.info('Loaded {} molecules from "{}"'.format(len(self.smiles), self.name))
 
-        # if data_len:
-        #     self.data = self.data.iloc[:data_len]
-
-        if self.data.shape[-1] == 1: # TODO this is a fix for an issue with SQL data cache, should improve datacache
-            self.data = self.data[columns[0]]
+        if self.smiles.shape[-1] == 1: # TODO this is a fix for an issue with SQL data cache, should improve datacache
+            self.smiles = self.smiles[columns[0]]

@@ -73,7 +73,7 @@ class ExCAPEDataset():
 
         if os.path.exists(self.filter_data_path):
             logger.debug('Using existing filtered ExCAPE data...')
-            return pd.read_csv(self.filter_data_path, nrows=1000)
+            return pd.read_csv(self.filter_data_path)
 
         self._download()
         logger.info(f'Loading ExCAPE file from {self.raw_data_path}...')

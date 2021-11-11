@@ -125,7 +125,7 @@ class BaseEmbeddingMetric():
 
         embeddings = []
         for smiles in self.smiles_dataset['canonical_smiles']:
-            # smiles = self.smiles_dataset.data.loc[smiles_index]
+            # smiles = self.smiles_dataset.smiles.loc[smiles_index]
             embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_seq_len=max_seq_len)
             embeddings.append(xpy.array(embedding))
 

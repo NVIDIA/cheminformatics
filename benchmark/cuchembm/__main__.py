@@ -152,8 +152,7 @@ def main(cfg):
                                                     embedding_cache,
                                                     excape_dataset)})
 
-    iteration = None
-    iteration = wait_for_megamolbart_service(inferrer)
+    wait_for_megamolbart_service(inferrer)
 
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]
@@ -179,7 +178,8 @@ def main(cfg):
             result = metric.calculate(**kwargs)
             run_time = convert_runtime(datetime.now() - start_time)
 
-            result['iteration'] = iteration
+            # Iteration as identifier needs to be removed. For now hardcoding
+            result['iteration'] = 0
             result['run_time'] = run_time
             result['data_size'] = len(metric.dataset.smiles)
 

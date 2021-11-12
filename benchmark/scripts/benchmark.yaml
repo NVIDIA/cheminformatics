@@ -20,6 +20,7 @@ metric:
     enabled: True
     radius:
       - 1
+      - 2
 
   unique:
     enabled: True
@@ -44,7 +45,7 @@ metric:
 
 sampling:
   max_seq_len: 512
-  input_size: 1000
+  input_size: 20000
   sample_size: 10
 
 output:

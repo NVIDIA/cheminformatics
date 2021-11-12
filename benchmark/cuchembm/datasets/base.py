@@ -28,7 +28,7 @@ class GenericCSVDataset():
         assert os.path.exists(self.prop_data_path)
         assert os.path.exists(self.fp_data_path)
 
-        # Metadata - PhyChem: Many of these are set in the base classes
+        # Metadata - PhysChem: Many of these are set in the base classes
         self.max_seq_len = max_seq_len
         self.physchem_index_col = index_col
         self.index_selection = index_selection
@@ -82,7 +82,7 @@ class GenericCSVDataset():
              columns=['canonical_smiles'],
              length_column='length',
              data_len=None):
-        # Load phyChem properties
+        # Load physChem properties
         logger.info(f'Loading physChem properties from {self.prop_data_path}')
         self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len)
 
@@ -97,7 +97,7 @@ class GenericCSVDataset():
             self.properties = self.properties[self.properties_cols]
 
         # Load fingerprint properties
-        logger.info(f'Loading phyChem properties from {self.fp_data_path}')
+        logger.info(f'Loading physChem properties from {self.fp_data_path}')
         self.fingerprints = pd.read_csv(self.fp_data_path)
 
         if self.physchem_index_col:

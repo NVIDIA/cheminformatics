@@ -75,15 +75,6 @@ class MegaMolBARTWrapper(metaclass=Singleton):
                 force_unique=force_unique)
         return generated_df
 
-        # embeddings = []
-
-        # for _, row in generated_df.iterrows():
-        #     embeddings.append(EmbeddingList(embedding=row.embeddings,
-        #                                    dim=row.embeddings_dim))
-
-        # return SmilesList(generatedSmiles=generated_df['SMILES'],
-        #                   embeddings=embeddings)
-
     def interpolate_smiles(self,
                            smiles: List,
                            num_points: int = 10,

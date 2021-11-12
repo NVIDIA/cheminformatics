@@ -42,17 +42,19 @@ def get_model_dict():
                          'l1_ratio': [0.1, 0.5, 1.0, 10.0]}
 
         sv_estimator = SVR(kernel='rbf')
-        sv_param_dict = {'C': [0.01, 0.1, 1.0, 10],
-                         'degree': [3,5,7,9]}
+        sv_param_dict = {'C': [1.75, 5.0, 7.5, 10.0, 20.0],
+                         'gamma': [0.0001, 0.001, 0.01, 0.1, 1.0],
+                         'epsilon': [0.001, 0.01, 0.1, 0.3],
+                         'degree': [3, 5, 7, 9]}
         if RAPIDS_AVAILABLE:
             rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0)
         else:
             rf_estimator = RandomForestRegressor(criterion='mse', random_state=0)
-        rf_param_dict = {'n_estimators': [10, 50]}
+        rf_param_dict = {'n_estimators': [10, 50, 100, 150, 200]}
 
         return {'linear_regression': [lr_estimator, lr_param_dict],
                 'elastic_net': [en_estimator, en_param_dict],
-                #'support_vector_machine': [sv_estimator, sv_param_dict],
+                'support_vector_machine': [sv_estimator, sv_param_dict],
                 'random_forest': [rf_estimator, rf_param_dict]
                 }
 
@@ -186,12 +188,13 @@ class Modelability(BaseEmbeddingMetric):
             self.model_dict = model_dict
         return {'model': list(self.model_dict.keys())}
 
-    def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=5):
+    def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=4):
         """Perform grid search with cross validation and return score"""
         logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
         best_score, best_param = np.inf, None
+        # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
 

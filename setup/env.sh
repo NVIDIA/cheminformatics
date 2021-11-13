@@ -117,6 +117,7 @@ fi
 DOCKER_CMD="docker run \
     --rm \
     --network host \
+    --gpus all \
     ${PARAM_RUNTIME} \
     -p ${JUPYTER_PORT}:8888 \
     -p ${DASK_PORT}:${DASK_PORT} \

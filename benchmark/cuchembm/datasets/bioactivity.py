@@ -84,13 +84,13 @@ class ExCAPEDataset():
         filtered_df = data[data[filter_col].isin(filter_list)]
 
         filtered_df = filtered_df.compute()
-        filtered_df.index.name = 'index'
         filtered_df = filtered_df.sort_values([filter_col] + self.properties_cols).reset_index(drop=True)
         filtered_df = filtered_df.rename(columns={'SMILES': 'canonical_smiles', 'Gene_Symbol': 'gene'})
 
         # Save for later use.
         logger.info('Saving filtered database records...')
         filtered_df.reset_index().to_csv(self.filter_data_path, index=False)
+        filtered_df['index'] = filtered_df.index
         return filtered_df
 
     def _remove_invalids_by_index(self):

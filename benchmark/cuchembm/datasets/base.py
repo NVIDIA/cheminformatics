@@ -106,7 +106,5 @@ class GenericCSVDataset():
         if self.smiles is not None:
             self.fingerprints = self.fingerprints.loc[self.smiles.index]
 
-        print(self.smiles.shape)
-        print(self.fingerprints.shape)
         assert len(self.fingerprints) == len(self.smiles)
         assert self.smiles.index.equals(self.fingerprints.index)

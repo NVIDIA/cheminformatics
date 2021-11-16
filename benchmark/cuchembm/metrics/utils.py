@@ -17,6 +17,7 @@
 import logging
 from math import isnan
 
+import pandas
 import cupy
 import cudf
 import numba
@@ -95,12 +96,14 @@ def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=Fals
     elif (data.ndim == 2) & (axis == 1) & (not is_symmetric):
         data = data.T
 
-    ranks = cudf.DataFrame(data).rank(axis=0, method=method, na_option=na_option) # TODO RAJESH this is where the bug with nearest neighbor search is
+    # TODO: Fix the issue with cudf.rank and revert back
+    ranks = pandas.DataFrame(cupy.asnumpy(data)).rank(axis=0, method=method, na_option=na_option)
     ranks = ranks.values
 
     if axis == 1:
         ranks = ranks.T
-    return ranks
+
+    return cupy.asarray(ranks)
 
 
 @cuda.jit()

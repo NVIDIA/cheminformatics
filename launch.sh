@@ -137,16 +137,9 @@ push() {
 }
 
 
-pull() {
-    docker pull ${CUCHEM_CONT}
-    docker pull ${MEGAMOLBART_CONT}
-}
-
-
 setup() {
     download_model
     dbSetup "${DATA_PATH}"
-    pull
 }
 
 dev() {
@@ -165,7 +158,7 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 
@@ -183,13 +176,14 @@ start() {
     else
         # run a container and start dash inside container.
         setup
-
+        set -x
         export CUCHEM_UI_START_CMD="./launch.sh start $@"
         export MEGAMOLBART_CMD="python3 -m megamolbart"
         export UID=$(id -u)
         export GID=$(id -g)
 
         # Working directory for the individual containers.
+        echo "Starting containers ${MEGAMOLBART_CONT} and ${CUCHEM_CONT}..."
         export WORKING_DIR_CUCHEMUI=/workspace
         export WORKING_DIR_MEGAMOLBART=/workspace/megamolbart
         export PYTHONPATH_MEGAMOLBART="${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
@@ -214,7 +208,7 @@ cache() {
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
         set -x
         # Executed within container or a managed env.
-        dbSetup "${DATA_MOUNT_PATH}"
+        dbSetup "${DATA_MOUNT_PATH}"a601b2a2a627
         cd ${CHEMINFO_DIR}/cuchem/; python3 startdash.py cache $@
     else
         dbSetup "${DATA_PATH}"

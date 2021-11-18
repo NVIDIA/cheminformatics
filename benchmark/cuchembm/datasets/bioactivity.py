@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import dask.dataframe as dd
 
-from cuchembm.metrics.utils import calculate_morgan_fingerprint
+from cuchemcommon.utils.metrics import calculate_morgan_fingerprint
 
 
 logger = logging.getLogger(__name__)

@@ -16,7 +16,8 @@ from cuchem.utils.data_peddler import download_cddd_models
 logger = logging.getLogger(__name__)
 
 
-class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
+class Cddd(BaseGenerativeWorkflow):
+    __metaclass__ = Singleton
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(None)) -> None:
         super().__init__(dao)

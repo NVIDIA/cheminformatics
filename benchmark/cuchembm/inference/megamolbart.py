@@ -1,14 +1,12 @@
 import os
 import pathlib
 import logging
-import torch
 
 from typing import List
 
 from generativesampler_pb2 import EmbeddingList, SmilesList
 
 from cuchemcommon.utils.singleton import Singleton
-from megamolbart.inference import MegaMolBART
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +20,8 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         checkpoint_file = 'megamolbart_checkpoint.nemo'
         files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
         dir = files[-1].absolute().parent.as_posix()
+
+        from megamolbart.inference import MegaMolBART
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
         self.megamolbart = MegaMolBART(model_dir=os.path.join(dir, checkpoint_file))
@@ -50,6 +50,8 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         Converts input embedding to SMILES.
         @param transform_spec: Input spec with embedding and mask.
         '''
+        import torch
+
         embedding = torch.FloatTensor(list(embedding))
         pad_mask = torch.BoolTensor(list(pad_mask))
         dim = tuple(dim)

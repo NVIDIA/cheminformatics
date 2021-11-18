@@ -15,7 +15,8 @@ from cuchemcommon.workflow import BaseGenerativeWorkflow
 logger = logging.getLogger(__name__)
 
 
-class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
+class MegatronMolBART(BaseGenerativeWorkflow):
+    __metaclass__ = Singleton
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(None)) -> None:
         super().__init__(dao)

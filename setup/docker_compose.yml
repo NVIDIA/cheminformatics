@@ -11,7 +11,7 @@ networks:
 services:
   cuchemUI:
     container_name: cuchemUI${RUN_ID}
-    image: "${CUCHEM_CONT}"
+    image: ${CUCHEM_CONT}
     hostname: cuchemUI
     user: $UID:$GID
     environment:
@@ -42,7 +42,7 @@ services:
 
   megamolbart:
     container_name: megamolbart${RUN_ID}
-    image: "${MEGAMOLBART_CONT}"
+    image: ${MEGAMOLBART_CONT}
     hostname: 'megamolbart'
     user: $UID:$GID
     environment:

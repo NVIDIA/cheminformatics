@@ -29,7 +29,6 @@ from dask.distributed import Client, LocalCluster
 from cuchemcommon.context import Context
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.data.cluster_wf import FINGER_PRINT_FILES
-from cuchemcommon.fingerprint import MorganFingerprint, Embeddings
 from cuchemcommon.utils.logger import initialize_logfile
 from cuchem.utils.dask import initialize_cluster
 
@@ -163,8 +162,10 @@ To start dash:
                 os.makedirs(args.cache_directory)
 
             if (args.cache_type == 'MorganFingerprint'):
+                from cuchemcommon.fingerprint import MorganFingerprint
                 prepocess_type = MorganFingerprint
             elif (args.cache_type == 'Embeddings'):
+                from cuchemcommon.fingerprint import Embeddings
                 prepocess_type = Embeddings
 
             chem_data = ChEmblData(fp_type=prepocess_type)

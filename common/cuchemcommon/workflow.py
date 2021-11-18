@@ -33,8 +33,8 @@ class BaseGenerativeWorkflow(BaseTransformation):
         self.dao = dao
         self.min_jitter_radius = None
 
-    def is_ready(self):
-        NotImplemented
+    def is_ready(self, timeout: int = 10):
+        return True
 
     def smiles_to_embedding(self,
                             smiles: str,

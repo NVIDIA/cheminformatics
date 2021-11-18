@@ -14,7 +14,7 @@ try:
     from cuml.linear_model import LinearRegression, ElasticNet
     from cuml.svm import SVR
     from cuml.ensemble import RandomForestRegressor
-    from cuchembm.metrics.utils import spearmanr
+    from cuchemcommon.utils.metrics import spearmanr
     from cuchem.utils.distance import tanimoto_calculate
     RAPIDS_AVAILABLE = True
     logger.info('RAPIDS installation found. Using cupy and cudf where possible.')

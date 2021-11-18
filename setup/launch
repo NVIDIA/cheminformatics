@@ -57,8 +57,12 @@ variables:
     REGISTRY_ACCESS_TOKEN
         container registry access token. e.g.,
         Ckj53jGK...
-    REGISTRY_USER
-        container registry username. e.g.,
+    REGISTRY_USER        export UID=$(id -u)
+        export GID=$(id -g)
+
+        container registry username. e.g.,        export UID=$(id -u)
+        export GID=$(id -g)
+
         astern
     REGISTRY
         container registry URL. e.g.,

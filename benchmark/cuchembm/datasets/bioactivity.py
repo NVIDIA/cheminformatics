@@ -1,9 +1,13 @@
 import logging
 import os
 import pandas as pd
-import dask.dataframe as dd
-
+from .base import GenericCSVDataset
 from cuchemcommon.utils.metrics import calculate_morgan_fingerprint
+try:
+    import dask.dataframe as dd
+    DASK_AVAILABLE = True
+except:
+    DASK_AVAILABLE = False
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +32,29 @@ GENE_SYMBOLS = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1
              "SCN9A", "SIGMAR1", "SLC6A2", "SLC6A3", "SRC", "TACR1", "TRPV1", "VDR"]
 
 
-class ExCAPEDataset():
+class ExCAPEDataset(GenericCSVDataset):
+    def __init__(self, **kwargs):
+        super().__init__(data_filename='benchmark_ExCAPE_Bioactivity.csv',
+                         fp_filename='fingerprints_ExCAPE_Bioactivity.csv',
+                         **kwargs)
+        self.name = 'ExCAPE'
+        self.table_name = 'excape'
+        self.smiles_col = 'SMILES'
+        self.index_col = 'index'
+        self.physchem_index_col = 'index'
+        self.properties_cols = ['pXC50']
+
+    def load(self,
+             columns=['canonical_smiles'],
+             length_column='length',
+             data_len=None):
+        super().load(columns, length_column, data_len)
+        self.smiles = self.smiles.rename(columns={'Gene_Symbol': 'gene'}).set_index('gene', append=True)
+        self.properties.index = self.smiles.index
+        self.fingerprints.index = self.smiles.index
+
+
+class FullExCAPEDataset():    
     def __init__(self,
                  data_dir='/data/ExCAPE',
                  name = 'ExCAPE',
@@ -36,6 +62,9 @@ class ExCAPEDataset():
                  properties_cols = ['pXC50'],
                  max_seq_len = None,
                  ):
+        assert DASK_AVAILABLE, AssertionError(f'Dask is not available and is required for processing full ExCAPE dataset.')
+        logger.warn(f'Download and processing of full ExCAPE db data is deprecated and will produce different results from included data tranche.')
+
         self.name = name
         self.table_name = table_name
         self.properties_cols = properties_cols

@@ -20,7 +20,7 @@ class BaseSampleMetric():
                  inferrer,
                  sample_cache,
                  smiles_dataset,
-                 remove_invalid):
+                 remove_invalid=False):
         self.inferrer = inferrer
         self.sample_cache = sample_cache
         self.dataset = smiles_dataset

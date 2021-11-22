@@ -119,22 +119,22 @@ def main(cfg):
 
         embedding_cache = PhysChemEmbeddingData()
 
-        for dataset in smiles_dataset_list:
-            log.info(f'Loading {dataset.table_name}...')
-            dataset.load(data_len=input_size, columns=['smiles'])
+        for smiles_dataset in smiles_dataset_list:
+            log.info(f'Loading {smiles_dataset.table_name}...')
+            smiles_dataset.load(data_len=input_size, columns=['SMILES'])
 
             metric_list.append(
-                {dataset.table_name: Modelability('modelability-physchem',
-                                                  inferrer,
-                                                  embedding_cache,
-                                                  dataset)})
+                {smiles_dataset.table_name: Modelability('modelability-physchem',
+                                                         inferrer,
+                                                         embedding_cache,
+                                                         smiles_dataset)})
 
     if cfg.metric.modelability.bioactivity.enabled:
 
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
 
-        excape_dataset.load(data_len=input_size)
+        excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
         log.info('Creating groups...')
         groups = list(zip(excape_dataset.smiles.groupby(level='gene'),
                           excape_dataset.properties.groupby(level='gene'),

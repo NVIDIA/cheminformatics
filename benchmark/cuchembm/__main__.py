@@ -75,8 +75,10 @@ def main(cfg):
     if cfg.model.name == 'MegaMolBART':
         inferrer = MegaMolBARTWrapper()
     elif cfg.model.name == 'CDDD':
-        from cuchem.wf.generative import Cddd
-        inferrer = Cddd()
+        from cuchembm.inference.cddd import CdddWrapper
+        inferrer = CdddWrapper()
+        # from cuchem.wf.generative import Cddd
+        # inferrer = Cddd()
     else:
         log.error(f'Model {cfg.model.name} not supported')
         sys.exit(1)

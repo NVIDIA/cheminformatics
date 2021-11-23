@@ -103,14 +103,17 @@ class BaseEmbeddingMetric():
         embedding, dim = self._find_embedding(smiles, max_seq_len)
 
         embedding = xpy.array(embedding).reshape(dim).squeeze()
-        assert embedding.ndim == 2, "Metric calculation code currently only works with 2D data (embeddings, not batched)"
+        # assert embedding.ndim == 2, f"Metric calculation code currently only works with 2D data (embeddings, not batched) got {embedding.ndim}"
 
         if zero_padded_vals:
-            embedding[len(smiles):, :] = 0.0
+            if dim == 2:
+                embedding[len(smiles):, :] = 0.0
+            else:
+                embedding[len(smiles):] = 0.0
 
         if average_tokens:
             embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
-            assert (embedding.ndim == 1) & (embedding.shape[0] == dim[-1])
+            # assert (embedding.ndim == 1) & (embedding.shape[0] == dim[-1])
         else:
             embedding = embedding.flatten() # TODO research alternatives to handle embedding sizes in second dim
 

@@ -23,16 +23,18 @@ from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
+# NOTE: this file is retained for documentation purposes only. Fingerprint data must be calculated at runtime due to filesize.
+
 # Data as provided by AstraZeneca
-# Location of original data: https://deepchemdata.s3-us-west-1.amazonaws.com/datasets/delaney-processed.csv
+# Location of original data: https://zenodo.org/record/2543724/files/pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv.xz?download=1
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent,
                                 'csv_data')
 columns = ['SMILES'] 
-physchem_columns = ['measured log solubility in mols per litre']
+physchem_columns = ['pXC50']
 
 if __name__ == '__main__':
-    data_benchmark_path = os.path.join(DATA_BENCHMARK_DIR, 'benchmark_MoleculeNet_ESOL.csv')
+    data_benchmark_path = os.path.join(DATA_BENCHMARK_DIR, 'benchmark_ExCAPE_Bioactivity.csv')
     benchmark_df = pd.read_csv(data_benchmark_path, usecols=columns+physchem_columns)
 
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?
@@ -48,4 +50,4 @@ if __name__ == '__main__':
     
     # Write results
     fp = fp.reset_index()
-    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_MoleculeNet_ESOL.csv'), index=False)
+    fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_ExCAPE_Bioactivity.csv'), index=False)

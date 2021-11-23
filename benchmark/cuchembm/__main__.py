@@ -120,24 +120,28 @@ def main(cfg):
                                MoleculeNetLipophilicity(max_seq_len=max_seq_len)]
 
         embedding_cache = PhysChemEmbeddingData()
+        n_splits = cfg.metric.modelability.physchem.n_splits
 
-        for dataset in smiles_dataset_list:
-            log.info(f'Loading {dataset.table_name}...')
-            dataset.load(data_len=input_size, columns=['smiles'])
+        for smiles_dataset in smiles_dataset_list:
+            log.info(f'Loading {smiles_dataset.table_name}...')
+            smiles_dataset.load(data_len=input_size, columns=['SMILES'])
 
             metric_list.append(
-                {dataset.table_name: Modelability('modelability-physchem',
-                                                  inferrer,
-                                                  embedding_cache,
-                                                  dataset)})
+                {smiles_dataset.table_name: Modelability('modelability-physchem',
+                                                         inferrer,
+                                                         embedding_cache,
+                                                         smiles_dataset,
+                                                         n_splits)})
 
     if cfg.metric.modelability.bioactivity.enabled:
 
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
 
-        excape_dataset.load(data_len=input_size)
+        excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
         log.info('Creating groups...')
+
+        n_splits = cfg.metric.modelability.bioactivity.n_splits
         groups = list(zip(excape_dataset.smiles.groupby(level='gene'),
                           excape_dataset.properties.groupby(level='gene'),
                           excape_dataset.fingerprints.groupby(level='gene')))
@@ -151,7 +155,8 @@ def main(cfg):
             metric_list.append({label: Modelability('modelability-bioactivity',
                                                     inferrer,
                                                     embedding_cache,
-                                                    excape_dataset)})
+                                                    excape_dataset,
+                                                    n_splits)})
 
     wait_for_megamolbart_service(inferrer)
 
@@ -171,23 +176,29 @@ def main(cfg):
                 estimator, param_dict = metric.model_dict[iter_val]
                 kwargs.update({'estimator': estimator, 'param_dict': param_dict})
                 if metric.name.endswith('bioactivity'):
+                    kwargs['n_splits'] = cfg.metric.modelability.bioactivity.n_splits
                     kwargs['gene'] = metric_key
+                else:
+                    kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
 
             if metric.name in ['validity', 'unique', 'novelty']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
+                
+                metric_cfg = eval('cfg.metric.' + metric.name)
+                kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)
 
             result = metric.calculate(**kwargs)
             run_time = convert_runtime(datetime.now() - start_time)
 
-            # Iteration as identifier needs to be removed. For now hardcoding
-            result['iteration'] = 0
+            result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
             result['run_time'] = run_time
             result['data_size'] = len(metric.dataset.smiles)
 
-            if 'model' in kwargs:
-                result['model'] = kwargs['model']
-            if 'gene' in kwargs:
-                result['gene'] = kwargs['gene']
+            # Updates to irregularly used arguments
+            key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
+            for key in key_list:
+                if key in kwargs:
+                    result[key] = kwargs[key]
 
             result_list.append(result)
         save_metric_results(cfg.model.name, result_list, output_dir)

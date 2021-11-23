@@ -178,17 +178,18 @@ class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, name, inferrer, sample_cache, dataset):
+    def __init__(self, name, inferrer, sample_cache, dataset, n_splits=4):
         super().__init__(inferrer, sample_cache, dataset)
         self.name = name
         self.model_dict = get_model_dict()
+        self.n_splits = n_splits
 
     def variations(self, model_dict=None, **kwargs):
         if model_dict:
             self.model_dict = model_dict
         return {'model': list(self.model_dict.keys())}
 
-    def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata, n_splits=4):
+    def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata):
         """Perform grid search with cross validation and return score"""
         logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
@@ -199,7 +200,7 @@ class Modelability(BaseEmbeddingMetric):
             estimator.set_params(**param)
 
             # Generate CV folds
-            kfold_gen = KFold(n_splits=n_splits, shuffle=True, random_state=0)
+            kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
             for train_idx, test_idx in kfold_gen.split(xdata, ydata):
                 xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]

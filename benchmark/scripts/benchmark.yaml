@@ -22,11 +22,11 @@ metric:
       - 2
 
   unique:
-    enabled: True
+    remove_invalid: True
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: True
+    remove_invalid: ${metric.unique.remove_invalid}
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
@@ -39,8 +39,10 @@ metric:
   modelability:
     bioactivity:
       enabled: True
+      n_splits: 20
     physchem:
       enabled: True
+      n_splits: 20
 
 sampling:
   max_seq_len: 512

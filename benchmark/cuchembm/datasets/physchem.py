@@ -42,7 +42,8 @@ class MoleculeNetLipophilicity(GenericCSVDataset):
                          **kwargs)
         self.name = 'MoleculeNet Lipophilicity'
         self.table_name = 'lipophilicity'
-        self.smiles_col = 0
+        self.index_col = 'index'
+        self.smiles_col = 'SMILES'
         self.properties_cols = ['logD']
         self.orig_property_name = ['exp']
 
@@ -54,7 +55,8 @@ class MoleculeNetESOL(GenericCSVDataset):
                          **kwargs)
         self.name = 'MoleculeNet ESOL'
         self.table_name = 'esol'
-        self.smiles_col = 0
+        self.index_col = 'index'
+        self.smiles_col = 'SMILES'
         self.properties_cols = ['log_solubility_(mol_per_L)']
         self.orig_property_name = ['measured log solubility in mols per litre']
 
@@ -66,7 +68,8 @@ class MoleculeNetFreeSolv(GenericCSVDataset):
                          **kwargs)
         self.name = 'MoleculeNet FreeSolv'
         self.table_name = 'freesolv'
-        self.smiles_col = 0
+        self.index_col = 'index'
+        self.smiles_col = 'SMILES'
         self.properties_cols = ['hydration_free_energy']
         self.orig_property_name = ['y']
 

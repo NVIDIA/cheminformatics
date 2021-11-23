@@ -1,4 +1,4 @@
-,molregno,canonical_smiles,length
+index,molregno,canonical_smiles,length
 0,47,Nc1cc[n+](Cc2ccc(/C=C\c3ccc(C[n+]4ccc(N)c5ccccc54)cc3)cc2)c2ccccc12,67
 1,60,COc1ccc(/C=C/C(=O)N2CCN(c3nc(N)c4cc(OC)c(OC)cc4n3)CC2)cc1,57
 2,154,CCN(CC)CCN(Cc1ccc(-c2ccc(C(F)(F)F)cc2)cc1)C(=O)Cn1c(SCc2ccc(F)cc2)nc(=O)c2c1CCC2,80

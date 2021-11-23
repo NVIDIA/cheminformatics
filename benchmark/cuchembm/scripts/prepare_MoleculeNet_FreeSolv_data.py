@@ -23,12 +23,12 @@ from cuchemcommon.fingerprint import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
-# Data location: https://deepchemdata.s3.us-west-1.amazonaws.com/datasets/freesolv.csv.gz
-# Download to DATA_BENCHMARK_DIR
+# Data as provided by AstraZeneca
+# Location of original data: https://deepchemdata.s3.us-west-1.amazonaws.com/datasets/freesolv.csv.gz
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent,
                                 'csv_data')
-columns = ['smiles'] 
+columns = ['SMILES'] 
 physchem_columns = ['y']
 
 if __name__ == '__main__':
@@ -37,6 +37,7 @@ if __name__ == '__main__':
 
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?
     fp = calc_morgan_fingerprints(benchmark_df, smiles_col=columns[0])
+    fp = fp.to_pandas()
     fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
     for col in fp.columns: # TODO why are these floats
         fp[col] = fp[col].astype(np.float32)

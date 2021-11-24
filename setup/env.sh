@@ -115,7 +115,6 @@ else
 fi
 
 DOCKER_CMD="docker run \
-    --rm \
     --network host \
     --gpus all \
     ${PARAM_RUNTIME} \

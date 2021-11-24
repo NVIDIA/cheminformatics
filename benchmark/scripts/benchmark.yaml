@@ -11,6 +11,7 @@ root:
   handlers: [console]
 
 model:
+  # name: MegaMolBART
   name: CDDD
   params:
     url: localhost:50051
@@ -19,13 +20,16 @@ metric:
   validity:
     enabled: True
     radius:
+      - 1
       - 2
 
   unique:
+    enabled: True
     remove_invalid: True
     radius: ${metric.validity.radius}
 
   novelty:
+    enabled: True
     remove_invalid: ${metric.unique.remove_invalid}
     radius: ${metric.validity.radius}
 
@@ -46,7 +50,7 @@ metric:
 
 sampling:
   max_seq_len: 512
-  input_size: 5000
+  input_size: 20000
   sample_size: 10
 
 output:

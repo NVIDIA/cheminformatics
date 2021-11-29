@@ -59,7 +59,7 @@ def save_metric_results(mode_name, metric_list, output_dir):
 
 @hydra.main(config_path=".", config_name="benchmark")
 def main(cfg):
-    timestamp = datetime.now().strftime("%Y/%m/%d, %H:%M:%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log.info(cfg)
     log.info(f'Timestamp: {timestamp}')
 

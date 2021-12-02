@@ -77,8 +77,6 @@ def main(cfg):
     elif cfg.model.name == 'CDDD':
         from cuchembm.inference.cddd import CdddWrapper
         inferrer = CdddWrapper()
-        # from cuchem.wf.generative import Cddd
-        # inferrer = Cddd()
     else:
         log.error(f'Model {cfg.model.name} not supported')
         sys.exit(1)
@@ -162,7 +160,6 @@ def main(cfg):
 
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]
-        log.info(f'Metric name: {metric.name}')
 
         iter_dict = metric.variations(cfg=cfg)
         iter_label, iter_vals = list(iter_dict.items())[0]
@@ -170,6 +167,7 @@ def main(cfg):
         result_list = []
         for iter_val in iter_vals:
             start_time = datetime.now()
+            log.debug(f'Metric name: {metric.name}::{iter_val}')
 
             kwargs = {iter_label: iter_val}
             if metric.name.startswith('modelability'):
@@ -183,10 +181,11 @@ def main(cfg):
 
             if metric.name in ['validity', 'unique', 'novelty']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
-                
+
                 metric_cfg = eval('cfg.metric.' + metric.name)
                 kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)
 
+            log.info(f'Metric name: {metric.name}::{metric_key} with args {kwargs}')
             result = metric.calculate(**kwargs)
             run_time = convert_runtime(datetime.now() - start_time)
 

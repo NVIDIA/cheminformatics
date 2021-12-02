@@ -145,7 +145,6 @@ setup() {
 dev() {
     local CONTAINER_OPTION=$1
     local CONT=${CUCHEM_CONT}
-
     if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
@@ -162,7 +161,14 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 
-    ${DOCKER_CMD} -it ${CONT} bash
+    if [ ! -z "$2" ]; then
+        DOCKER_CMD="${DOCKER_CMD} -d"
+        CMD="$2"
+    else
+        DOCKER_CMD="${DOCKER_CMD} --rm"
+        CMD='bash'
+    fi
+    ${DOCKER_CMD} -it ${CONT} ${CMD}
 }
 
 
@@ -245,7 +251,7 @@ jupyter() {
 
 case $1 in
     build)
-        $@
+        "$@"
         ;;
     config)
         config 1
@@ -257,17 +263,17 @@ case $1 in
     setup)
         ;&
     dev)
-        $@
+        "$@"
         ;;
     test)
         ;&
     start)
-        $@
+        "$@"
         ;;
     stop)
         ;&
     cache)
-        $@
+        "$@"
         ;;
     jupyter)
         $1

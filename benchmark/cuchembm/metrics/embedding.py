@@ -103,14 +103,17 @@ class BaseEmbeddingMetric():
         embedding, dim = self._find_embedding(smiles, max_seq_len)
 
         embedding = xpy.array(embedding).reshape(dim).squeeze()
-        assert embedding.ndim == 2, "Metric calculation code currently only works with 2D data (embeddings, not batched)"
+        # assert embedding.ndim == 2, f"Metric calculation code currently only works with 2D data (embeddings, not batched) got {embedding.ndim}"
 
         if zero_padded_vals:
-            embedding[len(smiles):, :] = 0.0
+            if dim == 2:
+                embedding[len(smiles):, :] = 0.0
+            else:
+                embedding[len(smiles):] = 0.0
 
         if average_tokens:
             embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
-            assert (embedding.ndim == 1) & (embedding.shape[0] == dim[-1])
+            # assert (embedding.ndim == 1) & (embedding.shape[0] == dim[-1])
         else:
             embedding = embedding.flatten() # TODO research alternatives to handle embedding sizes in second dim
 
@@ -168,7 +171,10 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         fingerprints = xpy.asarray(self.fingerprint_dataset)
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
-        metric = int(xpy.nanmean(metric))
+        metric = xpy.nanmean(metric)
+        if RAPIDS_AVAILABLE:
+            metric = xpy.asnumpy(metric)
+
         top_k = embeddings.shape[0] - 1 if not top_k else top_k
 
         return pd.Series({'name': self.name, 'value': metric, 'top_k': top_k})
@@ -198,6 +204,7 @@ class Modelability(BaseEmbeddingMetric):
         # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
+            logging.debug(f"Grid search param {param}")
 
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)

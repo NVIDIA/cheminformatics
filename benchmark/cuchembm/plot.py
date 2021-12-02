@@ -1,124 +1,172 @@
-#!/usr/bin/env python3
-
-# TODO cleanup and / or remove as appropriate
-
+import pandas as pd
+import matplotlib.pyplot as plt
 import glob
+import re
 import os
 import sys
-import matplotlib.pyplot as plt
-import argparse
 import numpy as np
-import textwrap
-import pandas as pd
+from datetime import datetime
+import matplotlib.dates as mdates
 
 
-def parse_args():
-    parser = argparse.ArgumentParser(description='Plot Results')
+def load_metric_results(output_dir):
+    """Load metric results from CSV files"""
+    custom_date_parser = lambda x: datetime.strptime(x, "%Y%m%d_%H%M%S")
+    file_list = glob.glob(os.path.join(output_dir, '*.csv'))
+    metric_df = list()
 
-    parser.add_argument('-i', '--input_dir',
-                        dest='input_dir',
-                        type=str,
-                        default='/workspace/megamolbart/benchmark',
-                        help='Path containing CSV files')
+    for file in file_list:
+        df = pd.read_csv(file, parse_dates=['timestamp'], date_parser=custom_date_parser)
+        metric_df.append(df)
 
-    parser.add_argument('-o', '--output_dir',
-                        dest='output_dir',
-                        type=str,
-                        help='Output directory -- defaults to input_dir')
-
-    parser.add_argument('-r', '--radius',
-                        dest='radius',
-                        type=float,
-                        default=0.1,
-                        help='Radius to select for appropriate metrics')
-
-    parser.add_argument('-t', '--top_k',
-                        dest='top_k',
-                        type=int,
-                        default=None,
-                        help='Top K for Nearest Neighbor -- default is max value')   
-
-    args = parser.parse_args(sys.argv[1:])
-
-    if args.output_dir is None:
-        args.output_dir = args.input_dir
-
-    return args
+    metric_df = pd.concat(metric_df, axis=0).reset_index(drop=True)
+    metric_df['name'] = metric_df['name'].str.replace('modelability-', '')
+    return metric_df
 
 
-def create_data_sets(input_dir, radius, top_k):
-    """Load data files and coalesce into dataset"""
+def make_sampling_plots(metric_df, output_dir):
+    """Using an input dataframe of all metrics, create sampling plots"""
+    # Select data
+    generative_mask = metric_df['name'].isin(['validity', 'unique', 'novelty'])
+    generative_df = metric_df[generative_mask].dropna(axis=1, how='all')
 
-    # Combine files
-    data_files = glob.glob(os.path.join(input_dir, '*.csv'))
-    assert len(data_files) > 0
-    data_list = list()
-    for data_file in data_files:
-        data = pd.read_csv(data_file)
-        data = data.replace('unique', 'uniqueness')
-        data_list.append(data)
+    # Set sort order by using a categorical
+    cat = pd.CategoricalDtype(['validity', 'novelty', 'unique'], ordered=True)
+    generative_df['name'] = generative_df['name'].astype(cat)
 
-    data_agg = pd.concat(data_list, axis=0)
+    grouper = generative_df.groupby('name')
+    n_plots = len(grouper)
+    fig, axes = plt.subplots(ncols=n_plots, figsize=(n_plots*4, 4))
+    axes = axes.flatten()
 
-    # Clean up data
-    top_k = data_agg['top_k'].max() if top_k is None else top_k
-    mask = (data_agg['radius'] == radius) | (data_agg['top_k'] == top_k) | data_agg['model'].notnull()
-    data_agg = data_agg[mask]
+    for (metric, dat), ax in zip(grouper, axes):
+        if not isinstance(dat, pd.DataFrame):
+            dat = dat.to_frame()
+            
+        n_timestamps = dat['timestamp'].nunique()
 
-    # Set sort order
-    name_category = pd.CategoricalDtype(['validity', 'novelty', 'uniqueness', 
-                                            'nearest neighbor correlation', 'modelability'], 
-                                        ordered=True)
+        if n_timestamps > 1: 
+            # timeseries plot if multiple dates are present
+            (dat.pivot_table(columns=['inferrer', 'radius'], 
+                                 values='value', 
+                                 index='timestamp', 
+                                 aggfunc='mean')
+                .plot(kind='line', marker='o', ax=ax))
+            date_form = mdates.DateFormatter("%Y/%m/%d")
+            ax.xaxis.set_major_formatter(date_form)
+            ax.xaxis.set_major_locator(mdates.DayLocator(interval=1))
+        else:
+            # bar plot if single date is present
+            (dat.pivot_table(columns='radius', 
+                                 values='value', 
+                                 index='inferrer', 
+                                 aggfunc='mean')
+                .plot(kind='bar', ax=ax))
 
-    model_category = pd.CategoricalDtype(['linear regression', 'elastic net', 'support vector machine', 'random forest'],
-                                        ordered=True)
-    data_agg['name'] = data_agg['name'].astype(name_category)
-    data_agg['model'] = data_agg['model'].astype(model_category)
-    data_agg = data_agg.sort_values(['name', 'model'])
-
-    return data_agg
+        ax.set(title=metric.title(), ylabel='Percentage', xlabel='Date')
+        plt.tight_layout()
+        fig.savefig(os.path.join(output_dir, 'Sampling_Metrics_Benchmark.png'), dpi=300)
 
 
-def create_plot(data, radius, iteration, output_dir):
-    """Create plot of metrics"""
+def make_embedding_df(metric_df):
+    """Select embedding metrics from metric dataframe"""
+    embedding_mask = metric_df['name'].isin(['validity', 'unique', 'novelty']).pipe(np.invert)
+    embedding_df = metric_df[embedding_mask]
 
-    def _clean_label(label):
-        label = label.get_text().title()
-        label = textwrap.wrap(label, width=20)
-        label = '\n'.join(label)
-        return label
+    cat = pd.CategoricalDtype(['nearest neighbor correlation', 'physchem', 'bioactivity'], ordered=True)
+    embedding_df['name'] = embedding_df['name'].astype(cat)
+    cat = pd.CategoricalDtype(['linear_regression', 'elastic_net', 'support_vector_machine', 'random_forest'], ordered=True)
+    embedding_df['model'] = embedding_df['model'].astype(cat)
+    return embedding_df
 
-    green = '#86B637'
-    blue = '#5473DC'
-    fig, axList = plt.subplots(ncols=2)
-    fig.set_size_inches(10, 5)
 
-    # Validity, uniqueness, novelty, and nearest neighbor correlation plot
-    ax = axList[0]
-    mask = data['name'] != 'modelability'
-    data.loc[mask, ['name', 'value']].set_index('name').plot(kind='bar', ax=ax, legend=False, color=green, rot=45)
-    xlabels = [_clean_label(x) for x in ax.get_xticklabels()]
-    ax.set_xticklabels(xlabels)
-    ax.set(ylabel='Percentage', xlabel='Metric', title=f'Metrics at Radius {radius} with Model at Iteration {iteration}')
-    ax.set_ylim(0, 1.0)
+def make_nearest_neighbor_plot(embedding_df, output_dir):
+    dat = embedding_df[embedding_df.name == 'nearest neighbor correlation']
+    d = dat[['timestamp', 'inferrer', 'top_k', 'value']].drop_duplicates()
+    n_timestamps = dat['timestamp'].nunique()
 
-    # ML Model Error Ratios
-    ax = axList[1]
-    data.loc[mask.pipe(np.invert), ['model', 'value']].set_index('model').plot(kind='bar', ax=ax, legend=False, color=green, rot=45)
-    ax.set(ylabel='Ratio of Mean Squared Errors\n(Morgan Fingerprint / Embedding)', xlabel='Model', title='Modelability Ratio: Higher --> Better Embeddings')
-    xlabels = [_clean_label(x) for x in ax.get_xticklabels()]
-    ax.set_xticklabels(xlabels)
+    if n_timestamps > 1:
+        # timeseries
+        ax = (d.pivot(columns=['inferrer', 'top_k'], 
+                      values='value', 
+                      index='timestamp')
+                .plot(kind='line', marker='o'))
+        ax.set(title='Nearest Neighbor Metric', ylabel='Percentage', xlabel='Date')
+    else:
+        # barplot of single timepoint
+        ax =  (d.pivot(index='inferrer', columns='top_k', values='value').plot(kind='bar'))
+        ax.set(title='Nearest Neighbor Metric', ylabel='Percentage', xlabel='Groups')
 
     plt.tight_layout()
-    fig.savefig(os.path.join(output_dir, 'metrics.png'), dpi=300, facecolor='white')
+    fig = plt.gcf()
+    fig.savefig(os.path.join(output_dir, 'Nearest_Neighbor_Benchmark.png'), dpi=300)
 
 
-if __name__ == '__main__':
-    
-    args = parse_args()
-    data = create_data_sets(args.input_dir, args.radius, args.top_k)
+def make_physchem_plots(embedding_df, output_dir):
+    """Plots of phychem property results"""
+    # TODO convert xaxis label from units to property
+    dat = embedding_df[embedding_df.name == 'physchem']
+    d = dat[['timestamp', 'inferrer', 'property', 'model', 'value']].drop_duplicates()
 
-    assert data['iteration'].nunique() == 1
-    iteration = data['iteration'].iloc[0]
-    create_plot(data, args.radius, iteration, args.output_dir)
+    grouper = d.groupby('inferrer')
+    n_models = len(grouper)
+    fig, axes = plt.subplots(ncols=2, nrows=2, figsize=(16, 4*n_models))
+
+    for row, (inferrer,dat) in enumerate(grouper):
+        
+        # Timeseries plot
+        ax = axes[row, 0]
+        _ = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean').plot(kind='line', marker='o', legend=False, ax=ax, rot=0)
+        
+        ax.set_title('Physchem Property Prediction (Mean of All Properties as Timeseries)') if ax.is_first_row() else ax.set_title('')
+        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
+        ax.set_xlabel('Timestamp') if ax.is_last_row() else ax.set_xlabel('')
+        
+        # Latest values plot
+        ax = axes[row, 1]
+        last_timestep = dat.sort_values('timestamp').groupby(['inferrer', 'property', 'model']).last().reset_index()
+        _ = last_timestep.pivot(columns=['model'], values='value', index='property').plot(kind='bar', width=0.8, legend=False, ax=ax, rot=0)
+        ax.set_ylim(0,50)
+        
+        ax.set_title('Physchem Property Prediction (Most Recent Benchmark)') if ax.is_first_row() else ax.set_title('')
+        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
+        ax.set_xlabel('Property') if ax.is_last_row() else ax.set_xlabel('')
+        
+    fig = plt.gcf()
+    fig.legend(loc=7)
+    plt.tight_layout()
+    fig.savefig(os.path.join(output_dir, 'Physchem_Benchmark.png'), dpi=300)
+
+
+def make_bioactivity_plots(embedding_df, output_dir):
+    dat = embedding_df[embedding_df.name == 'bioactivity']
+    d = dat[['timestamp', 'inferrer', 'gene', 'model', 'value']].drop_duplicates()
+
+    grouper = d.groupby('inferrer')
+    n_models = len(grouper)
+    fig, axes = plt.subplots(ncols=2, nrows=2, figsize=(16, 4*n_models))
+    # labels = sorted(d['gene'].unique())
+
+    for row, (inferrer,dat) in enumerate(grouper):
+        
+        # Timeseries plot
+        ax = axes[row, 0]
+        _ = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean').plot(kind='line', marker='o', legend=False, ax=ax, rot=0)
+        ax.set_title('Bioactivity Metrics Timeseries (Mean over all Genes)') if ax.is_first_row() else ax.set_title('')
+        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
+        ax.set_xlabel('Timestamp') if ax.is_last_row() else ax.set_xlabel('')
+        
+        ax = axes[row, 1]
+        last_timestep = dat.sort_values('timestamp').groupby(['inferrer', 'gene', 'model']).last().reset_index()
+        _ = last_timestep.pivot(columns=['model'], values='value', index='gene').plot(kind='bar', width=0.8, legend=True, ax=ax, rot=70)
+        # ax.set_xticklabels(labels) # TODO figure out how to align genes if they're different 
+        
+        ax.set_title('Bioactivity Metrics (Latest)') if ax.is_first_row() else ax.set_title('')
+        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
+        ax.set_xlabel('Gene') if ax.is_last_row() else ax.set_xlabel('')
+        
+    fig = plt.gcf()
+    fig.legend(loc=7)
+    plt.tight_layout()
+    fig.savefig(os.path.join(output_dir, 'Bioactivity_Benchmark.png'), dpi=300)
 

@@ -20,7 +20,7 @@ class BaseSampleMetric():
                  inferrer,
                  sample_cache,
                  smiles_dataset,
-                 remove_invalid):
+                 remove_invalid=False):
         self.inferrer = inferrer
         self.sample_cache = sample_cache
         self.dataset = smiles_dataset
@@ -68,10 +68,8 @@ class BaseSampleMetric():
                                                      embeddings_dim)
         return generated_smiles
 
-
-    def _calculate_metric(self, metric_array, num_samples):
-        total_samples = len(metric_array) * num_samples
-        return np.nansum(metric_array) / float(total_samples)
+    def _calculate_metric(self, metric_array, num_array):
+        return np.nanmean(metric_array / num_array)
 
     def variations(self):
         return NotImplemented
@@ -81,18 +79,20 @@ class BaseSampleMetric():
 
     def sample_many(self, smiles_dataset, num_samples, radius):
         metric_result = list()
+        num_result = list()
 
         for index in range(len(smiles_dataset.smiles)):
             smiles = smiles_dataset.smiles.iloc[index]
             logger.debug(f'Sampling around {smiles}...')
-            result = self.sample(smiles, num_samples, radius)
+            result, num_molecules = self.sample(smiles, num_samples, radius)
             metric_result.append(result)
+            num_result.append(num_molecules)
 
-        return np.array(metric_result)
+        return np.array(metric_result), np.array(num_result)
 
     def calculate(self, radius, num_samples, **kwargs):
-        metric_array = self.sample_many(self.dataset, num_samples, radius)
-        metric = self._calculate_metric(metric_array, num_samples)
+        metric_array, num_array = self.sample_many(self.dataset, num_samples, radius)
+        metric = self._calculate_metric(metric_array, num_array)
 
         return pd.Series({'name': self.name,
                           'value': metric,
@@ -127,9 +127,10 @@ class Validity(BaseSampleMetric):
                                                       scaled_radius=radius,
                                                       force_unique=False,
                                                       sanitize=False)
-
+        
+        num_mol = len(generated_smiles[1:])
         valid_ctr = len(self.get_valid_molecules(generated_smiles[1:]))
-        return valid_ctr
+        return valid_ctr, num_mol
 
 
 class Unique(BaseSampleMetric):
@@ -155,8 +156,9 @@ class Unique(BaseSampleMetric):
             generated_smiles = self.get_valid_molecules(generated_smiles)
 
         # Get the unique ones
+        num_mol = len(generated_smiles)
         generated_ctr = len(set(generated_smiles))
-        return generated_ctr
+        return generated_ctr, num_mol
 
 
 class Novelty(BaseSampleMetric):
@@ -187,5 +189,6 @@ class Novelty(BaseSampleMetric):
         if self.remove_invalid:
             generated_smiles = self.get_valid_molecules(generated_smiles)
 
+        num_mol = len(generated_smiles)
         novelty_ctr = sum([self.smiles_not_in_train(x) for x in generated_smiles])
-        return novelty_ctr
+        return novelty_ctr, num_mol

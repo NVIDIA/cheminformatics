@@ -77,136 +77,137 @@ def main(cfg):
 
     # max_seq_len = int(cfg.sampling.max_seq_len)  # TODO: pull from inferrer
 
-    # # Inferrer (DL model)
-    # if cfg.model.name == 'MegaMolBART':
-    #     inferrer = MegaMolBARTWrapper()
-    # elif cfg.model.name == 'CDDD':
-    #     from cuchem.wf.generative import Cddd
-    #     inferrer = Cddd()
-    # else:
-    #     log.error(f'Model {cfg.model.name} not supported')
-    #     sys.exit(1)
+    # Inferrer (DL model)
+    if cfg.model.name == 'MegaMolBART':
+        inferrer = MegaMolBARTWrapper()
+    elif cfg.model.name == 'CDDD':
+        from cuchembm.inference.cddd import CdddWrapper
+        inferrer = CdddWrapper()
+    else:
+        log.error(f'Model {cfg.model.name} not supported')
+        sys.exit(1)
 
-    # # Metrics
-    # metric_list = []
+    # Metrics
+    metric_list = []
 
-    # for sampling_metric in [Validity, Unique, Novelty]:
-    #     name = sampling_metric.name
+    for sampling_metric in [Validity, Unique, Novelty]:
+        name = sampling_metric.name
 
-    #     if eval(f'cfg.metric.{name}.enabled'):
-    #         smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
-    #         sample_cache = SampleCacheData()
+        if eval(f'cfg.metric.{name}.enabled'):
+            smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
+            sample_cache = SampleCacheData()
 
-    #         smiles_dataset.load(data_len=input_size)
+            smiles_dataset.load(data_len=input_size)
 
-    #         param_list = [inferrer, sample_cache, smiles_dataset]
-    #         if name == 'novelty':
-    #             training_data = ZINC15TrainDataset()
-    #             param_list += [training_data]
-    #         metric_list.append({name: sampling_metric(*param_list)})
+            param_list = [inferrer, sample_cache, smiles_dataset]
+            if name == 'novelty':
+                training_data = ZINC15TrainDataset()
+                param_list += [training_data]
+            metric_list.append({name: sampling_metric(*param_list)})
 
-    # if cfg.metric.nearest_neighbor_correlation.enabled:
-    #     name = NearestNeighborCorrelation.name
+    if cfg.metric.nearest_neighbor_correlation.enabled:
+        name = NearestNeighborCorrelation.name
 
-    #     smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
-    #     embedding_cache = ChEMBLApprovedDrugsEmbeddingData()
+        smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
+        embedding_cache = ChEMBLApprovedDrugsEmbeddingData()
 
-    #     smiles_dataset.load(data_len=input_size)
+        smiles_dataset.load(data_len=input_size)
 
-    #     metric_list.append({name: NearestNeighborCorrelation(inferrer,
-    #                                                          embedding_cache,
-    #                                                          smiles_dataset)})
+        metric_list.append({name: NearestNeighborCorrelation(inferrer,
+                                                             embedding_cache,
+                                                             smiles_dataset)})
 
-    # if cfg.metric.modelability.physchem.enabled:
-    #     # Could concat datasets to make prep similar to bioactivity
-    #     smiles_dataset_list = [MoleculeNetESOL(max_seq_len=max_seq_len),
-    #                            MoleculeNetFreeSolv(max_seq_len=max_seq_len),
-    #                            MoleculeNetLipophilicity(max_seq_len=max_seq_len)]
+    if cfg.metric.modelability.physchem.enabled:
+        # Could concat datasets to make prep similar to bioactivity
+        smiles_dataset_list = [MoleculeNetESOL(max_seq_len=max_seq_len),
+                               MoleculeNetFreeSolv(max_seq_len=max_seq_len),
+                               MoleculeNetLipophilicity(max_seq_len=max_seq_len)]
 
-    #     embedding_cache = PhysChemEmbeddingData()
-    #     n_splits = cfg.metric.modelability.physchem.n_splits
+        embedding_cache = PhysChemEmbeddingData()
+        n_splits = cfg.metric.modelability.physchem.n_splits
 
-    #     for smiles_dataset in smiles_dataset_list:
-    #         log.info(f'Loading {smiles_dataset.table_name}...')
-    #         smiles_dataset.load(data_len=input_size, columns=['SMILES'])
+        for smiles_dataset in smiles_dataset_list:
+            log.info(f'Loading {smiles_dataset.table_name}...')
+            smiles_dataset.load(data_len=input_size, columns=['SMILES'])
 
-    #         metric_list.append(
-    #             {smiles_dataset.table_name: Modelability('modelability-physchem',
-    #                                                      inferrer,
-    #                                                      embedding_cache,
-    #                                                      smiles_dataset,
-    #                                                      n_splits)})
+            metric_list.append(
+                {smiles_dataset.table_name: Modelability('modelability-physchem',
+                                                         inferrer,
+                                                         embedding_cache,
+                                                         smiles_dataset,
+                                                         n_splits)})
 
-    # if cfg.metric.modelability.bioactivity.enabled:
+    if cfg.metric.modelability.bioactivity.enabled:
 
-    #     excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
-    #     embedding_cache = BioActivityEmbeddingData()
+        excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
+        embedding_cache = BioActivityEmbeddingData()
 
-    #     excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
-    #     log.info('Creating groups...')
+        excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
+        log.info('Creating groups...')
 
-    #     n_splits = cfg.metric.modelability.bioactivity.n_splits
-    #     groups = list(zip(excape_dataset.smiles.groupby(level='gene'),
-    #                       excape_dataset.properties.groupby(level='gene'),
-    #                       excape_dataset.fingerprints.groupby(level='gene')))
+        n_splits = cfg.metric.modelability.bioactivity.n_splits
+        groups = list(zip(excape_dataset.smiles.groupby(level='gene'),
+                          excape_dataset.properties.groupby(level='gene'),
+                          excape_dataset.fingerprints.groupby(level='gene')))
 
-    #     for (label, sm_), (_, prop_), (_, fp_) in groups:
-    #         excape_dataset.smiles = sm_
-    #         excape_dataset.properties = prop_
-    #         excape_dataset.fingerprints = fp_
-    #         log.info(f'Creating bioactivity Modelability for {label}...')
+        for (label, sm_), (_, prop_), (_, fp_) in groups:
+            excape_dataset.smiles = sm_
+            excape_dataset.properties = prop_
+            excape_dataset.fingerprints = fp_
+            log.info(f'Creating bioactivity Modelability for {label}...')
 
-    #         metric_list.append({label: Modelability('modelability-bioactivity',
-    #                                                 inferrer,
-    #                                                 embedding_cache,
-    #                                                 excape_dataset,
-    #                                                 n_splits)})
+            metric_list.append({label: Modelability('modelability-bioactivity',
+                                                    inferrer,
+                                                    embedding_cache,
+                                                    excape_dataset,
+                                                    n_splits)})
 
-    # wait_for_megamolbart_service(inferrer)
+    wait_for_megamolbart_service(inferrer)
 
-    # for metric_dict in metric_list:
-    #     metric_key, metric = list(metric_dict.items())[0]
-    #     log.info(f'Metric name: {metric.name}')
+    for metric_dict in metric_list:
+        metric_key, metric = list(metric_dict.items())[0]
 
-    #     iter_dict = metric.variations(cfg=cfg)
-    #     iter_label, iter_vals = list(iter_dict.items())[0]
+        iter_dict = metric.variations(cfg=cfg)
+        iter_label, iter_vals = list(iter_dict.items())[0]
 
-    #     result_list = []
-    #     for iter_val in iter_vals:
-    #         start_time = datetime.now()
+        result_list = []
+        for iter_val in iter_vals:
+            start_time = datetime.now()
+            log.debug(f'Metric name: {metric.name}::{iter_val}')
 
-    #         kwargs = {iter_label: iter_val}
-    #         if metric.name.startswith('modelability'):
-    #             estimator, param_dict = metric.model_dict[iter_val]
-    #             kwargs.update({'estimator': estimator, 'param_dict': param_dict})
-    #             if metric.name.endswith('bioactivity'):
-    #                 kwargs['n_splits'] = cfg.metric.modelability.bioactivity.n_splits
-    #                 kwargs['gene'] = metric_key
-    #             else:
-    #                 kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
+            kwargs = {iter_label: iter_val}
+            if metric.name.startswith('modelability'):
+                estimator, param_dict = metric.model_dict[iter_val]
+                kwargs.update({'estimator': estimator, 'param_dict': param_dict})
+                if metric.name.endswith('bioactivity'):
+                    kwargs['n_splits'] = cfg.metric.modelability.bioactivity.n_splits
+                    kwargs['gene'] = metric_key
+                else:
+                    kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
 
-    #         if metric.name in ['validity', 'unique', 'novelty']:
-    #             kwargs['num_samples'] = int(cfg.sampling.sample_size)
-                
-    #             metric_cfg = eval('cfg.metric.' + metric.name)
-    #             kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)
+            if metric.name in ['validity', 'unique', 'novelty']:
+                kwargs['num_samples'] = int(cfg.sampling.sample_size)
 
-    #         result = metric.calculate(**kwargs)
-    #         run_time = convert_runtime(datetime.now() - start_time)
+                metric_cfg = eval('cfg.metric.' + metric.name)
+                kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)
 
-    #         result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
-    #         result['run_time'] = run_time
-    #         result['data_size'] = len(metric.dataset.smiles)
+            log.info(f'Metric name: {metric.name}::{metric_key} with args {kwargs}')
+            result = metric.calculate(**kwargs)
+            run_time = convert_runtime(datetime.now() - start_time)
 
-    #         # Updates to irregularly used arguments
-    #         key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
-    #         for key in key_list:
-    #             if key in kwargs:
-    #                 result[key] = kwargs[key]
+            result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
+            result['run_time'] = run_time
+            result['data_size'] = len(metric.dataset.smiles)
 
-    #         result_list.append(result)
-    #     save_metric_results(cfg.model.name, result_list, output_dir)
-    
+            # Updates to irregularly used arguments
+            key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
+            for key in key_list:
+                if key in kwargs:
+                    result[key] = kwargs[key]
+
+            result_list.append(result)
+        save_metric_results(cfg.model.name, result_list, output_dir)
+        
     # Plotting
     metric_df = load_metric_results(output_dir)
     make_sampling_plots(metric_df, output_dir)

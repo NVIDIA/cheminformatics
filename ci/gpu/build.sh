@@ -23,7 +23,6 @@ cd "${WORKSPACE}"
 
 source ci/commons/common.sh
 
-logger "Build container..."
-./launch.sh build
-
+logger "Run tests"
 ./launch.sh test
+

@@ -172,6 +172,9 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
         metric = xpy.nanmean(metric)
+        if RAPIDS_AVAILABLE:
+            metric = xpy.asnumpy(metric)
+
         top_k = embeddings.shape[0] - 1 if not top_k else top_k
 
         return pd.Series({'name': self.name, 'value': metric, 'top_k': top_k})

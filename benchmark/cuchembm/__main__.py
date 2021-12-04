@@ -59,7 +59,9 @@ def save_metric_results(mode_name, metric_list, output_dir):
 
 @hydra.main(config_path=".", config_name="benchmark")
 def main(cfg):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log.info(cfg)
+    log.info(f'Timestamp: {timestamp}')
 
     output_dir = cfg.output.path
     os.makedirs(output_dir, exist_ok=True)
@@ -190,8 +192,10 @@ def main(cfg):
             result = metric.calculate(**kwargs)
             run_time = convert_runtime(datetime.now() - start_time)
 
+            result['inferrer'] = cfg.model.name
             result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
             result['run_time'] = run_time
+            result['timestamp'] = timestamp
             result['data_size'] = len(metric.dataset.smiles)
 
             # Updates to irregularly used arguments

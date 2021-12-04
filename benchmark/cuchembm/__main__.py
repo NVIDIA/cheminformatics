@@ -136,7 +136,8 @@ def main(cfg):
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
 
-        excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
+        excape_dataset.load(columns=['SMILES', 'Gene_Symbol'])
+
         log.info('Creating groups...')
 
         n_splits = cfg.metric.modelability.bioactivity.n_splits

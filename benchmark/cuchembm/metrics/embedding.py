@@ -82,7 +82,7 @@ class BaseEmbeddingMetric():
 
         # Check db for results from a previous run
         embedding_results = self.sample_cache.fetch_embedding_data(smiles)
-        if not embedding_results:
+        if not embedding_results or len(embedding_results[1]) == 1:
             # Generate new samples and update the database
             embedding_results = self.inferrer.smiles_to_embedding(smiles,
                                                                   max_seq_len)
@@ -95,15 +95,12 @@ class BaseEmbeddingMetric():
         else:
             # Convert result to correct format
             embedding, embedding_dim = embedding_results
-
         return embedding, embedding_dim
 
     def encode(self, smiles, zero_padded_vals, average_tokens, max_seq_len=None):
         """Encode a single SMILES to embedding from model"""
         embedding, dim = self._find_embedding(smiles, max_seq_len)
-
         embedding = xpy.array(embedding).reshape(dim).squeeze()
-        # assert embedding.ndim == 2, f"Metric calculation code currently only works with 2D data (embeddings, not batched) got {embedding.ndim}"
 
         if zero_padded_vals:
             if dim == 2:
@@ -113,9 +110,8 @@ class BaseEmbeddingMetric():
 
         if average_tokens:
             embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
-            # assert (embedding.ndim == 1) & (embedding.shape[0] == dim[-1])
         else:
-            embedding = embedding.flatten() # TODO research alternatives to handle embedding sizes in second dim
+            embedding = embedding.flatten()
 
         return embedding
 
@@ -130,11 +126,10 @@ class BaseEmbeddingMetric():
 
         embeddings = []
         for smiles in self.smiles_dataset['canonical_smiles']:
-            # smiles = self.smiles_dataset.smiles.loc[smiles_index]
             embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_seq_len=max_seq_len)
-            embeddings.append(xpy.array(embedding))
+            embeddings.append(embedding)
 
-        return xpy.asarray(embeddings)
+        return embeddings
 
     def calculate(self):
         raise NotImplementedError

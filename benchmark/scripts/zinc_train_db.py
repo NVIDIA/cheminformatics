@@ -20,7 +20,7 @@ def canonicalize_smiles(smiles):
 
 def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
     print(f'Loading data from {path}...')
-    db = f'sqlite:///{db_name}.sqlite3'
+    db = f'sqlite:///data/db/{db_name}.sqlite3'
 
     cluster = LocalCluster(n_workers=n_workers, threads_per_worker=threads_per_worker)
     client = Client(cluster, asynchronous=True)
@@ -71,7 +71,7 @@ if __name__ == '__main__':
 
     args = parse_args()
     print(args)
-    
+
     print('Loading CDDD training data')
     upload(path=args.cddd_data_path, db_name='cddd_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)
 

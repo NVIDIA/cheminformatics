@@ -209,13 +209,13 @@ def main(cfg):
             result_list.append(result)
         save_metric_results(cfg.model.name, result_list, output_dir)
     # Plotting
-    metric_df = load_metric_results(output_dir)
-    make_sampling_plots(metric_df, output_dir)
+    # metric_df = load_metric_results(output_dir)
+    # make_sampling_plots(metric_df, output_dir)
 
-    embedding_df = make_embedding_df(metric_df)
-    make_nearest_neighbor_plot(embedding_df, output_dir)
-    make_physchem_plots(embedding_df, output_dir)
-    make_bioactivity_plots(embedding_df, output_dir)
+    # embedding_df = make_embedding_df(metric_df)
+    # make_nearest_neighbor_plot(embedding_df, output_dir)
+    # make_physchem_plots(embedding_df, output_dir)
+    # make_bioactivity_plots(embedding_df, output_dir)
 
 
 if __name__ == '__main__':

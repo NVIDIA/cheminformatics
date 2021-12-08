@@ -83,8 +83,8 @@ def main(cfg):
         inferrer = MegaMolBARTWrapper()
         training_data_class = ZINC15TrainDataset
     elif cfg.model.name == 'CDDD':
-        from cuchem.wf.generative import Cddd
-        inferrer = Cddd()
+        from cuchembm.inference.cddd import CdddWrapper
+        inferrer = CdddWrapper()
         training_data_class = CDDDTrainDataset
     else:
         log.error(f'Model {cfg.model.name} not supported')
@@ -169,14 +169,13 @@ def main(cfg):
 
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]
-        log.info(f'Metric name: {metric.name}')
-
         iter_dict = metric.variations(cfg=cfg)
         iter_label, iter_vals = list(iter_dict.items())[0]
 
         result_list = []
         for iter_val in iter_vals:
             start_time = datetime.now()
+            log.debug(f'Metric name: {metric.name}::{iter_val}')
 
             kwargs = {iter_label: iter_val}
             if metric.name.startswith('modelability'):
@@ -190,10 +189,10 @@ def main(cfg):
 
             if metric.name in ['validity', 'unique', 'novelty']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
-                
                 metric_cfg = eval('cfg.metric.' + metric.name)
                 kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)
 
+            log.info(f'Metric name: {metric.name}::{metric_key} with args {kwargs}')
             result = metric.calculate(**kwargs)
             run_time = convert_runtime(datetime.now() - start_time)
 
@@ -209,7 +208,6 @@ def main(cfg):
 
             result_list.append(result)
         save_metric_results(cfg.model.name, result_list, output_dir)
-    
     # Plotting
     metric_df = load_metric_results(output_dir)
     make_sampling_plots(metric_df, output_dir)

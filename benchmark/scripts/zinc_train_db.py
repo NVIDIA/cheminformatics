@@ -26,7 +26,7 @@ def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
     client = Client(cluster, asynchronous=True)
 
     zinc_data = dd.read_csv(path)
-    
+
     # Canonicalize SMILES
     if canonicalize:
         canonical_zinc_data = zinc_data['smiles'].apply(canonicalize_smiles, meta=('smiles', 'object'))
@@ -70,6 +70,8 @@ def parse_args():
 if __name__ == '__main__':
 
     args = parse_args()
+    print(args)
+    
     print('Loading CDDD training data')
     upload(path=args.cddd_data_path, db_name='cddd_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)
 

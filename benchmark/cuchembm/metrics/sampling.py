@@ -110,6 +110,8 @@ class BaseSampleMetric():
                     valid_smiles_list.append(canonical_smiles)
                 else:
                     valid_smiles_list.append(smiles)
+            else:
+                logger.info(f'Molecule {smiles} is invalid')
         return valid_smiles_list
 
 

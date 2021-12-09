@@ -72,7 +72,7 @@ def get_input_size(metric_cfg):
     return input_size
 
 
-@hydra.main(config_path=".", config_name="benchmark")
+@hydra.main(config_path="config", config_name="benchmark_metrics")
 def main(cfg):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log.info(cfg)
@@ -158,7 +158,7 @@ def main(cfg):
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
 
-        excape_dataset.load(columns=['SMILES', 'Gene_Symbol'])
+        excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
 
         log.info('Creating groups...')
 

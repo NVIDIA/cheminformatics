@@ -1,11 +1,8 @@
 #! /usr/bin/env python3
 import argparse
-import os
 import sys
-import csv
 from dask import dataframe as dd
 from dask.distributed import LocalCluster, Client
-import sqlite3 as lite
 from rdkit import Chem
 
 
@@ -20,7 +17,7 @@ def canonicalize_smiles(smiles):
 
 def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
     print(f'Loading data from {path}...')
-    db = f'sqlite:///data/db/{db_name}.sqlite3'
+    db = f'sqlite:////data/db/{db_name}.sqlite3'
 
     cluster = LocalCluster(n_workers=n_workers, threads_per_worker=threads_per_worker)
     client = Client(cluster, asynchronous=True)

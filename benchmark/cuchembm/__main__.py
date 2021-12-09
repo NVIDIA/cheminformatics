@@ -64,17 +64,20 @@ def save_metric_results(mode_name, metric_list, output_dir):
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
+def get_input_size(metric_cfg):
+    input_size = None
+    if metric_cfg.input_size:
+        i_size_ = int(metric_cfg.input_size)
+        input_size = i_size_ if i_size_ > 0 else input_size
+    return input_size
+
+
 @hydra.main(config_path=".", config_name="benchmark")
 def main(cfg):
     log.info(cfg)
 
     output_dir = cfg.output.path
     os.makedirs(output_dir, exist_ok=True)
-
-    input_size = None
-    if cfg.sampling.input_size:
-        i_size_ = int(cfg.sampling.input_size)
-        input_size = i_size_ if i_size_ > 0 else input_size
 
     max_seq_len = int(cfg.sampling.max_seq_len)  # TODO: pull from inferrer
 
@@ -95,8 +98,10 @@ def main(cfg):
 
     for sampling_metric in [Validity, Unique, Novelty]:
         name = sampling_metric.name
+        metric_cfg = eval(f'cfg.metric.{name}')
+        input_size = get_input_size(metric_cfg)
 
-        if eval(f'cfg.metric.{name}.enabled'):
+        if metric_cfg.enabled:
             smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
             sample_cache = SampleCacheData()
 
@@ -110,7 +115,9 @@ def main(cfg):
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
         name = NearestNeighborCorrelation.name
-
+        metric_cfg = cfg.metric.nearest_neighbor_correlation
+        input_size = get_input_size(metric_cfg)
+        
         smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
         embedding_cache = ChEMBLApprovedDrugsEmbeddingData()
 
@@ -121,13 +128,15 @@ def main(cfg):
                                                              smiles_dataset)})
 
     if cfg.metric.modelability.physchem.enabled:
+        metric_cfg = cfg.metric.modelability.physchem
+        input_size = get_input_size(metric_cfg)
         # Could concat datasets to make prep similar to bioactivity
         smiles_dataset_list = [MoleculeNetESOL(max_seq_len=max_seq_len),
                                MoleculeNetFreeSolv(max_seq_len=max_seq_len),
                                MoleculeNetLipophilicity(max_seq_len=max_seq_len)]
 
         embedding_cache = PhysChemEmbeddingData()
-        n_splits = cfg.metric.modelability.physchem.n_splits
+        n_splits = metric_cfg.n_splits
 
         for smiles_dataset in smiles_dataset_list:
             log.info(f'Loading {smiles_dataset.table_name}...')
@@ -141,6 +150,8 @@ def main(cfg):
                                                          n_splits)})
 
     if cfg.metric.modelability.bioactivity.enabled:
+        metric_cfg = cfg.metric.modelability.bioactivity
+        input_size = get_input_size(metric_cfg)
 
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
@@ -148,7 +159,7 @@ def main(cfg):
         excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
         log.info('Creating groups...')
 
-        n_splits = cfg.metric.modelability.bioactivity.n_splits
+        n_splits = metric_cfg.n_splits
         groups = list(zip(excape_dataset.smiles.groupby(level='gene'),
                           excape_dataset.properties.groupby(level='gene'),
                           excape_dataset.fingerprints.groupby(level='gene')))

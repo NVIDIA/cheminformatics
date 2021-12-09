@@ -63,6 +63,10 @@ class GenericCSVDataset():
         fp.to_csv(self.fp_data_path, index=False)
         assert os.path.exists(self.fp_data_path), AssertionError(f'Failed to create temporary fingerprint file {self.fp_data_path}')
 
+    @staticmethod
+    def _truncate_data(data, data_len):
+        return data.iloc[:data_len]
+
     def _load_csv(self,
                   columns,
                   length_column=None,
@@ -86,7 +90,7 @@ class GenericCSVDataset():
             self.max_seq_len = data[columns[0]].str.len().max()
 
         if data_len:
-            data = data.iloc[:data_len]
+            data = self._truncate_data(data, data_len)
 
         if not os.path.exists(self.fp_data_path):
             # Generate here so that column names are consistent with inputs

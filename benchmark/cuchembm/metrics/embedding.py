@@ -5,6 +5,8 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import ParameterGrid, KFold
 
+from cuchembm.data.memcache import Cache
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -230,10 +232,17 @@ class Modelability(BaseEmbeddingMetric):
         return ratio, fingerprint_error, embedding_error, fingerprint_param, embedding_param
 
     def calculate(self, estimator, param_dict, **kwargs):
-        embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
+
+        embeddings = Cache().get_data('embeddings')
+        if embeddings is None:
+            logger.info("Retrieving embeddings...")
+            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
+            Cache().set_data('embeddings', embeddings)
+
         embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
         fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
 
+        logger.info("Computing metric...")
         results = self._calculate_metric(embeddings,
                                          fingerprints,
                                          estimator,

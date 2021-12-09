@@ -15,6 +15,34 @@ logger = logging.getLogger(__name__)
 __all__ = ['ExCAPEDataset', 'BIOACTIVITY_TABLE_LIST']
 BIOACTIVITY_TABLE_LIST = ['excape_activity', 'excape_fp']
 
+class ExCAPEDataset(GenericCSVDataset):
+    def __init__(self, **kwargs):
+        super().__init__(data_filename='benchmark_ExCAPE_Bioactivity.csv',
+                         fp_filename='fingerprints_ExCAPE_Bioactivity.csv',
+                         **kwargs)
+        self.name = 'ExCAPE'
+        self.table_name = 'excape'
+        self.smiles_col = 'SMILES'
+        self.index_col = 'index'
+        self.index_col = 'index'
+        self.properties_cols = ['pXC50']
+
+    def load(self,
+             columns=['canonical_smiles'],
+             length_column='length',
+             data_len=None):
+        super().load(columns, length_column, data_len)
+        self.smiles = self.smiles.rename(columns={'Gene_Symbol': 'gene'}).set_index('gene', append=True)
+        self.properties.index = self.smiles.index
+        self.fingerprints.index = self.smiles.index
+
+        assert len(self.fingerprints) == len(self.smiles) == len(self.properties)
+        assert len(self.fingerprints.columns) == 512
+        assert self.smiles.index.equals(self.fingerprints.index)
+        assert self.smiles.index.equals(self.properties.index)
+
+#### Deprecated ####
+
 GENE_SYMBOLS = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1A", "ADRA1D",
              "ADRB1", "ADRB2", "ADRB3", "AKT1", "AKT2", "ALK", "ALOX5", "AR", "AURKA",
              "AURKB", "BACE1", "CA1", "CA12", "CA2", "CA9", "CASP1", "CCKBR", "CCR2",
@@ -30,29 +58,6 @@ GENE_SYMBOLS = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1
              "PDGFRB", "PGR", "PIK3CA", "PIM1", "PIM2", "PLK1", "PPARA", "PPARD", "PPARG",
              "PRKACA", "PRKCD", "PTGDR2", "PTGS2", "PTPN1", "REN", "ROCK1", "ROCK2", "S1PR1",
              "SCN9A", "SIGMAR1", "SLC6A2", "SLC6A3", "SRC", "TACR1", "TRPV1", "VDR"]
-
-
-class ExCAPEDataset(GenericCSVDataset):
-    def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_ExCAPE_Bioactivity.csv',
-                         fp_filename='fingerprints_ExCAPE_Bioactivity.csv',
-                         **kwargs)
-        self.name = 'ExCAPE'
-        self.table_name = 'excape'
-        self.smiles_col = 'SMILES'
-        self.index_col = 'index'
-        self.physchem_index_col = 'index'
-        self.properties_cols = ['pXC50']
-
-    def load(self,
-             columns=['canonical_smiles'],
-             length_column='length',
-             data_len=None):
-        super().load(columns, length_column, data_len)
-        self.smiles = self.smiles.rename(columns={'Gene_Symbol': 'gene'}).set_index('gene', append=True)
-        self.properties.index = self.smiles.index
-        self.fingerprints.index = self.smiles.index
-
 
 class FullExCAPEDataset():    
     def __init__(self,

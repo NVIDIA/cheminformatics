@@ -38,14 +38,11 @@ class GenericCSVDataset():
 
         # Metadata - Physchem: Many of these are set in the base classes
         self.max_seq_len = max_seq_len
-        self.physchem_index_col = index_col
+        self.index_col = index_col
         self.index_selection = index_selection
         self.properties_cols = properties_cols # TODO most of these should be passed during load
         self.orig_property_name = None
         self.smiles_col = None
-
-        # Metadata - Fingerprints
-        self.fp_index_col = index_col
 
         # Data
         self.smiles = None
@@ -74,8 +71,8 @@ class GenericCSVDataset():
         columns = [columns] if not isinstance(columns, list) else columns
         data = pd.read_csv(self.prop_data_path)
 
-        if self.physchem_index_col:
-            data = data.set_index(self.physchem_index_col).sort_index()
+        if self.index_col:
+            data = data.set_index(self.index_col).sort_index()
         else:
             data.index.name = 'index'
 
@@ -109,8 +106,9 @@ class GenericCSVDataset():
              columns=['canonical_smiles'],
              length_column='length',
              data_len=None):
-        # Load physChem properties
-        logger.info(f'Loading physchem properties from {self.prop_data_path}')
+
+        # Load physchem properties
+        logger.info(f'Loading data from {self.prop_data_path}')
         self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len)
 
         if self.smiles_col is not None:
@@ -124,14 +122,16 @@ class GenericCSVDataset():
             self.properties = self.properties[self.properties_cols]
 
         # Load fingerprint properties
-        logger.info(f'Loading physchem properties from {self.fp_data_path}')
+        logger.info(f'Loading fingerprints from {self.fp_data_path}')
         self.fingerprints = pd.read_csv(self.fp_data_path)
 
-        if self.physchem_index_col:
-            self.fingerprints = self.fingerprints.set_index(self.physchem_index_col).sort_index()
+        if self.index_col:
+            self.fingerprints = self.fingerprints.set_index(self.index_col).sort_index()
 
         if self.smiles is not None:
             self.fingerprints = self.fingerprints.loc[self.smiles.index]
 
-        assert len(self.fingerprints) == len(self.smiles)
+        assert len(self.fingerprints) == len(self.smiles) == len(self.properties)
+        assert len(self.fingerprints.columns) == 512
         assert self.smiles.index.equals(self.fingerprints.index)
+        assert self.smiles.index.equals(self.properties.index)

@@ -10,8 +10,8 @@ import sqlite3 as lite
 from rdkit import Chem
 import glob
 
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger('zinc_train_db')
+logging.basicConfig(level=logging.INFO)
 
 def canonicalize_smiles(smiles):
     try:
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     logger.info(f'Using arguments {args}...')
 
     logger.info('Loading CDDD training data ...')
-    upload(path=args.cddd_data_path, db_name='cddd_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)
+    # upload(path=args.cddd_data_path, db_name='cddd_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)
 
     logger.info('Loading ZINC15 training data ...')
     upload(path=args.zinc_data_path, db_name='zinc_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)

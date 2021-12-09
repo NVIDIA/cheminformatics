@@ -1,10 +1,14 @@
 #! /usr/bin/env python3
 import argparse
 import sys
+import logging
 from dask import dataframe as dd
 from dask.distributed import LocalCluster, Client
 from rdkit import Chem
+import glob
 
+logger = logging.getLogger('zinc_train_db')
+logging.basicConfig(level=logging.INFO)
 
 def canonicalize_smiles(smiles):
     try:
@@ -16,21 +20,27 @@ def canonicalize_smiles(smiles):
 
 
 def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
-    print(f'Loading data from {path}...')
-    db = f'sqlite:////data/db/{db_name}.sqlite3'
+    logger.info(f'Loading data from {path}...')
+    filelist = sorted(glob.glob(path))
+    assert len(filelist) >= 1, AssertionError(f'No CSV files were found at {path}')
+    logger.info(f'Found {len(filelist)} files ...')
 
+    db = f'sqlite:////data/db/{db_name}.sqlite3'
     cluster = LocalCluster(n_workers=n_workers, threads_per_worker=threads_per_worker)
     client = Client(cluster, asynchronous=True)
 
-    zinc_data = dd.read_csv(path)
+    for pos, file in enumerate(filelist):
+        logger.info(f'Processing file {file}...')
+        zinc_data = dd.read_csv(file)
 
-    # Canonicalize SMILES
-    if canonicalize:
-        canonical_zinc_data = zinc_data['smiles'].apply(canonicalize_smiles, meta=('smiles', 'object'))
-        zinc_data = zinc_data.drop('smiles', axis=1)
-        zinc_data['smiles'] = canonical_zinc_data
+        # Canonicalize SMILES
+        if canonicalize:
+            canonical_zinc_data = zinc_data['smiles'].apply(canonicalize_smiles, meta=('smiles', 'object'))
+            zinc_data = zinc_data.drop('smiles', axis=1)
+            zinc_data['smiles'] = canonical_zinc_data
 
-    zinc_data.to_sql('train_data', db, if_exists='replace')
+        if_exists = 'replace' if pos==0 else 'append'
+        zinc_data.to_sql('train_data', db, if_exists=if_exists)
 
 
 def parse_args():
@@ -67,10 +77,10 @@ def parse_args():
 if __name__ == '__main__':
 
     args = parse_args()
-    print(args)
+    logger.info(f'Using arguments {args}...')
 
-    print('Loading CDDD training data')
-    upload(path=args.cddd_data_path, db_name='cddd_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)
+    logger.info('Loading CDDD training data ...')
+    # upload(path=args.cddd_data_path, db_name='cddd_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)
 
-    print('Loading ZINC15 training data')
+    logger.info('Loading ZINC15 training data ...')
     upload(path=args.zinc_data_path, db_name='zinc_train', n_workers=args.workers, threads_per_worker=args.threads_per_worker, canonicalize=args.canonicalize)

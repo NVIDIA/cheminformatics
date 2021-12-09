@@ -14,6 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+echo "Script has been refactored and paths will need to be updated before running"
+exit
+
 export PATH=/opt/conda/envs/rapids/bin:$PATH
 
 GREEN='\033[1;32m'

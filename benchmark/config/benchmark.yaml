@@ -19,22 +19,26 @@ model:
 metric:
   validity:
     enabled: True
+    input_size: 20000
     radius:
       - 1
       - 2
 
   unique:
     enabled: True
+    input_size: ${metric.validity.input_size}
     remove_invalid: True
     radius: ${metric.validity.radius}
 
   novelty:
     enabled: True
-    remove_invalid: ${metric.unique.remove_invalid}
+    input_size: ${metric.validity.input_size}
+    remove_invalid: True
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
-    enabled: True
+    enabled: False
+    input_size: ${metric.validity.input_size}
     top_k:
       - 50
       - 100
@@ -42,15 +46,17 @@ metric:
 
   modelability:
     bioactivity:
-      enabled: True
-      n_splits: 20
-    physchem:
-      enabled: True
+      enabled: False
+      input_size: -1 # Number of genes to include, not number of molecules
       n_splits: 20
 
+    physchem:
+      enabled: False
+      input_size: ${metric.validity.input_size}
+      n_splits: 20
+  
 sampling:
   max_seq_len: 512
-  input_size: 20000
   sample_size: 10
 
 output:

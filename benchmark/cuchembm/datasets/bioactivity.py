@@ -27,6 +27,13 @@ class ExCAPEDataset(GenericCSVDataset):
         self.index_col = 'index'
         self.properties_cols = ['pXC50']
 
+    @staticmethod
+    def _truncate_data(data, data_len):
+        orig_index = data.index.name
+        genes = data['Gene_Symbol'].unique()[:data_len]
+        dat = data.reset_index().set_index('Gene_Symbol').loc[genes]
+        return dat.reset_index().set_index(orig_index)
+
     def load(self,
              columns=['canonical_smiles'],
              length_column='length',

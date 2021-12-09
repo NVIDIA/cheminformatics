@@ -1,12 +1,9 @@
 #! /usr/bin/env python3
 import argparse
-import os
 import sys
-import csv
 import logging
 from dask import dataframe as dd
 from dask.distributed import LocalCluster, Client
-import sqlite3 as lite
 from rdkit import Chem
 import glob
 
@@ -28,7 +25,7 @@ def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
     assert len(filelist) >= 1, AssertionError(f'No CSV files were found at {path}')
     logger.info(f'Found {len(filelist)} files ...')
 
-    db = f'sqlite:///data/db/{db_name}.sqlite3'
+    db = f'sqlite:////data/db/{db_name}.sqlite3'
     cluster = LocalCluster(n_workers=n_workers, threads_per_worker=threads_per_worker)
     client = Client(cluster, asynchronous=True)
 

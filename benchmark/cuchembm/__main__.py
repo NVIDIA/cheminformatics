@@ -74,7 +74,9 @@ def get_input_size(metric_cfg):
 
 @hydra.main(config_path=".", config_name="benchmark")
 def main(cfg):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log.info(cfg)
+    log.info(f'Timestamp: {timestamp}')
 
     output_dir = cfg.output.path
     os.makedirs(output_dir, exist_ok=True)
@@ -156,7 +158,8 @@ def main(cfg):
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
 
-        excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
+        excape_dataset.load(columns=['SMILES', 'Gene_Symbol'])
+
         log.info('Creating groups...')
 
         n_splits = metric_cfg.n_splits
@@ -207,8 +210,10 @@ def main(cfg):
             result = metric.calculate(**kwargs)
             run_time = convert_runtime(datetime.now() - start_time)
 
+            result['inferrer'] = cfg.model.name
             result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
             result['run_time'] = run_time
+            result['timestamp'] = timestamp
             result['data_size'] = len(metric.dataset.smiles)
 
             # Updates to irregularly used arguments

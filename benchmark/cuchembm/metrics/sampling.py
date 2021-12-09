@@ -100,12 +100,16 @@ class BaseSampleMetric():
                           'num_samples': num_samples})
 
     @staticmethod
-    def get_valid_molecules(smiles_list):
+    def get_valid_molecules(smiles_list, canonicalize=False):
         valid_smiles_list = list()
         for smiles in smiles_list:
-            m = Chem.MolFromSmiles(smiles)
-            if m:
-                valid_smiles_list.append(smiles)
+            mol = Chem.MolFromSmiles(smiles)
+            if mol:
+                if canonicalize:
+                    canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
+                    valid_smiles_list.append(canonical_smiles)
+                else:
+                    valid_smiles_list.append(smiles)
         return valid_smiles_list
 
 
@@ -153,7 +157,7 @@ class Unique(BaseSampleMetric):
                                                       sanitize=False)
         generated_smiles = generated_smiles[1:]
         if self.remove_invalid:
-            generated_smiles = self.get_valid_molecules(generated_smiles)
+            generated_smiles = self.get_valid_molecules(generated_smiles, canonicalize=True)
 
         # Get the unique ones
         num_mol = len(generated_smiles)
@@ -187,7 +191,7 @@ class Novelty(BaseSampleMetric):
 
         generated_smiles = generated_smiles[1:]
         if self.remove_invalid:
-            generated_smiles = self.get_valid_molecules(generated_smiles)
+            generated_smiles = self.get_valid_molecules(generated_smiles, canonicalize=True)
 
         num_mol = len(generated_smiles)
         novelty_ctr = sum([self.smiles_not_in_train(x) for x in generated_smiles])

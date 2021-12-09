@@ -6,7 +6,7 @@ from typing import List
 from cuchemcommon.utils.singleton import Singleton
 from cuchemcommon.context import Context
 
-__all__ = ['ZINC15TrainDataset']
+__all__ = ['ZINC15TrainDataset', 'CDDDTrainDataset']
 
 logger = logging.getLogger(__name__)
 

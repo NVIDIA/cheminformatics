@@ -135,7 +135,11 @@ class GenericCSVDataset():
         if self.smiles is not None:
             self.fingerprints = self.fingerprints.loc[self.smiles.index]
 
-        assert len(self.fingerprints) == len(self.smiles) == len(self.properties)
-        assert len(self.fingerprints.columns) == 512
-        assert self.smiles.index.equals(self.fingerprints.index)
-        assert self.smiles.index.equals(self.properties.index)
+        assert len(self.fingerprints) == len(self.smiles) == len(self.properties), AssertionError('Dataframes for SMILES, properties, and fingerprints are not identical length.')
+        assert self.smiles.index.equals(self.fingerprints.index) & self.smiles.index.equals(self.properties.index), AssertionError(f'Dataframe indexes are not equivalent')
+        assert len(self.fingerprints.columns) == 512, AssertionError(f'Fingerprint dataframe appears to contain incorrect number of column(s)')
+        try:
+            self.fingerprints.columns.astype(int)
+        except:
+            raise ValueError(f'Fingerprint dataframe appears to contain incorrect (non integer) column name(s)')
+        

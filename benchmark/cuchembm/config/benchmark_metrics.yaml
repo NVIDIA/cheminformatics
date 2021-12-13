@@ -38,22 +38,24 @@ metric:
 
   nearest_neighbor_correlation:
     enabled: True
-    input_size: ${metric.validity.input_size}
+    input_size: -1
     top_k:
       - 50
       - 100
       - 500
 
   modelability:
-    bioactivity:
-      enabled: True
-      input_size: -1 # Number of genes to include, not number of molecules, -1 is all genes
-      n_splits: 20
-
     physchem:
       enabled: True
-      input_size: ${metric.validity.input_size}
+      input_size: -1
       n_splits: 20
+      return_predictions: True
+
+    bioactivity:
+      enabled: True
+      input_size: 10 # Number of genes to include, not number of molecules, -1 is all genes
+      n_splits: 20
+      return_predictions: True
   
 sampling:
   max_seq_len: 512

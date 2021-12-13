@@ -1,12 +1,13 @@
 import os
 import sys
+from pydoc import locate
 import logging
 import hydra
 import pandas as pd
 from datetime import datetime
-from cuchembm.plot import (load_metric_results, 
-                           make_sampling_plots, 
-                           make_embedding_df, 
+from cuchembm.plot import (load_metric_results,
+                           make_sampling_plots,
+                           make_embedding_df,
                            make_nearest_neighbor_plot,
                            make_physchem_plots,
                            make_bioactivity_plots)
@@ -92,8 +93,10 @@ def main(cfg):
         inferrer = CdddWrapper()
         training_data_class = CDDDTrainDataset
     else:
-        log.error(f'Model {cfg.model.name} not supported')
-        sys.exit(1)
+        log.warning(f'Creating model {cfg.model.name} & training dataclass {cfg.model.dataclass}')
+        inf_class = locate(cfg.model.name)
+        inferrer = inf_class()
+        training_data_class = locate(cfg.model.dataclass)
 
     # Metrics
     metric_list = []
@@ -119,7 +122,7 @@ def main(cfg):
         name = NearestNeighborCorrelation.name
         metric_cfg = cfg.metric.nearest_neighbor_correlation
         input_size = get_input_size(metric_cfg)
-        
+
         smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
         embedding_cache = ChEMBLApprovedDrugsEmbeddingData()
 

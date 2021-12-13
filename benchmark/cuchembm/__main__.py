@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import pickle
+from copy import deepcopy
 from cuchembm.plot import (load_metric_results, 
                            make_sampling_plots, 
                            make_embedding_df, 
@@ -185,19 +186,20 @@ def main(cfg):
         log.info('Creating groups...')
 
         n_splits = metric_cfg.n_splits
-        groups = list(zip(excape_dataset.smiles.groupby(level='gene'),
-                          excape_dataset.properties.groupby(level='gene'),
-                          excape_dataset.fingerprints.groupby(level='gene')))
+        gene_dataset = deepcopy(excape_dataset)
+        for label, sm_ in excape_dataset.smiles.groupby(level='gene'):
+            gene_dataset.smiles = sm_
 
-        for (label, sm_), (_, prop_), (_, fp_) in groups:
-            excape_dataset.smiles = sm_
-            excape_dataset.properties = prop_
-            excape_dataset.fingerprints = fp_
-            log.info(f'Creating bioactivity Modelability for {label}...')
+            index = sm_.index.get_level_values(gene_dataset.index_col)
+            gene_dataset.properties = excape_dataset.properties.loc[index]
+            gene_dataset.fingerprints = excape_dataset.fingerprints.loc[index]
+
+            log.info(f'Creating bioactivity Modelability metric for {label}...')
 
             metric_list.append({label: Modelability('modelability-bioactivity',
                                                     inferrer,
                                                     embedding_cache,
+                                                    gene_dataset,
                                                     n_splits,
                                                     metric_cfg.return_predictions)})
 

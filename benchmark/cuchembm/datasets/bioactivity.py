@@ -24,7 +24,6 @@ class ExCAPEDataset(GenericCSVDataset):
         self.table_name = 'excape'
         self.smiles_col = 'SMILES'
         self.index_col = 'index'
-        self.index_col = 'index'
         self.properties_cols = ['pXC50']
 
     @staticmethod
@@ -38,18 +37,9 @@ class ExCAPEDataset(GenericCSVDataset):
              columns=['canonical_smiles'],
              length_column='length',
              data_len=None):
+
         super().load(columns, length_column, data_len)
         self.smiles = self.smiles.rename(columns={'Gene_Symbol': 'gene'}).set_index('gene', append=True)
-        self.properties.index = self.smiles.index
-        self.fingerprints.index = self.smiles.index
-
-        assert len(self.fingerprints) == len(self.smiles) == len(self.properties), AssertionError('Dataframes for SMILES, properties, and fingerprints are not identical length.')
-        assert self.smiles.index.equals(self.fingerprints.index) & self.smiles.index.equals(self.properties.index), AssertionError(f'Dataframe indexes are not equivalent')
-        assert len(self.fingerprints.columns) == 512, AssertionError(f'Fingerprint dataframe appears to contain incorrect number of column(s)')
-        try:
-            self.fingerprints.columns.astype(int)
-        except:
-            raise ValueError(f'Fingerprint dataframe appears to contain incorrect (non integer) column name(s)')
 
 #### Deprecated ####
 

@@ -174,18 +174,19 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
         top_k = embeddings.shape[0] - 1 if not top_k else top_k
 
-        return pd.Series({'name': self.name, 'value': metric, 'top_k': top_k})
+        return {'name': self.name, 'value': metric, 'top_k': top_k}
 
 
 class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, name, inferrer, sample_cache, dataset, n_splits=4):
+    def __init__(self, name, inferrer, sample_cache, dataset, n_splits=4, return_predictions=False):
         super().__init__(inferrer, sample_cache, dataset)
         self.name = name
         self.model_dict = get_model_dict()
         self.n_splits = n_splits
+        self.return_predictions = return_predictions
 
     def variations(self, model_dict=None, **kwargs):
         if model_dict:
@@ -197,7 +198,7 @@ class Modelability(BaseEmbeddingMetric):
         logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
-        best_score, best_param = np.inf, None
+        best_score, best_param, best_pred = np.inf, None, None
         # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
@@ -217,7 +218,9 @@ class Modelability(BaseEmbeddingMetric):
             avg_mse = np.nanmean(np.array(kfold_mse))
             if avg_mse < best_score:
                 best_score, best_param = avg_mse, param
-        return best_score, best_param
+                if self.return_predictions:
+                    best_pred = estimator.predict(xdata)
+        return best_score, best_param, best_pred
 
     def _calculate_metric(self, embeddings, fingerprints, estimator, param_dict):
         """Perform grid search for each metric and calculate ratio"""
@@ -226,18 +229,31 @@ class Modelability(BaseEmbeddingMetric):
         prop_name = properties.columns[0]
         properties = xpy.asarray(properties[prop_name], dtype=xpy.float32)
 
-        embedding_error, embedding_param = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
-        fingerprint_error, fingerprint_param = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
+        embedding_error, embedding_param, embedding_pred = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
+        fingerprint_error, fingerprint_param, fingerprint_pred = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
+
+        if self.return_predictions & RAPIDS_AVAILABLE:
+            embedding_pred, fingerprint_pred = xpy.asnumpy(embedding_pred), xpy.asnumpy(fingerprint_pred)
+
         ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
-        return ratio, fingerprint_error, embedding_error, fingerprint_param, embedding_param
+        results = {'value': ratio, 
+                   'fingerprint_error': fingerprint_error, 
+                   'embedding_error': embedding_error, 
+                   'fingerprint_param': fingerprint_param, 
+                   'embedding_param': embedding_param,
+                   'predictions': {'fingerprint_pred': fingerprint_pred, 
+                                   'embedding_pred': embedding_pred} }
+        return results
 
     def calculate(self, estimator, param_dict, **kwargs):
 
-        embeddings = Cache().get_data('embeddings')
-        if embeddings is None:
-            logger.info("Retrieving embeddings...")
-            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
-            Cache().set_data('embeddings', embeddings)
+        # TODO DEBUG RAJESH
+        embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
+        # embeddings = Cache().get_data('embeddings')
+        # if embeddings is None:
+        #     logger.info("Retrieving embeddings...")
+        #     embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
+        #     Cache().set_data('embeddings', embeddings)
 
         embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
         fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
@@ -247,8 +263,6 @@ class Modelability(BaseEmbeddingMetric):
                                          fingerprints,
                                          estimator,
                                          param_dict)
-        ratio, fingerprint_error, embedding_error, fingerprint_param, embedding_param = results
-        property_name = self.smiles_properties.columns[0]
-        return pd.Series({'name': self.name, 'value': ratio, 'property': property_name,
-                          'fingerprint_error': fingerprint_error, 'embedding_error': embedding_error,
-                          'fingerprint_param': fingerprint_param, 'embedding_param': embedding_param})
+        results['property'] = self.smiles_properties.columns[0]
+        results['name'] = self.name
+        return results

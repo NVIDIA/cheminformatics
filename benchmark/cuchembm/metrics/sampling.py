@@ -94,10 +94,10 @@ class BaseSampleMetric():
         metric_array, num_array = self.sample_many(self.dataset, num_samples, radius)
         metric = self._calculate_metric(metric_array, num_array)
 
-        return pd.Series({'name': self.name,
-                          'value': metric,
-                          'radius': radius,
-                          'num_samples': num_samples})
+        return {'name': self.name,
+                'value': metric,
+                'radius': radius,
+                'num_samples': num_samples}
 
     @staticmethod
     def get_valid_molecules(smiles_list, canonicalize=False):

@@ -1,10 +1,10 @@
 import os
-import sys
 from pydoc import locate
 import logging
 import hydra
 import pandas as pd
 from datetime import datetime
+from copy import deepcopy
 from cuchembm.plot import (load_metric_results,
                            make_sampling_plots,
                            make_embedding_df,
@@ -37,7 +37,7 @@ from cuchembm.metrics import (Validity,
                               Modelability)
 
 
-log = logging.getLogger(__name__)
+log = logging.getLogger('model benchmarking')
 
 def convert_runtime(time_):
     return time_.seconds + (time_.microseconds / 1.0e6)
@@ -56,11 +56,30 @@ def wait_for_megamolbart_service(inferrer):
     return False
 
 
-def save_metric_results(mode_name, metric_list, output_dir):
+def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
+    """Save CSV for metrics"""
+
     metric_df = pd.concat(metric_list, axis=1).T
+    metric = metric_df.iloc[0]['name'].replace(' ', '_')
+    file_path = os.path.join(output_dir, f'{mode_name}_{metric}')
+
+    if return_predictions:
+        pickle_file = file_path + '.pkl'
+        logging.info(f'Writing predictions to {pickle_file}...')
+
+        if os.path.exists(pickle_file):
+            pickle_df = pd.read_pickle(pickle_file)
+            pickle_df = pd.concat([pickle_df, metric_df], axis=0)
+        else:
+            pickle_df = metric_df
+
+        pickle_df.to_pickle(pickle_file)
+
+    if 'predictions' in metric_df.columns:
+        metric_df.drop('predictions', inplace=True, axis=1)
+
     log.info(metric_df)
-    metric = metric_df['name'].iloc[0].replace(' ', '_')
-    csv_file_path = os.path.join(output_dir, f'{mode_name}_{metric}.csv')
+    csv_file_path = file_path + '.csv'
     write_header = False if os.path.exists(csv_file_path) else True
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
@@ -73,7 +92,7 @@ def get_input_size(metric_cfg):
     return input_size
 
 
-@hydra.main(config_path=".", config_name="benchmark")
+@hydra.main(config_path=".", config_name="benchmark_metrics")
 def main(cfg):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log.info(cfg)
@@ -152,7 +171,8 @@ def main(cfg):
                                                          inferrer,
                                                          embedding_cache,
                                                          smiles_dataset,
-                                                         n_splits)})
+                                                         n_splits,
+                                                         metric_cfg.return_predictions)})
 
     if cfg.metric.modelability.bioactivity.enabled:
         metric_cfg = cfg.metric.modelability.bioactivity
@@ -161,26 +181,27 @@ def main(cfg):
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
 
-        excape_dataset.load(columns=['SMILES', 'Gene_Symbol'])
+        excape_dataset.load(data_len=input_size, columns=['SMILES', 'Gene_Symbol'])
 
         log.info('Creating groups...')
 
         n_splits = metric_cfg.n_splits
-        groups = list(zip(excape_dataset.smiles.groupby(level='gene'),
-                          excape_dataset.properties.groupby(level='gene'),
-                          excape_dataset.fingerprints.groupby(level='gene')))
+        gene_dataset = deepcopy(excape_dataset)
+        for label, sm_ in excape_dataset.smiles.groupby(level='gene'):
+            gene_dataset.smiles = sm_
 
-        for (label, sm_), (_, prop_), (_, fp_) in groups:
-            excape_dataset.smiles = sm_
-            excape_dataset.properties = prop_
-            excape_dataset.fingerprints = fp_
-            log.info(f'Creating bioactivity Modelability for {label}...')
+            index = sm_.index.get_level_values(gene_dataset.index_col)
+            gene_dataset.properties = excape_dataset.properties.loc[index]
+            gene_dataset.fingerprints = excape_dataset.fingerprints.loc[index]
+
+            log.info(f'Creating bioactivity Modelability metric for {label}...')
 
             metric_list.append({label: Modelability('modelability-bioactivity',
                                                     inferrer,
                                                     embedding_cache,
-                                                    excape_dataset,
-                                                    n_splits)})
+                                                    gene_dataset,
+                                                    n_splits,
+                                                    metric_cfg.return_predictions)})
 
     wait_for_megamolbart_service(inferrer)
 
@@ -225,8 +246,14 @@ def main(cfg):
                 if key in kwargs:
                     result[key] = kwargs[key]
 
-            result_list.append(result)
-        save_metric_results(cfg.model.name, result_list, output_dir)
+            result_list.append(pd.Series(result))
+        if result['name'].startswith('modelability'):
+            metric_name = result['name'].split('-')[1]
+            return_predictions = cfg.metric.modelability[metric_name]['return_predictions']
+        else:
+            return_predictions = False
+        save_metric_results(cfg.model.name, result_list, output_dir, return_predictions=return_predictions)
+
     # Plotting
     # metric_df = load_metric_results(output_dir)
     # make_sampling_plots(metric_df, output_dir)

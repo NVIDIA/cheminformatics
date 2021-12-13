@@ -11,8 +11,8 @@ root:
   handlers: [console]
 
 model:
-  # name: MegaMolBART
-  name: CDDD
+  name: MegaMolBART
+  # name: CDDD
   params:
     url: localhost:50051
 
@@ -37,23 +37,25 @@ metric:
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
-    enabled: False
-    input_size: ${metric.validity.input_size}
+    enabled: True
+    input_size: -1
     top_k:
       - 50
       - 100
       - 500
 
   modelability:
-    bioactivity:
-      enabled: False
-      input_size: -1 # Number of genes to include, not number of molecules
-      n_splits: 20
-
     physchem:
-      enabled: False
-      input_size: ${metric.validity.input_size}
+      enabled: True
+      input_size: -1
       n_splits: 20
+      return_predictions: True
+
+    bioactivity:
+      enabled: True
+      input_size: 10 # Number of genes to include, not number of molecules, -1 is all genes
+      n_splits: 20
+      return_predictions: True
   
 sampling:
   max_seq_len: 512

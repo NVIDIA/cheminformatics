@@ -92,7 +92,19 @@ class GenericCSVDataset():
         if data_len:
             data = self._truncate_data(data, data_len)
 
-        if not os.path.exists(self.fp_data_path):
+        generate_fingerprints_file = True
+        if os.path.exists(self.fp_data_path):
+            logger.info(f'Fingerprints file {self.fp_data_path} exists. Checking if indexes match data.')
+            
+            # Check index
+            fp_subset = pd.read_csv(self.fp_data_path, usecols=[self.index_col])
+            if data.index.isin(fp_subset[self.index_col]).all():
+                generate_fingerprints_file = False
+                logger.info(f'Indexes in data are all contained in fingerprints file {self.fp_data_path}. Using existing file.')
+            else:
+                logger.info(f'Indexes in data are not all contained in fingerprints file {self.fp_data_path} Regenerating.')
+
+        if generate_fingerprints_file:
             # Generate here so that column names are consistent with inputs
             logger.info(f'Creating temporary fingerprints file {self.fp_data_path}')
             self._generate_fingerprints(data, columns)
@@ -129,13 +141,22 @@ class GenericCSVDataset():
         logger.info(f'Loading fingerprints from {self.fp_data_path}')
         self.fingerprints = pd.read_csv(self.fp_data_path)
 
+        # Set column names and check for correctness
         if self.index_col:
             self.fingerprints = self.fingerprints.set_index(self.index_col).sort_index()
 
+        assert len(self.fingerprints.columns) == 512, AssertionError(f'Fingerprint dataframe appears to contain incorrect number of column(s)')
+        try:
+            self.fingerprints.columns.astype(int)
+        except:
+            raise ValueError(f'Fingerprint dataframe appears to contain incorrect (non integer) column name(s)')
+
+        # Slice fingerprints if needed and ensure data set indexes are identical
         if self.smiles is not None:
             self.fingerprints = self.fingerprints.loc[self.smiles.index]
 
-        assert len(self.fingerprints) == len(self.smiles) == len(self.properties)
-        assert len(self.fingerprints.columns) == 512
-        assert self.smiles.index.equals(self.fingerprints.index)
-        assert self.smiles.index.equals(self.properties.index)
+        assert len(self.fingerprints) == len(self.smiles) == len(self.properties), AssertionError('Dataframes for SMILES, properties, and fingerprints are not identical length.')
+        assert self.smiles.index.equals(self.fingerprints.index) & self.smiles.index.equals(self.properties.index), AssertionError(f'Dataframe indexes are not equivalent')
+
+
+        

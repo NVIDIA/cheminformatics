@@ -103,6 +103,74 @@ class MoleculeGenerator():
                                           force_unique,
                                           sanitize)
 
+    def fetch_samples(self,
+                      model_name,
+                      smiles,
+                      num_samples,
+                      scaled_radius,
+                      force_unique,
+                      sanitize):
+        """
+        Fetch the benchmark data for a given set of parameters.
+        """
+        log.debug('Fetching benchmark data...')
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                '''
+                SELECT id FROM smiles
+                WHERE model_name=?
+                    AND smiles=?
+                    AND scaled_radius=?
+                    AND force_unique=?
+                    AND sanitize=?
+                ''',
+                [model_name, smiles, scaled_radius, force_unique, sanitize])
+            id = cursor.fetchone()
+
+            if not id:
+                return None
+
+            cursor.execute(
+                '''
+                SELECT smiles, embedding, embedding_dim, is_valid
+                FROM smiles_samples WHERE input_id=?
+                LIMIT ?
+                ''',
+                [id[0], num_samples])
+            generated_smiles = cursor.fetchall()
+
+        return generated_smiles
+
+    def fetch_embedding(self,
+                        model_name,
+                        smiles):
+        """
+        Fetch the embedding of a given SMILES string.
+        """
+        log.debug('Fetching benchmark data...')
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                '''
+                SELECT id FROM smiles
+                WHERE model_name=?
+                    AND smiles=?
+                ''',
+                [model_name, smiles])
+            id = cursor.fetchone()
+
+            if not id:
+                return None
+
+            cursor.execute(
+                '''
+                SELECT smiles, embedding, embedding_dim
+                FROM smiles_samples WHERE input_id=?
+                LIMIT ?
+                ''',
+                [id[0], 1])
+            return cursor.fetchone()
+
+
 inferrer = MegaMolBARTWrapper()
 generator = MoleculeGenerator(inferrer)
 generator.generate_and_store('/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv',

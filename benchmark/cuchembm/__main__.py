@@ -94,7 +94,7 @@ def get_input_size(metric_cfg):
     return input_size
 
 
-@hydra.main(config_path="config", config_name="benchmark_metrics")
+@hydra.main(config_path=".", config_name="benchmark_metrics")
 def main(cfg):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log.info(cfg)

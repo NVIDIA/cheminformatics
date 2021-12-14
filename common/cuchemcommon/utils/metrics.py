@@ -30,20 +30,6 @@ from rdkit.Chem import AllChem
 logger = logging.getLogger(__name__)
 
 
-@numba.jit(bool_[:, :](string[:], int64, int64), forceobj=True, parallel=True)
-def calculate_morgan_fingerprint(smiles, radius, nbits):
-    fingerprints = np.empty((smiles.shape[0], nbits), dtype=np.bool_)
-    for i in range(smiles.shape[0]):
-        mol = Chem.MolFromSmiles(smiles[i])
-        if mol:
-            fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=nbits)
-            fp = np.frombuffer(fp.ToBitString().encode(), 'b1')
-        else:
-            fp = np.zeros(nbits, dtype=bool)
-
-        fingerprints[i] = fp
-    return fingerprints
-
 
 def rankdata(data, method='average', na_option='keep', axis=1, is_symmetric=False):
     """Rank observations for a series of samples, with tie handling

@@ -22,7 +22,7 @@ metric:
     input_size: 20000
     radius:
       - 1
-      - 2
+      # - 2
 
   unique:
     enabled: True
@@ -56,7 +56,7 @@ metric:
       input_size: 10 # Number of genes to include, not number of molecules, -1 is all genes
       n_splits: 20
       return_predictions: True
-  
+
 sampling:
   max_seq_len: 512
   sample_size: 10

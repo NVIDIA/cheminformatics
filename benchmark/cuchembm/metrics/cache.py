@@ -3,15 +3,19 @@ import logging
 import pickle
 import sqlite3
 import pandas as pd
+import numpy as np
 
 from contextlib import closing
 from cuchembm.inference.megamolbart import MegaMolBARTWrapper
 from cuchemcommon.utils.smiles import validate_smiles
 
-logging.basicConfig(level=logging.INFO, filename='/logs/molecule_generator.log')
+format = '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
+logging.basicConfig(level=logging.INFO,
+                    filename='/logs/molecule_generator.log',
+                    format=format)
 console = logging.StreamHandler()
 console.setLevel(logging.INFO)
-console.setFormatter(logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s'))
+console.setFormatter(logging.Formatter(format))
 logging.getLogger("").addHandler(console)
 
 log = logging.getLogger('cuchembm.molecule_generator')
@@ -23,6 +27,7 @@ class MoleculeGenerator():
     def __init__(self, inferrer) -> None:
         self.db = '/data/db/generated_smiles.sqlite3'
         self.inferrer = inferrer
+        self._process_pending = False
 
         execute_db_creation = False
         if not os.path.exists(self.db):
@@ -35,30 +40,27 @@ class MoleculeGenerator():
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
 
+        with closing(self.conn.cursor()) as cursor:
+            pending_recs = cursor.execute(
+                'SELECT count(*) from smiles where processed = 0').fetchone()[0]
+            if pending_recs > 0:
+                self._process_pending = True
+
     def _insert_generated_smiles(self,
-                                 smiles,
-                                 smiles_df,
-                                 num_requested,
-                                 scaled_radius,
-                                 force_unique,
-                                 sanitize):
+                                 smiles_id,
+                                 smiles_df):
         log.debug('Inserting benchmark data...')
-        model_name = self.inferrer.__class__.__name__
 
         generated_smiles = smiles_df['SMILES'].to_list()
         embeddings = smiles_df['embeddings'].to_list()
         embeddings_dim = smiles_df['embeddings_dim'].to_list()
 
         with closing(self.conn.cursor()) as cursor:
-            id = cursor.execute(
-                '''
-                INSERT INTO smiles(model_name, smiles, num_samples,
-                                   scaled_radius, force_unique, sanitize)
-                VALUES(?, ?,?,?,?,?)
-                ''',
-                [model_name, smiles, num_requested,
-                 scaled_radius, force_unique, sanitize]).lastrowid
+            cursor.execute(
+                'UPDATE smiles set processed = 1 WHERE id = ?',
+                [smiles_id])
 
+            generated = False
             for i in range(len(generated_smiles)):
                 gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
                                                         return_fingerprint=True)
@@ -71,11 +73,14 @@ class MoleculeGenerator():
                 cursor.execute(
                     '''
                     INSERT INTO smiles_samples(input_id, smiles, embedding,
-                                               embedding_dim, is_valid, finger_print)
-                    VALUES(?, ?, ?, ?, ?, ?)
+                                               embedding_dim, is_valid,
+                                               finger_print, is_generated)
+                    VALUES(?, ?, ?, ?, ?, ?, ?)
                     ''',
-                    [id, gsmiles, sqlite3.Binary(embedding),
-                     sqlite3.Binary(embedding_dim), is_valid, fp])
+                    [smiles_id, gsmiles, sqlite3.Binary(embedding),
+                     sqlite3.Binary(embedding_dim), is_valid, fp, generated])
+                generated = True
+
             self.conn.commit()
 
     def generate_and_store(self,
@@ -85,23 +90,39 @@ class MoleculeGenerator():
                            scaled_radius=1,
                            force_unique=False,
                            sanitize=True):
-        df = pd.read_csv(csv_data_file)
 
-        smiles_series = df[smiles_col_name]
-        for index, smiles in smiles_series.iteritems():
-            log.debug(f'Generating embeddings for {smiles}...')
-            result = self.inferrer.find_similars_smiles(smiles,
-                                                        num_requested=num_requested,
-                                                        scaled_radius=scaled_radius,
-                                                        force_unique=force_unique,
-                                                        sanitize=sanitize)
+        if self._process_pending is False:
+            input_df = pd.read_csv(csv_data_file)
+            df = pd.DataFrame()
+            df['smiles'] = input_df[smiles_col_name]
+            del input_df
 
-            self._insert_generated_smiles(smiles,
-                                          result,
-                                          num_requested,
-                                          scaled_radius,
-                                          force_unique,
-                                          sanitize)
+            df['model_name'] = np.full(shape=df.shape[0], fill_value=self.inferrer.__class__.__name__)
+            df['num_samples'] = np.full(shape=df.shape[0], fill_value=num_requested)
+            df['scaled_radius'] = np.full(shape=df.shape[0], fill_value=scaled_radius)
+            df['force_unique'] = np.full(shape=df.shape[0], fill_value=force_unique)
+            df['sanitize'] = np.full(shape=df.shape[0], fill_value=sanitize)
+            df.to_sql('smiles', self.conn, index=False, if_exists='append')
+            del df
+
+
+        while True:
+            df = pd.read_sql_query(
+                'SELECT * from smiles where processed = 0 LIMIT 1000',
+                self.conn)
+            if df.shape[0] == 0:
+                break
+
+            for row in df.itertuples ():
+                print(row.id, row.smiles)
+                log.debug(f'Generating embeddings for {row.smiles}...')
+                result = self.inferrer.find_similars_smiles(row.smiles,
+                                                            num_requested=row.num_samples,
+                                                            scaled_radius=row.scaled_radius,
+                                                            force_unique=row.force_unique,
+                                                            sanitize=row.sanitize)
+
+                self._insert_generated_smiles(row.id, result)
 
     def fetch_samples(self,
                       model_name,
@@ -133,8 +154,7 @@ class MoleculeGenerator():
             cursor.execute(
                 '''
                 SELECT smiles, embedding, embedding_dim, is_valid
-                FROM smiles_samples WHERE input_id=?
-                LIMIT ?
+                FROM smiles_samples WHERE input_id=? LIMIT ?
                 ''',
                 [id[0], num_samples])
             generated_smiles = cursor.fetchall()

@@ -19,18 +19,21 @@ import glob
 import pandas as pd
 import numpy as np
 import multiprocessing as mp
+import pathlib
 
 from cuchemcommon.fingerprint import calc_morgan_fingerprints
-from cuchem.utils.dataset import ZINC_TRIE_DIR
 
 from rdkit.Chem.Crippen import MolLogP
 from rdkit.Chem.Descriptors import ExactMolWt
 from rdkit import Chem
 
-DATA_BENCHMARK_DIR = '/workspace/cuchem/nvidia/cheminformatics/data'
+from CDDD_train_data_overlap import MOLECULES_IN_CDDD_TRAIN_DATA
+
+DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent.parent,
+                                'cuchembm', 'csv_data')
 NUM_PROCESSES = (mp.cpu_count() * 2) - 1 # --> max num proceses, but needs more memory
 NUM_DATA = 20000
-
+ZINC_DATA_DIR = '/data/zinc_csv_split'
 
 def calc_properties(smiles_list):
     logp_vals, mw_vals = [], []
@@ -44,23 +47,28 @@ def calc_properties(smiles_list):
 if __name__ == '__main__':
 
     # Read data
-    zinc_test_filelist = glob.glob(os.path.join(ZINC_TRIE_DIR, 'test', '*.txt'))
+    zinc_test_filelist = glob.glob(os.path.join(ZINC_DATA_DIR, 'test', 'x*.csv'))
     benchmark_df = list()
     for fil in zinc_test_filelist:
-        benchmark_df.append(pd.read_csv(fil, names=['canonical_smiles']))
-    benchmark_df = pd.concat(benchmark_df, axis=0).reset_index(drop=True)
+        benchmark_df.append(pd.read_csv(fil, names=['canonical_smiles'], skiprows=[0]))
+    benchmark_df = pd.concat(benchmark_df, axis=0)
+    mask = benchmark_df['canonical_smiles'].isin(MOLECULES_IN_CDDD_TRAIN_DATA).pipe(np.invert)
+    benchmark_df = benchmark_df[mask].reset_index(drop=True)
+
     benchmark_df = benchmark_df.sample(n=NUM_DATA, replace=False, random_state=0).reset_index(drop=True)
     assert NUM_DATA <= len(benchmark_df)
     benchmark_df['length'] = benchmark_df['canonical_smiles'].map(len)
 
-    # Calculate properties -- parallelized
-    pool = mp.Pool(processes=NUM_PROCESSES)
-    chunks = benchmark_df['canonical_smiles'].to_numpy()
-    chunks = np.array_split(chunks, NUM_PROCESSES)
-    outputs = pool.map(calc_properties, chunks)
-    outputs = pd.concat(outputs, axis=0).reset_index(drop=True)
+    # Calculate properties
+    # pool = mp.Pool(processes=NUM_PROCESSES)
+    # chunks = benchmark_df['canonical_smiles'].to_numpy()
+    # chunks = np.array_split(chunks, NUM_PROCESSES)
+    # outputs = pool.map(calc_properties, chunks)
+    # outputs = pd.concat(outputs, axis=0).reset_index(drop=True)
+    outputs = calc_properties(benchmark_df['canonical_smiles'].tolist())
     benchmark_df = pd.concat([benchmark_df, outputs], axis=1)
     benchmark_df.index.name = 'index'
+
 
     fp = calc_morgan_fingerprints(benchmark_df[['canonical_smiles']])
     fp.index = fp.index.astype(np.int64)

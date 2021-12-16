@@ -42,7 +42,7 @@ class MoleculeGenerator():
 
         with closing(self.conn.cursor()) as cursor:
             pending_recs = cursor.execute(
-                'SELECT count(*) from smiles where processed = 0').fetchone()[0]
+                'SELECT count(*) from smiles').fetchone()[0]
             if pending_recs > 0:
                 self._process_pending = True
 
@@ -104,7 +104,6 @@ class MoleculeGenerator():
             df['sanitize'] = np.full(shape=df.shape[0], fill_value=sanitize)
             df.to_sql('smiles', self.conn, index=False, if_exists='append')
             del df
-
 
         while True:
             df = pd.read_sql_query(
@@ -190,6 +189,60 @@ class MoleculeGenerator():
                 [id[0], 1])
             return cursor.fetchone()
 
+    def compute_sampling_metrics(self):
+        """
+        Compute the sampling metrics for a given set of parameters.
+        """
+        # Valid SMILES
+        valid_result = self.conn.execute('''
+            SELECT is_valid, count(*)
+            FROM smiles_samples ss
+            WHERE is_generated = 1
+            GROUP BY is_valid;
+            ''')
+
+        total_molecules = 0
+        valid_molecules = 0
+        for rec in valid_result.fetchall():
+            total_molecules += rec[1]
+            if rec[0] == 1:
+                valid_molecules += rec[1]
+        log.info(f'Total molecules: {total_molecules}')
+        log.info(f'Valid molecules: {valid_molecules}')
+
+        # Unique SMILES
+        unique_result = self.conn.execute('''
+            SELECT sum(smiles_cnt), sum(distinct_cnt)
+            FROM (
+                SELECT count(smiles) smiles_cnt, count(DISTINCT smiles) distinct_cnt
+                FROM smiles_samples ss
+                WHERE is_valid = 1
+                    AND is_generated = 1
+                group by input_id
+            )
+            ''')
+
+        rec = unique_result.fetchone()
+        unique_molecules = rec[1]
+        log.info(f'Unique molecules: {unique_molecules}')
+
+        # Novel SMILES
+        self.conn.execute('ATTACH ? AS training_db', ['/data/db/zinc_train.sqlite3'])
+        res = self.conn.execute('''
+            SELECT count(distinct main.smiles_samples.smiles)
+            FROM main.smiles_samples, training_db.train_data
+            Where main.smiles_samples.smiles = training_db.train_data.smiles
+               AND main.smiles_samples.is_generated = 1
+               AND main.smiles_samples.is_valid = 1
+            ''')
+        rec = res.fetchone()
+        novel_molecules = valid_molecules - rec[0]
+        log.info(f'Novel molecules: {novel_molecules}')
+
+        log.info(f'Validity Ratio: {valid_molecules/total_molecules}')
+        log.info(f'Unique Ratio: {unique_molecules/valid_molecules}')
+        log.info(f'Novelity Ratio: {novel_molecules/valid_molecules}')
+
 
 inferrer = MegaMolBARTWrapper()
 generator = MoleculeGenerator(inferrer)
@@ -199,3 +252,7 @@ generator.generate_and_store('/workspace/benchmark/cuchembm/csv_data/benchmark_Z
                              scaled_radius=1,
                              force_unique=False,
                              sanitize=True)
+import time
+start_time = time.time()
+generator.compute_sampling_metrics()
+log.info("Time: {}".format(time.time() - start_time))

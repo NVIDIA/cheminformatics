@@ -167,7 +167,8 @@ def main(cfg):
                                                          embedding_cache,
                                                          smiles_dataset,
                                                          n_splits,
-                                                         metric_cfg.return_predictions)})
+                                                         metric_cfg.return_predictions,
+                                                         metric_cfg.normalize_inputs)})
 
     if cfg.metric.modelability.bioactivity.enabled:
         metric_cfg = cfg.metric.modelability.bioactivity
@@ -196,7 +197,8 @@ def main(cfg):
                                                     embedding_cache,
                                                     gene_dataset,
                                                     n_splits,
-                                                    metric_cfg.return_predictions)})
+                                                    metric_cfg.return_predictions,
+                                                    metric_cfg.normalize_inputs)})
 
     wait_for_megamolbart_service(inferrer)
 

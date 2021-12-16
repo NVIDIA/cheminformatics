@@ -32,7 +32,8 @@ class GenericCSVDataset():
             pathlib.Path(__file__).parent.parent.absolute(), 'csv_data', fp_filename)
         if not os.path.exists(fp_data_path):
             logger.info(f'Fingerprint path {fp_data_path} does not exist, generating temporary fingerprints file.')
-            fp_data_path = os.path.join(tempfile.tempdir, self.fp_filename)
+            temp_dir = '/tmp' #tempfile.TemporaryDirectory().name
+            fp_data_path = os.path.join(temp_dir, self.fp_filename)
 
         self.fp_data_path = fp_data_path
 

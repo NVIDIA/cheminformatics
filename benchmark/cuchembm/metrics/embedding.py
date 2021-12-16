@@ -165,7 +165,7 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
         embeddings = self.encode_many(zero_padded_vals=True,
                                       average_tokens=False)
-
+        embeddings = xpy.asarray(embeddings)
         fingerprints = xpy.asarray(self.fingerprint_dataset)
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)

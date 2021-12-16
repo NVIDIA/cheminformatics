@@ -17,7 +17,7 @@ try:
     from cuml.ensemble import RandomForestRegressor
     from cuchemcommon.utils.metrics import spearmanr
     from cuchem.utils.distance import tanimoto_calculate
-    from cuml.experimental.preprocessing import Normalizer
+    from cuml.experimental.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = True
     logger.info('RAPIDS installation found. Using cupy and cudf where possible.')
 except ModuleNotFoundError as e:
@@ -30,17 +30,17 @@ except ModuleNotFoundError as e:
     from sklearn.ensemble import RandomForestRegressor
     from scipy.stats import spearmanr
     from cuchem.utils.distance import tanimoto_calculate
-    from sklearn.preprocessing import Normalizer
+    from sklearn.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = False
 
 __all__ = ['NearestNeighborCorrelation', 'Modelability']
 
 
 def get_model_dict():
-    lr_estimator = LinearRegression(normalize=True)
-    lr_param_dict = {'normalize': [True]}
+    lr_estimator = LinearRegression(normalize=False) # Normalization done by StandardScaler
+    lr_param_dict = {'normalize': [False]}
 
-    en_estimator = ElasticNet(normalize=True)
+    en_estimator = ElasticNet(normalize=False)
     en_param_dict = {'alpha': [0.001, 0.01, 0.1, 1.0, 10.0, 100],
                      'l1_ratio': [0.0, 0.2, 0.5, 0.7, 1.0]}
 
@@ -74,7 +74,6 @@ class BaseEmbeddingMetric():
         self.smiles_dataset = dataset.smiles
         self.fingerprint_dataset = dataset.fingerprints
         self.smiles_properties = dataset.properties
-
 
     def variations(self):
         return NotImplemented
@@ -189,7 +188,7 @@ class Modelability(BaseEmbeddingMetric):
         self.n_splits = n_splits
         self.return_predictions = return_predictions
         if normalize_inputs:
-            self.norm_data, self.norm_prop = Normalizer(), Normalizer()
+            self.norm_data, self.norm_prop = StandardScaler(), StandardScaler()
         else:
             self.norm_data, self.norm_prop = False, False
 
@@ -237,8 +236,7 @@ class Modelability(BaseEmbeddingMetric):
         if self.norm_data:
             embeddings = self.norm_data.fit_transform(embeddings)
         if self.norm_prop:
-            properties = self.norm_prop.fit_transform(properties[:, xpy.newaxis])
-            properties = properties.squeeze()
+            properties = self.norm_prop.fit_transform(properties[xpy.newaxis, :]).squeeze()
 
         embedding_error, embedding_param, embedding_pred = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
         fingerprint_error, fingerprint_param, fingerprint_pred = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
@@ -249,9 +247,8 @@ class Modelability(BaseEmbeddingMetric):
         ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
         if (self.norm_prop is not None) & self.return_predictions:
-            fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[:, xpy.newaxis])
-            embedding_pred = self.norm_prop.inverse_transform(embedding_pred[:, xpy.newaxis])
-            fingerprint_pred, embedding_pred = fingerprint_pred.squeeze(), embedding_pred.squeeze()
+            fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[xpy.newaxis, :]).squeeze()
+            embedding_pred = self.norm_prop.inverse_transform(embedding_pred[xpy.newaxis, :]).squeeze()
 
         results = {'value': ratio, 
                    'fingerprint_error': fingerprint_error, 

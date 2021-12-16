@@ -7,12 +7,7 @@ import numpy as np
 from datetime import datetime
 import pickle
 from copy import deepcopy
-from cuchembm.plot import (load_metric_results, 
-                           make_sampling_plots, 
-                           make_embedding_df, 
-                           make_nearest_neighbor_plot,
-                           make_physchem_plots,
-                           make_bioactivity_plots)
+from cuchembm.plot import (create_aggregated_plots, make_model_plots)
 
 # Dataset classess
 from cuchembm.datasets.physchem import (ChEMBLApprovedDrugs,
@@ -255,13 +250,10 @@ def main(cfg):
         save_metric_results(cfg.model.name, result_list, output_dir, return_predictions=return_predictions)
         
     # Plotting
-    # metric_df = load_metric_results(output_dir)
-    # make_sampling_plots(metric_df, output_dir)
+    create_aggregated_plots(output_dir)
+    make_model_plots(max_seq_len, 'physchem', output_dir)
+    make_model_plots(max_seq_len, 'bioactivity', output_dir)
 
-    # embedding_df = make_embedding_df(metric_df)
-    # make_nearest_neighbor_plot(embedding_df, output_dir)
-    # make_physchem_plots(embedding_df, output_dir)
-    # make_bioactivity_plots(embedding_df, output_dir)
 
 
 if __name__ == '__main__':

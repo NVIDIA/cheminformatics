@@ -84,18 +84,22 @@ class MoleculeGenerator():
             self.conn.commit()
 
     def generate_and_store(self,
-                           csv_data_file,
-                           smiles_col_name,
+                           csv_data_files,
                            num_requested=10,
                            scaled_radius=1,
                            force_unique=False,
                            sanitize=True):
 
         if self._process_pending is False:
-            input_df = pd.read_csv(csv_data_file)
+            all_dataset_df = []
+            for csv_data_file in csv_data_files:
+                smiles_col_name = csv_data_files[csv_data_file]
+                dataset_df = pd.DataFrame()
+                dataset_df['smiles'] = pd.read_csv(csv_data_file)[smiles_col_name]
+                all_dataset_df.append(dataset_df)
+
             df = pd.DataFrame()
-            df['smiles'] = input_df[smiles_col_name]
-            del input_df
+            df['smiles'] = pd.concat(all_dataset_df)['smiles'].unique()
 
             df['model_name'] = np.full(shape=df.shape[0], fill_value=self.inferrer.__class__.__name__)
             df['num_samples'] = np.full(shape=df.shape[0], fill_value=num_requested)
@@ -211,20 +215,20 @@ class MoleculeGenerator():
         log.info(f'Valid molecules: {valid_molecules}')
 
         # Unique SMILES
-        unique_result = self.conn.execute('''
-            SELECT sum(smiles_cnt), sum(distinct_cnt)
+        unique_result = self.conn.execute(f'''
+            SELECT sum(ratio)/{total_molecules}
             FROM (
-                SELECT count(smiles) smiles_cnt, count(DISTINCT smiles) distinct_cnt
+                SELECT CAST(count(smiles)as float) as smiles_cnt,
+                    count(DISTINCT smiles) as distinct_cnt,
+                    CAST(count(DISTINCT smiles) as float)/CAST(count(smiles) as float) ratio
                 FROM smiles_samples ss
                 WHERE is_valid = 1
                     AND is_generated = 1
                 group by input_id
             )
             ''')
-
         rec = unique_result.fetchone()
-        unique_molecules = rec[1]
-        log.info(f'Unique molecules: {unique_molecules}')
+        unique_ratio = rec[0]
 
         # Novel SMILES
         self.conn.execute('ATTACH ? AS training_db', ['/data/db/zinc_train.sqlite3'])
@@ -240,19 +244,26 @@ class MoleculeGenerator():
         log.info(f'Novel molecules: {novel_molecules}')
 
         log.info(f'Validity Ratio: {valid_molecules/total_molecules}')
-        log.info(f'Unique Ratio: {unique_molecules/valid_molecules}')
+        log.info(f'Unique Ratio: {unique_ratio}')
         log.info(f'Novelity Ratio: {novel_molecules/valid_molecules}')
 
 
+data_files = {'/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv': 'canonical_smiles',
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv': 'canonical_smiles',
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv': 'SMILES',
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv': 'SMILES',
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv': 'SMILES'}
+
 inferrer = MegaMolBARTWrapper()
 generator = MoleculeGenerator(inferrer)
-generator.generate_and_store('/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv',
-                             'canonical_smiles',
+generator.generate_and_store(data_files,
                              num_requested=10,
                              scaled_radius=1,
                              force_unique=False,
                              sanitize=True)
+
+
 import time
 start_time = time.time()
 generator.compute_sampling_metrics()
-log.info("Time: {}".format(time.time() - start_time))
+log.info("Time(sec): {}".format(time.time() - start_time))

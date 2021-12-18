@@ -49,12 +49,14 @@ metric:
       enabled: True
       input_size: -1
       n_splits: 20
+      normalize_inputs: True
       return_predictions: True
 
     bioactivity:
       enabled: True
       input_size: 10 # Number of genes to include, not number of molecules, -1 is all genes
       n_splits: 20
+      normalize_inputs: True
       return_predictions: True
 
 sampling:

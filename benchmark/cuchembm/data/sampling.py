@@ -15,11 +15,12 @@ logger = logging.getLogger(__name__)
 
 class SampleCacheData(object, metaclass=Singleton):
 
-    def __init__(self):
+    def __init__(self, db_file=None):
 
         context = Context()
-        db_file = context.get_config('data_mount_path', default='/data')
-        db_file = os.path.join(db_file, 'db/embedding_cache.sqlite3')
+        if db_file is None:
+            db_file = context.get_config('data_mount_path', default='/data')
+            db_file = os.path.join(db_file, 'db/embedding_cache.sqlite3')
 
         logger.info(f'Embedding cache database {db_file}...')
         self.conn = sqlite3.connect(db_file)

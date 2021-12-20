@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS smiles (
     force_unique INTEGER,
     sanitize INTEGER,
 	processed INTEGER DEFAULT 0,
+	dataset_type TEXT NOT NULL,
 	UNIQUE(model_name, smiles, num_samples, scaled_radius, force_unique, sanitize)
 );
 

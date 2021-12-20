@@ -3,7 +3,6 @@
 import logging
 
 import numpy as np
-import pandas as pd
 from rdkit import Chem
 
 
@@ -133,7 +132,7 @@ class Validity(BaseSampleMetric):
                                                       scaled_radius=radius,
                                                       force_unique=False,
                                                       sanitize=False)
-        
+
         num_mol = len(generated_smiles[1:])
         valid_ctr = len(self.get_valid_molecules(generated_smiles[1:]))
         return valid_ctr, num_mol

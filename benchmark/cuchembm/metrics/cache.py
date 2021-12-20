@@ -27,7 +27,6 @@ class MoleculeGenerator():
     def __init__(self, inferrer) -> None:
         self.db = '/data/db/generated_smiles.sqlite3'
         self.inferrer = inferrer
-        self._process_pending = False
 
         execute_db_creation = False
         if not os.path.exists(self.db):
@@ -39,12 +38,6 @@ class MoleculeGenerator():
                 sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
-
-        with closing(self.conn.cursor()) as cursor:
-            pending_recs = cursor.execute(
-                'SELECT count(*) from smiles').fetchone()[0]
-            if pending_recs > 0:
-                self._process_pending = True
 
     def _insert_generated_smiles(self,
                                  smiles_id,
@@ -83,6 +76,55 @@ class MoleculeGenerator():
 
             self.conn.commit()
 
+    def fetch_samples(self,
+                      smiles,
+                      num_samples,
+                      scaled_radius,
+                      force_unique,
+                      sanitize):
+        """
+        Fetch the benchmark data for a given set of parameters.
+        """
+        log.debug('Fetching benchmark data...')
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                '''
+                SELECT ss.smiles, ss.embedding, ss.embedding_dim, ss.is_valid
+                FROM smiles s, smiles_samples ss
+                WHERE s.id = ss.input_id
+                    AND s.model_name = ?
+                    AND s.scaled_radius = ?
+                    AND s.force_unique = ?
+                    AND s.sanitize = ?
+                    AND s.smiles = ?
+                LIMIT ?;
+                ''',
+                [self.inferrer.__class__.__name__, smiles, scaled_radius,
+                 force_unique, sanitize, num_samples])
+            generated_smiles = cursor.fetchall()
+
+        return generated_smiles
+
+    def fetch_embedding(self, smiles):
+        """
+        Fetch the embedding of a given SMILES string.
+        """
+        log.debug('Fetching benchmark data...')
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                '''
+                SELECT ss.smiles, ss.embedding, ss.embedding_dim
+                FROM smiles as s, smiles_samples as ss
+                WHERE s.id = ss.input_id
+                    AND s.model_name = ?
+                    AND s.smiles = s.smiles
+                    AND s.smiles = ?
+                    LIMIT 1;
+                ''',
+                [self.inferrer.__class__.__name__, smiles])
+
+            return cursor.fetchone()
+
     def generate_and_store(self,
                            csv_data_files,
                            num_requested=10,
@@ -90,17 +132,26 @@ class MoleculeGenerator():
                            force_unique=False,
                            sanitize=True):
 
-        if self._process_pending is False:
+        process_pending = False
+        with closing(self.conn.cursor()) as cursor:
+            pending_recs = cursor.execute(
+                'SELECT count(*) from smiles where processed = 0').fetchone()
+            if pending_recs[0] > 0:
+                process_pending = True
+
+        if process_pending is False:
             all_dataset_df = []
             for csv_data_file in csv_data_files:
-                smiles_col_name = csv_data_files[csv_data_file]
+                smiles_col_name = csv_data_files[csv_data_file]['col_name']
+                dataset_type = csv_data_files[csv_data_file]['dataset_type']
                 dataset_df = pd.DataFrame()
                 dataset_df['smiles'] = pd.read_csv(csv_data_file)[smiles_col_name]
+                dataset_df['dataset_type'] = np.full(shape=dataset_df.shape[0], fill_value=dataset_type)
+
                 all_dataset_df.append(dataset_df)
 
             df = pd.DataFrame()
-            df['smiles'] = pd.concat(all_dataset_df)['smiles'].unique()
-
+            df = pd.concat(all_dataset_df).drop_duplicates()
             df['model_name'] = np.full(shape=df.shape[0], fill_value=self.inferrer.__class__.__name__)
             df['num_samples'] = np.full(shape=df.shape[0], fill_value=num_requested)
             df['scaled_radius'] = np.full(shape=df.shape[0], fill_value=scaled_radius)
@@ -108,6 +159,9 @@ class MoleculeGenerator():
             df['sanitize'] = np.full(shape=df.shape[0], fill_value=sanitize)
             df.to_sql('smiles', self.conn, index=False, if_exists='append')
             del df
+        else:
+            log.warn(f"There are pending records in the database.")
+            log.warn(f"Please rerun after this job to process {csv_data_files}.")
 
         while True:
             df = pd.read_sql_query(
@@ -127,83 +181,30 @@ class MoleculeGenerator():
 
                 self._insert_generated_smiles(row.id, result)
 
-    def fetch_samples(self,
-                      model_name,
-                      smiles,
-                      num_samples,
-                      scaled_radius,
-                      force_unique,
-                      sanitize):
-        """
-        Fetch the benchmark data for a given set of parameters.
-        """
-        log.debug('Fetching benchmark data...')
-        with closing(self.conn.cursor()) as cursor:
-            cursor.execute(
-                '''
-                SELECT id FROM smiles
-                WHERE model_name=?
-                    AND smiles=?
-                    AND scaled_radius=?
-                    AND force_unique=?
-                    AND sanitize=?
-                ''',
-                [model_name, smiles, scaled_radius, force_unique, sanitize])
-            id = cursor.fetchone()
-
-            if not id:
-                return None
-
-            cursor.execute(
-                '''
-                SELECT smiles, embedding, embedding_dim, is_valid
-                FROM smiles_samples WHERE input_id=? LIMIT ?
-                ''',
-                [id[0], num_samples])
-            generated_smiles = cursor.fetchall()
-
-        return generated_smiles
-
-    def fetch_embedding(self,
-                        model_name,
-                        smiles):
-        """
-        Fetch the embedding of a given SMILES string.
-        """
-        log.debug('Fetching benchmark data...')
-        with closing(self.conn.cursor()) as cursor:
-            cursor.execute(
-                '''
-                SELECT id FROM smiles
-                WHERE model_name=?
-                    AND smiles=?
-                ''',
-                [model_name, smiles])
-            id = cursor.fetchone()
-
-            if not id:
-                return None
-
-            cursor.execute(
-                '''
-                SELECT smiles, embedding, embedding_dim
-                FROM smiles_samples WHERE input_id=?
-                LIMIT ?
-                ''',
-                [id[0], 1])
-            return cursor.fetchone()
-
-    def compute_sampling_metrics(self):
+    def compute_sampling_metrics(self,
+                                 scaled_radius=1,
+                                 force_unique=False,
+                                 sanitize=True,
+                                 dataset_type='SAMPLE'):
         """
         Compute the sampling metrics for a given set of parameters.
         """
         # Valid SMILES
         valid_result = self.conn.execute('''
-            SELECT is_valid, count(*)
-            FROM smiles_samples ss
-            WHERE is_generated = 1
-            GROUP BY is_valid;
-            ''')
+            SELECT ss.is_valid, count(*)
+            FROM smiles s, smiles_samples ss
+            WHERE s.id = ss.input_id
+                AND s.model_name = ?
+                AND s.scaled_radius = ?
+                AND s.force_unique = ?
+                AND s.sanitize = ?
+                AND ss.is_generated = 1
+                AND s.processed = 1
+                AND s.dataset_type = ?
+            GROUP BY ss.is_valid;
+            ''',
+            [self.inferrer.__class__.__name__, scaled_radius,
+             force_unique, sanitize, dataset_type])
 
         total_molecules = 0
         valid_molecules = 0
@@ -216,29 +217,44 @@ class MoleculeGenerator():
 
         # Unique SMILES
         unique_result = self.conn.execute(f'''
-            SELECT sum(ratio)/{total_molecules}
+            SELECT avg(ratio)
             FROM (
-                SELECT CAST(count(smiles)as float) as smiles_cnt,
-                    count(DISTINCT smiles) as distinct_cnt,
-                    CAST(count(DISTINCT smiles) as float)/CAST(count(smiles) as float) ratio
-                FROM smiles_samples ss
-                WHERE is_valid = 1
-                    AND is_generated = 1
-                group by input_id
-            )
-            ''')
+                SELECT CAST(count(DISTINCT ss.smiles) as float) / CAST(count(ss.smiles) as float) ratio
+            FROM smiles s, smiles_samples ss
+            WHERE s.id = ss.input_id
+                AND s.model_name = ?
+                AND s.scaled_radius = ?
+                AND s.force_unique = ?
+                AND s.sanitize = ?
+                AND ss.is_valid = 1
+                AND ss.is_generated = 1
+                AND s.processed = 1
+                AND s.dataset_type = ?
+            GROUP BY s.id
+            )''',
+            [self.inferrer.__class__.__name__, scaled_radius, force_unique,
+             sanitize, dataset_type])
         rec = unique_result.fetchone()
         unique_ratio = rec[0]
 
         # Novel SMILES
         self.conn.execute('ATTACH ? AS training_db', ['/data/db/zinc_train.sqlite3'])
         res = self.conn.execute('''
-            SELECT count(distinct main.smiles_samples.smiles)
-            FROM main.smiles_samples, training_db.train_data
-            Where main.smiles_samples.smiles = training_db.train_data.smiles
-               AND main.smiles_samples.is_generated = 1
-               AND main.smiles_samples.is_valid = 1
-            ''')
+            SELECT count(distinct ss.smiles)
+            FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
+            WHERE ss.smiles = td.smiles
+                AND s.id = ss.input_id
+                AND s.model_name = ?
+                AND s.scaled_radius = ?
+                AND s.force_unique = ?
+                AND s.sanitize = ?
+                AND ss.is_valid = 1
+                AND ss.is_generated = 1
+                AND s.processed = 1
+                AND s.dataset_type = ?
+            ''',
+            [self.inferrer.__class__.__name__, scaled_radius, force_unique,
+             sanitize, dataset_type])
         rec = res.fetchone()
         novel_molecules = valid_molecules - rec[0]
         log.info(f'Novel molecules: {novel_molecules}')
@@ -248,11 +264,23 @@ class MoleculeGenerator():
         log.info(f'Novelity Ratio: {novel_molecules/valid_molecules}')
 
 
-data_files = {'/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv': 'canonical_smiles',
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv': 'canonical_smiles',
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv': 'SMILES',
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv': 'SMILES',
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv': 'SMILES'}
+data_files = {
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv':
+        {'col_name': 'canonical_smiles',
+         'dataset_type': 'SAMPLE'},
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv':
+        {'col_name': 'canonical_smiles',
+         'dataset_type': 'EMBEDDING'},
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv':
+        {'col_name': 'SMILES',
+         'dataset_type': 'EMBEDDING'},
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv':
+        {'col_name': 'SMILES',
+         'dataset_type': 'EMBEDDING'},
+    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv':
+        {'col_name': 'SMILES',
+         'dataset_type': 'EMBEDDING'}
+    }
 
 inferrer = MegaMolBARTWrapper()
 generator = MoleculeGenerator(inferrer)
@@ -262,8 +290,10 @@ generator.generate_and_store(data_files,
                              force_unique=False,
                              sanitize=True)
 
-
 import time
 start_time = time.time()
-generator.compute_sampling_metrics()
+generator.compute_sampling_metrics(scaled_radius=1,
+                                   force_unique=False,
+                                   sanitize=True,
+                                   dataset_type='SAMPLE')
 log.info("Time(sec): {}".format(time.time() - start_time))

@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import logging
-import pandas as pd
 import numpy as np
 from sklearn.model_selection import ParameterGrid, KFold
-from cuchembm.data.memcache import Cache
 
 logger = logging.getLogger(__name__)
 
@@ -233,6 +231,7 @@ class Modelability(BaseEmbeddingMetric):
         prop_name = properties.columns[0]
         properties = xpy.asarray(properties[prop_name], dtype=xpy.float32)
 
+        logging.info(f"==============>>>> {type(embeddings)} {embeddings.shape}")
         if self.norm_data:
             embeddings = self.norm_data.fit_transform(embeddings)
         if self.norm_prop:
@@ -250,12 +249,12 @@ class Modelability(BaseEmbeddingMetric):
             fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[xpy.newaxis, :]).squeeze()
             embedding_pred = self.norm_prop.inverse_transform(embedding_pred[xpy.newaxis, :]).squeeze()
 
-        results = {'value': ratio, 
-                   'fingerprint_error': fingerprint_error, 
-                   'embedding_error': embedding_error, 
-                   'fingerprint_param': fingerprint_param, 
+        results = {'value': ratio,
+                   'fingerprint_error': fingerprint_error,
+                   'embedding_error': embedding_error,
+                   'fingerprint_param': fingerprint_param,
                    'embedding_param': embedding_param,
-                   'predictions': {'fingerprint_pred': fingerprint_pred, 
+                   'predictions': {'fingerprint_pred': fingerprint_pred,
                                    'embedding_pred': embedding_pred} }
         return results
 

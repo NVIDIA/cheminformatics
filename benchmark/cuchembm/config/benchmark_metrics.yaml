@@ -18,26 +18,26 @@ model:
 
 metric:
   validity:
-    enabled: True
+    enabled: False
     input_size: 20000
     radius:
       - 1
       # - 2
 
   unique:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: True
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: True
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
-    enabled: True
+    enabled: False
     input_size: -1
     top_k:
       - 50

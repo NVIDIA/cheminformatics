@@ -122,7 +122,7 @@ def main(cfg):
 
         if metric_cfg.enabled:
             smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
-            sample_cache = SampleCacheData()
+            sample_cache = SampleCacheData(db=cfg.sampling.db)
 
             smiles_dataset.load(data_len=input_size)
 

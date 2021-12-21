@@ -1,10 +1,17 @@
 import os
+import grpc
 import pathlib
 import logging
+import pandas as pd
 
 from typing import List
 
-from generativesampler_pb2 import EmbeddingList, SmilesList
+from generativesampler_pb2_grpc import GenerativeSamplerStub
+from generativesampler_pb2 import (GenerativeSpec,
+                                   EmbeddingList,
+                                   SmilesList,
+                                   GenerativeModel,
+                                   google_dot_protobuf_dot_empty__pb2)
 
 from cuchemcommon.utils.singleton import Singleton
 
@@ -91,3 +98,96 @@ class MegaMolBARTWrapper(metaclass=Singleton):
             sanitize=sanitize,
             force_unique=force_unique)
         return SmilesList(generatedSmiles=generated_smiles)
+
+
+class GrpcMegaMolBARTWrapper(metaclass=Singleton):
+
+    def __init__(self) -> None:
+
+        self.channel = grpc.insecure_channel('nginx:50052')
+        self.stub = GenerativeSamplerStub(self.channel)
+
+    def is_ready(self, timeout: int = 10) -> bool:
+        try:
+            self.find_similars_smiles(smiles='CC')
+            # grpc.channel_ready_future(self.channel).result(timeout=timeout)
+            logger.info('Megatron MolBART is ready')
+            return True
+        except (grpc.RpcError):
+            logger.warning('Megatron MolBART is not reachable.')
+            return False
+
+    def smiles_to_embedding(self,
+                            smiles: str,
+                            padding: int,
+                            scaled_radius=None,
+                            num_requested: int = 10,
+                            sanitize=True):
+        spec = GenerativeSpec(smiles=[smiles],
+                              padding=padding,
+                              radius=scaled_radius,
+                              numRequested=num_requested,
+                              sanitize=sanitize)
+
+        result = self.stub.SmilesToEmbedding(spec)
+        return result
+
+    def embedding_to_smiles(self,
+                            embedding,
+                            dim: int,
+                            pad_mask):
+        spec = EmbeddingList(embedding=embedding,
+                             dim=dim,
+                             pad_mask=pad_mask)
+
+        return self.stub.EmbeddingToSmiles(spec)
+
+    def find_similars_smiles(self,
+                             smiles: str,
+                             num_requested: int = 10,
+                             scaled_radius=None,
+                             force_unique=False,
+                             sanitize=True):
+        spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
+                              smiles=smiles,
+                              radius=scaled_radius,
+                              numRequested=num_requested,
+                              forceUnique=force_unique,
+                              sanitize=sanitize)
+        result = self.stub.FindSimilars(spec)
+        generatedSmiles = result.generatedSmiles
+        embeddings = []
+        dims = []
+        for embedding in result.embeddings:
+            embeddings.append(list(embedding.embedding))
+            dims.append(embedding.dim)
+
+        generated_df = pd.DataFrame({'SMILES': generatedSmiles,
+                                     'embeddings': embeddings,
+                                     'embeddings_dim': dims,
+                                     'Generated': [True for i in range(len(generatedSmiles))]})
+        generated_df['Generated'].iat[0] = False
+
+        return generated_df
+
+    def interpolate_smiles(self,
+                           smiles: List,
+                           num_points: int = 10,
+                           scaled_radius=None,
+                           force_unique=False,
+                           sanitize=True):
+        spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
+                              smiles=smiles,
+                              radius=scaled_radius,
+                              numRequested=num_points,
+                              forceUnique=force_unique,
+                              sanitize=sanitize)
+
+        result = self.stub.Interpolate(spec)
+        result = result.generatedSmiles
+
+        generated_df = pd.DataFrame({'SMILES': result,
+                                     'Generated': [True for i in range(len(result))]})
+        generated_df.iat[0, 1] = False
+        generated_df.iat[-1, 1] = False
+        return generated_df

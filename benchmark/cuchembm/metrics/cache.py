@@ -2,8 +2,10 @@ import os
 import logging
 import pickle
 import sqlite3
+import tempfile
 import pandas as pd
 import numpy as np
+import concurrent.futures
 
 from contextlib import closing
 from cuchembm.inference.megamolbart import MegaMolBARTWrapper
@@ -24,10 +26,14 @@ __all__ = ['MoleculeGenerator']
 
 
 class MoleculeGenerator():
-    def __init__(self, inferrer) -> None:
-        self.db = '/data/db/generated_smiles.sqlite3'
+    def __init__(self, inferrer, db_file=None) -> None:
+        self.db = db_file
         self.inferrer = inferrer
 
+        if self.db is None:
+            self.db = tempfile.NamedTemporaryFile(prefix='gsmiles_',
+                                                  suffix='.sqlite3',
+                                                  dir='/tmp')
         execute_db_creation = False
         if not os.path.exists(self.db):
             execute_db_creation = True
@@ -130,7 +136,8 @@ class MoleculeGenerator():
                            num_requested=10,
                            scaled_radius=1,
                            force_unique=False,
-                           sanitize=True):
+                           sanitize=True,
+                           concurrent_requests=4):
 
         process_pending = False
         with closing(self.conn.cursor()) as cursor:
@@ -163,23 +170,31 @@ class MoleculeGenerator():
             log.warn(f"There are pending records in the database.")
             log.warn(f"Please rerun after this job to process {csv_data_files}.")
 
-        while True:
-            df = pd.read_sql_query(
-                'SELECT * from smiles where processed = 0 LIMIT 1000',
-                self.conn)
-            if df.shape[0] == 0:
-                break
+        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
+            while True:
+                df = pd.read_sql_query(
+                    'SELECT * from smiles where processed = 0 LIMIT 1000',
+                    self.conn)
+                if df.shape[0] == 0:
+                    break
 
-            for row in df.itertuples ():
-                print(row.id, row.smiles)
-                log.debug(f'Generating embeddings for {row.smiles}...')
-                result = self.inferrer.find_similars_smiles(row.smiles,
-                                                            num_requested=row.num_samples,
-                                                            scaled_radius=row.scaled_radius,
-                                                            force_unique=row.force_unique,
-                                                            sanitize=row.sanitize)
+                futures = {executor.submit(self._sample, row): \
+                    row for row in df.itertuples}
+                for future in concurrent.futures.as_completed(futures):
+                    smiles = futures[future]
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        log.warning(f'{smiles} generated an exception: {exc}')
 
-                self._insert_generated_smiles(row.id, result)
+    def _sample(self, row):
+        result = self.inferrer.find_similars_smiles(row.smiles,
+                                                    num_requested=row.num_samples,
+                                                    scaled_radius=row.scaled_radius,
+                                                    force_unique=row.force_unique,
+                                                    sanitize=row.sanitize)
+        self._insert_generated_smiles(row.id, result)
+
 
     def compute_sampling_metrics(self,
                                  scaled_radius=1,
@@ -282,8 +297,11 @@ data_files = {
          'dataset_type': 'EMBEDDING'}
     }
 
+
 inferrer = MegaMolBARTWrapper()
-generator = MoleculeGenerator(inferrer)
+generator = MoleculeGenerator(inferrer,
+                              db_file='/data/db/generated_smiles.sqlite3')
+
 generator.generate_and_store(data_files,
                              num_requested=10,
                              scaled_radius=1,

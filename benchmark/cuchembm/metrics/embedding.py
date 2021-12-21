@@ -231,7 +231,6 @@ class Modelability(BaseEmbeddingMetric):
         prop_name = properties.columns[0]
         properties = xpy.asarray(properties[prop_name], dtype=xpy.float32)
 
-        logging.info(f"==============>>>> {type(embeddings)} {embeddings.shape}")
         if self.norm_data:
             embeddings = self.norm_data.fit_transform(embeddings)
         if self.norm_prop:

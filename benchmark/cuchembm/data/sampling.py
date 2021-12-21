@@ -23,7 +23,7 @@ class SampleCacheData(object, metaclass=Singleton):
             db_file = os.path.join(db_file, 'db/embedding_cache.sqlite3')
 
         logger.info(f'Embedding cache database {db_file}...')
-        self.conn = sqlite3.connect(db_file)
+        self.conn = sqlite3.connect(db_file, check_same_thread=False)
 
         cursor = self.conn.cursor()
 

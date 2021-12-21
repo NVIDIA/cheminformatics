@@ -93,6 +93,7 @@ start() {
     # Working directory for the individual containers.
     export WORKING_DIR_CUCHEMUI=/opt/nvidia/cheminfomatics
     export WORKING_DIR_MEGAMOLBART=/opt/nvidia/megamolbart
+    export NGINX_CONFIG=nginx.conf
 
     docker-compose --env-file .env  \
         -f docker_compose.yml \

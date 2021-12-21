@@ -2,6 +2,7 @@
 
 import logging
 
+import concurrent.futures
 import numpy as np
 from rdkit import Chem
 
@@ -76,16 +77,22 @@ class BaseSampleMetric():
     def sample(self):
         return NotImplemented
 
-    def sample_many(self, smiles_dataset, num_samples, radius):
+    def sample_many(self, smiles_dataset, num_samples, radius, concurrent_requests=4):
         metric_result = list()
         num_result = list()
+        input_simileses = smiles_dataset.smiles.tolist()
 
-        for index in range(len(smiles_dataset.smiles)):
-            smiles = smiles_dataset.smiles.iloc[index]
-            logger.debug(f'Sampling around {smiles}...')
-            result, num_molecules = self.sample(smiles, num_samples, radius)
-            metric_result.append(result)
-            num_result.append(num_molecules)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
+            futures = {executor.submit(self.sample, smiles, num_samples, radius): \
+                smiles for smiles in input_simileses}
+            for future in concurrent.futures.as_completed(futures):
+                smiles = futures[future]
+                try:
+                    data = future.result()
+                    metric_result.append(data[0])
+                    num_result.append(data[1])
+                except Exception as exc:
+                    logger.warning(f'{smiles} generated an exception: {exc}')
 
         return np.array(metric_result), np.array(num_result)
 

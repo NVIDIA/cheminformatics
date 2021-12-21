@@ -26,7 +26,7 @@ class TrainDataset(object):
 
         db_url = f'file:{db_file}?mode=ro'
         logger.info(f'Train database {db_url}...')
-        self.conn = sqlite3.connect(db_url, uri=True)
+        self.conn = sqlite3.connect(db_url, uri=True, check_same_thread=False)
 
     def is_known_smiles(self, smiles: str) -> bool:
         """

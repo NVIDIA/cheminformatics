@@ -1,4 +1,5 @@
 import os
+import time
 from pydoc import locate
 import logging
 import hydra
@@ -41,12 +42,13 @@ def convert_runtime(time_):
 def wait_for_megamolbart_service(inferrer):
     retry_count = 0
     while retry_count < 30:
-        if inferrer.is_ready(timeout=10):
+        if inferrer.is_ready():
             logging.info(f'Service found after {retry_count} retries.')
             return True
         else:
             logging.warning(f'Service not available. Retrying {retry_count}...')
             retry_count += 1
+            time.sleep(10)
             continue
     return False
 
@@ -122,7 +124,7 @@ def main(cfg):
 
         if metric_cfg.enabled:
             smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
-            sample_cache = SampleCacheData(db=cfg.sampling.db)
+            sample_cache = SampleCacheData(db_file=cfg.sampling.db)
 
             smiles_dataset.load(data_len=input_size)
 
@@ -252,10 +254,9 @@ def main(cfg):
         save_metric_results(cfg.model.name, result_list, output_dir, return_predictions=return_predictions)
 
     # Plotting
-    create_aggregated_plots(output_dir)
-    make_model_plots(max_seq_len, 'physchem', output_dir)
-    make_model_plots(max_seq_len, 'bioactivity', output_dir)
-
+    # create_aggregated_plots(output_dir)
+    # make_model_plots(max_seq_len, 'physchem', output_dir)
+    # make_model_plots(max_seq_len, 'bioactivity', output_dir)
 
 
 if __name__ == '__main__':

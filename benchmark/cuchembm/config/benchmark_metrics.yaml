@@ -11,27 +11,38 @@ root:
   handlers: [console]
 
 model:
-  # name: MegaMolBART
-  name: CDDD
+  name: cuchembm.inference.GrpcMegaMolBARTWrapper
+  training_data: /data/db/zinc_train.sqlite3
+  # training_data: /data/db/cddd_train.sqlite3
+  # name: CDDD
   params:
-    url: localhost:50051
+    url: localhost:50052
+
+sampling:
+  max_seq_len: 512
+  sample_size: 10
+  db: /data/db/embedding_cache_test.sqlite3
+  concurrent_requests: 4
+
+output:
+  path: /data/benchmark_output/
 
 metric:
   validity:
-    enabled: False
-    input_size: 20000
+    enabled: True
+    input_size: 100
     radius:
       - 1
       # - 2
 
   unique:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: True
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: True
     radius: ${metric.validity.radius}
@@ -46,24 +57,15 @@ metric:
 
   modelability:
     physchem:
-      enabled: True
+      enabled: False
       input_size: -1
       n_splits: 20
       normalize_inputs: True
       return_predictions: True
 
     bioactivity:
-      enabled: True
+      enabled: False
       input_size: 10 # Number of genes to include, not number of molecules, -1 is all genes
       n_splits: 20
       normalize_inputs: True
       return_predictions: True
-
-sampling:
-  max_seq_len: 512
-  sample_size: 10
-  db: /data/db/embedding_cache_test.sqlite3
-  concurrent_requests: 4
-
-output:
-  path: /data/benchmark_output/

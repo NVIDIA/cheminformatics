@@ -73,6 +73,9 @@ class BaseEmbeddingMetric():
         self.fingerprint_dataset = dataset.fingerprints
         self.smiles_properties = dataset.properties
 
+    def __len__(self):
+        return len(self.dataset.smiles)
+
     def variations(self):
         return NotImplemented
 

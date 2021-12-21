@@ -6,21 +6,20 @@ import hydra
 import pandas as pd
 from datetime import datetime
 from copy import deepcopy
+from cuchembm.metrics.cache import MoleculeGenerator
 from cuchembm.plot import (create_aggregated_plots, make_model_plots)
 
 # Dataset classess
 from cuchembm.datasets.physchem import (ChEMBLApprovedDrugs,
                                         MoleculeNetESOL,
                                         MoleculeNetFreeSolv,
-                                        MoleculeNetLipophilicity,
-                                        ZINC15TestSplit)
+                                        MoleculeNetLipophilicity)
 from cuchembm.datasets.bioactivity import ExCAPEDataset
 from cuchembm.inference.megamolbart import MegaMolBARTWrapper
 
 # Data caches
 from cuchembm.data import (PhysChemEmbeddingData,
                            BioActivityEmbeddingData,
-                           SampleCacheData,
                            ZINC15TrainDataset,
                            CDDDTrainDataset,
                            ChEMBLApprovedDrugsEmbeddingData)
@@ -81,6 +80,60 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
+def generate_sample(cfg, inferrer):
+    sample_input = -1
+    radii = set()
+    data_files = {}
+
+    sample_data_req = False
+    for sampling_metric in [Validity, Unique, Novelty]:
+        name = sampling_metric.name
+        sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
+        radii.add(eval(f'cfg.metric.{name}.radius'))
+        metric_cfg = eval(f'cfg.metric.{name}')
+        if metric_cfg.enabled:
+            sample_data_req = True
+
+    if sample_data_req:
+        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv'] =\
+            {'col_name': 'canonical_smiles',
+                'dataset_type': 'SAMPLE',
+                'input_size': sample_input}
+
+    for sampling_metric in [Validity, Unique, Novelty]:
+        name = sampling_metric.name
+
+    if cfg.metric.nearest_neighbor_correlation.enabled:
+        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'] =\
+            {'col_name': 'canonical_smiles',
+            'dataset_type': 'EMBEDDING',
+            'input_size': cfg.metric.nearest_neighbor_correlation.input_size}
+
+    if cfg.metric.modelability.physchem.enabled:
+        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'] =\
+            {'col_name': 'SMILES',
+            'dataset_type': 'EMBEDDING',
+            'input_size': cfg.metric.modelability.physchem.input_size}
+        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv'] =\
+            {'col_name': 'SMILES',
+            'dataset_type': 'EMBEDDING',
+            'input_size': cfg.metric.modelability.physchem.input_size},
+        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv'] =\
+            {'col_name': 'SMILES',
+            'dataset_type': 'EMBEDDING',
+            'input_size': cfg.metric.modelability.physchem.input_size}
+
+    generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db)
+    for radius in radii:
+        log.info(f'Generating samples for radius {radius}...')
+        generator.generate_and_store(data_files,
+                                     num_requested=10,
+                                     scaled_radius=radius,
+                                     force_unique=False,
+                                     sanitize=True,
+                                     concurrent_requests=cfg.sampling.concurrent_requests)
+    generator.conn.close()
+
 def get_input_size(metric_cfg):
     input_size = None
     if metric_cfg.input_size:
@@ -109,29 +162,19 @@ def main(cfg):
         inferrer = CdddWrapper()
         training_data_class = CDDDTrainDataset
     else:
-        log.warning(f'Creating model {cfg.model.name} & training dataclass {cfg.model.dataclass}')
+        log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
-        training_data_class = locate(cfg.model.dataclass)
 
+    generate_sample(cfg, inferrer)
     # Metrics
     metric_list = []
 
     for sampling_metric in [Validity, Unique, Novelty]:
         name = sampling_metric.name
         metric_cfg = eval(f'cfg.metric.{name}')
-        input_size = get_input_size(metric_cfg)
-
         if metric_cfg.enabled:
-            smiles_dataset = ZINC15TestSplit(max_seq_len=max_seq_len)
-            sample_cache = SampleCacheData(db_file=cfg.sampling.db)
-
-            smiles_dataset.load(data_len=input_size)
-
-            param_list = [inferrer, sample_cache, smiles_dataset]
-            if name == 'novelty':
-                training_data = training_data_class()
-                param_list += [training_data]
+            param_list = [inferrer, cfg]
             metric_list.append({name: sampling_metric(*param_list)})
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
@@ -237,7 +280,8 @@ def main(cfg):
             result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
             result['run_time'] = run_time
             result['timestamp'] = timestamp
-            result['data_size'] = len(metric.dataset.smiles)
+            #TODO: inputsize as dataset size is bad assumption
+            result['data_size'] = len(metric)
 
             # Updates to irregularly used arguments
             key_list = ['model', 'gene', 'remove_invalid', 'n_splits']

@@ -38,7 +38,7 @@ class MoleculeGenerator():
         if not os.path.exists(self.db):
             execute_db_creation = True
 
-        self.conn = sqlite3.connect(self.db)
+        self.conn = sqlite3.connect(self.db, check_same_thread=False)
         if execute_db_creation:
             with closing(self.conn.cursor()) as cursor:
                 sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
@@ -139,21 +139,31 @@ class MoleculeGenerator():
                            sanitize=True,
                            concurrent_requests=4):
 
-        process_pending = False
+        new_sample_db = False
         with closing(self.conn.cursor()) as cursor:
-            pending_recs = cursor.execute(
-                'SELECT count(*) from smiles where processed = 0').fetchone()
-            if pending_recs[0] > 0:
-                process_pending = True
+            recs = cursor.execute('SELECT count(*) from smiles').fetchone()
+            if recs[0] == 0:
+                new_sample_db = True
 
-        if process_pending is False:
+        if new_sample_db:
             all_dataset_df = []
             for csv_data_file in csv_data_files:
                 smiles_col_name = csv_data_files[csv_data_file]['col_name']
                 dataset_type = csv_data_files[csv_data_file]['dataset_type']
+
+                input_size = -1
+                if 'input_size' in csv_data_files[csv_data_file]:
+                    input_size = csv_data_files[csv_data_file]['input_size']
+
+                if input_size > 0:
+                    file_df = pd.read_csv(csv_data_file, nrows=input_size)
+                else:
+                    file_df = pd.read_csv(csv_data_file)
+
                 dataset_df = pd.DataFrame()
-                dataset_df['smiles'] = pd.read_csv(csv_data_file)[smiles_col_name]
+                dataset_df['smiles'] = file_df[smiles_col_name]
                 dataset_df['dataset_type'] = np.full(shape=dataset_df.shape[0], fill_value=dataset_type)
+                del file_df
 
                 all_dataset_df.append(dataset_df)
 
@@ -179,7 +189,7 @@ class MoleculeGenerator():
                     break
 
                 futures = {executor.submit(self._sample, row): \
-                    row for row in df.itertuples}
+                    row for row in df.itertuples()}
                 for future in concurrent.futures.as_completed(futures):
                     smiles = futures[future]
                     try:
@@ -196,122 +206,127 @@ class MoleculeGenerator():
         self._insert_generated_smiles(row.id, result)
 
 
-    def compute_sampling_metrics(self,
-                                 scaled_radius=1,
-                                 force_unique=False,
-                                 sanitize=True,
-                                 dataset_type='SAMPLE'):
-        """
-        Compute the sampling metrics for a given set of parameters.
-        """
-        # Valid SMILES
-        valid_result = self.conn.execute('''
-            SELECT ss.is_valid, count(*)
-            FROM smiles s, smiles_samples ss
-            WHERE s.id = ss.input_id
-                AND s.model_name = ?
-                AND s.scaled_radius = ?
-                AND s.force_unique = ?
-                AND s.sanitize = ?
-                AND ss.is_generated = 1
-                AND s.processed = 1
-                AND s.dataset_type = ?
-            GROUP BY ss.is_valid;
-            ''',
-            [self.inferrer.__class__.__name__, scaled_radius,
-             force_unique, sanitize, dataset_type])
+    # def compute_sampling_metrics(self,
+    #                              scaled_radius=1,
+    #                              force_unique=False,
+    #                              sanitize=True,
+    #                              dataset_type='SAMPLE'):
+    #     """
+    #     Compute the sampling metrics for a given set of parameters.
+    #     """
+    #     # Valid SMILES
+    #     valid_result = self.conn.execute('''
+    #         SELECT ss.is_valid, count(*)
+    #         FROM smiles s, smiles_samples ss
+    #         WHERE s.id = ss.input_id
+    #             AND s.model_name = ?
+    #             AND s.scaled_radius = ?
+    #             AND s.force_unique = ?
+    #             AND s.sanitize = ?
+    #             AND ss.is_generated = 1
+    #             AND s.processed = 1
+    #             AND s.dataset_type = ?
+    #         GROUP BY ss.is_valid;
+    #         ''',
+    #         [self.inferrer.__class__.__name__, scaled_radius,
+    #          force_unique, sanitize, dataset_type])
 
-        total_molecules = 0
-        valid_molecules = 0
-        for rec in valid_result.fetchall():
-            total_molecules += rec[1]
-            if rec[0] == 1:
-                valid_molecules += rec[1]
-        log.info(f'Total molecules: {total_molecules}')
-        log.info(f'Valid molecules: {valid_molecules}')
+    #     total_molecules = 0
+    #     valid_molecules = 0
+    #     for rec in valid_result.fetchall():
+    #         total_molecules += rec[1]
+    #         if rec[0] == 1:
+    #             valid_molecules += rec[1]
+    #     log.info(f'Total molecules: {total_molecules}')
+    #     log.info(f'Valid molecules: {valid_molecules}')
 
-        # Unique SMILES
-        unique_result = self.conn.execute(f'''
-            SELECT avg(ratio)
-            FROM (
-                SELECT CAST(count(DISTINCT ss.smiles) as float) / CAST(count(ss.smiles) as float) ratio
-            FROM smiles s, smiles_samples ss
-            WHERE s.id = ss.input_id
-                AND s.model_name = ?
-                AND s.scaled_radius = ?
-                AND s.force_unique = ?
-                AND s.sanitize = ?
-                AND ss.is_valid = 1
-                AND ss.is_generated = 1
-                AND s.processed = 1
-                AND s.dataset_type = ?
-            GROUP BY s.id
-            )''',
-            [self.inferrer.__class__.__name__, scaled_radius, force_unique,
-             sanitize, dataset_type])
-        rec = unique_result.fetchone()
-        unique_ratio = rec[0]
+    #     # Unique SMILES
+    #     unique_result = self.conn.execute(f'''
+    #         SELECT avg(ratio)
+    #         FROM (
+    #             SELECT CAST(count(DISTINCT ss.smiles) as float) / CAST(count(ss.smiles) as float) ratio
+    #         FROM smiles s, smiles_samples ss
+    #         WHERE s.id = ss.input_id
+    #             AND s.model_name = ?
+    #             AND s.scaled_radius = ?
+    #             AND s.force_unique = ?
+    #             AND s.sanitize = ?
+    #             AND ss.is_valid = 1
+    #             AND ss.is_generated = 1
+    #             AND s.processed = 1
+    #             AND s.dataset_type = ?
+    #         GROUP BY s.id
+    #         )''',
+    #         [self.inferrer.__class__.__name__, scaled_radius, force_unique,
+    #          sanitize, dataset_type])
+    #     rec = unique_result.fetchone()
+    #     unique_ratio = rec[0]
 
-        # Novel SMILES
-        self.conn.execute('ATTACH ? AS training_db', ['/data/db/zinc_train.sqlite3'])
-        res = self.conn.execute('''
-            SELECT count(distinct ss.smiles)
-            FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
-            WHERE ss.smiles = td.smiles
-                AND s.id = ss.input_id
-                AND s.model_name = ?
-                AND s.scaled_radius = ?
-                AND s.force_unique = ?
-                AND s.sanitize = ?
-                AND ss.is_valid = 1
-                AND ss.is_generated = 1
-                AND s.processed = 1
-                AND s.dataset_type = ?
-            ''',
-            [self.inferrer.__class__.__name__, scaled_radius, force_unique,
-             sanitize, dataset_type])
-        rec = res.fetchone()
-        novel_molecules = valid_molecules - rec[0]
-        log.info(f'Novel molecules: {novel_molecules}')
+    #     # Novel SMILES
+    #     self.conn.execute('ATTACH ? AS training_db', ['/data/db/zinc_train.sqlite3'])
+    #     res = self.conn.execute('''
+    #         SELECT count(distinct ss.smiles)
+    #         FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
+    #         WHERE ss.smiles = td.smiles
+    #             AND s.id = ss.input_id
+    #             AND s.model_name = ?
+    #             AND s.scaled_radius = ?
+    #             AND s.force_unique = ?
+    #             AND s.sanitize = ?
+    #             AND ss.is_valid = 1
+    #             AND ss.is_generated = 1
+    #             AND s.processed = 1
+    #             AND s.dataset_type = ?
+    #         ''',
+    #         [self.inferrer.__class__.__name__, scaled_radius, force_unique,
+    #          sanitize, dataset_type])
+    #     rec = res.fetchone()
+    #     novel_molecules = valid_molecules - rec[0]
+    #     log.info(f'Novel molecules: {novel_molecules}')
 
-        log.info(f'Validity Ratio: {valid_molecules/total_molecules}')
-        log.info(f'Unique Ratio: {unique_ratio}')
-        log.info(f'Novelity Ratio: {novel_molecules/valid_molecules}')
-
-
-data_files = {
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv':
-        {'col_name': 'canonical_smiles',
-         'dataset_type': 'SAMPLE'},
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv':
-        {'col_name': 'canonical_smiles',
-         'dataset_type': 'EMBEDDING'},
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv':
-        {'col_name': 'SMILES',
-         'dataset_type': 'EMBEDDING'},
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv':
-        {'col_name': 'SMILES',
-         'dataset_type': 'EMBEDDING'},
-    '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv':
-        {'col_name': 'SMILES',
-         'dataset_type': 'EMBEDDING'}
-    }
+    #     log.info(f'Validity Ratio: {valid_molecules/total_molecules}')
+    #     log.info(f'Unique Ratio: {unique_ratio}')
+    #     log.info(f'Novelity Ratio: {novel_molecules/valid_molecules}')
 
 
-inferrer = MegaMolBARTWrapper()
-generator = MoleculeGenerator(inferrer,
-                              db_file='/data/db/generated_smiles.sqlite3')
+# data_files = {
+#     '/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv':
+#         {'col_name': 'canonical_smiles',
+#          'dataset_type': 'SAMPLE',
+#          'input_size': 20000},
+#     '/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv':
+#         {'col_name': 'canonical_smiles',
+#          'dataset_type': 'EMBEDDING',
+#          'input_size': -1},
+#     '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv':
+#         {'col_name': 'SMILES',
+#          'dataset_type': 'EMBEDDING',
+#          'input_size': -1},
+#     '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv':
+#         {'col_name': 'SMILES',
+#          'dataset_type': 'EMBEDDING',
+#          'input_size': -1},
+#     '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv':
+#         {'col_name': 'SMILES',
+#          'dataset_type': 'EMBEDDING',
+#          'input_size': -1}
+#     }
 
-generator.generate_and_store(data_files,
-                             num_requested=10,
-                             scaled_radius=1,
-                             force_unique=False,
-                             sanitize=True)
 
-import time
-start_time = time.time()
-generator.compute_sampling_metrics(scaled_radius=1,
-                                   force_unique=False,
-                                   sanitize=True,
-                                   dataset_type='SAMPLE')
-log.info("Time(sec): {}".format(time.time() - start_time))
+# inferrer = MegaMolBARTWrapper()
+# generator = MoleculeGenerator(inferrer,
+#                               db_file='/data/db/generated_smiles.sqlite3')
+
+# generator.generate_and_store(data_files,
+#                              num_requested=10,
+#                              scaled_radius=1,
+#                              force_unique=False,
+#                              sanitize=True)
+
+# import time
+# start_time = time.time()
+# generator.compute_sampling_metrics(scaled_radius=1,
+#                                    force_unique=False,
+#                                    sanitize=True,
+#                                    dataset_type='SAMPLE')
+# log.info("Time(sec): {}".format(time.time() - start_time))

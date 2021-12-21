@@ -6,7 +6,7 @@ ID=100
 ACTION="up --scale megamolbart=4"
 GPU_ID="0"
 MODEL_DIR="/models"
-CONFIG_DIR="/workspace/benchmark/cuchembm/config2"
+CONFIG_DIR="/workspace/benchmark/cuchembm/config"
 SIZE=''
 NUM_LAYERS=4
 HIDDEN_SIZE=256

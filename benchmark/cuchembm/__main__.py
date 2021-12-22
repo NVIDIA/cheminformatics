@@ -94,6 +94,7 @@ def generate_sample(cfg, inferrer):
         if metric_cfg.enabled:
             sample_data_req = True
 
+    #TODO: the path to dataset restricts the usage in dev mode only.
     if sample_data_req:
         data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv'] =\
             {'col_name': 'canonical_smiles',
@@ -156,11 +157,9 @@ def main(cfg):
     # Inferrer (DL model)
     if cfg.model.name == 'MegaMolBART':
         inferrer = MegaMolBARTWrapper()
-        training_data_class = ZINC15TrainDataset
     elif cfg.model.name == 'CDDD':
         from cuchembm.inference.cddd import CdddWrapper
         inferrer = CdddWrapper()
-        training_data_class = CDDDTrainDataset
     else:
         log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
         inf_class = locate(cfg.model.name)

@@ -16,7 +16,7 @@ model:
   # training_data: /data/db/cddd_train.sqlite3
   # name: CDDD
   params:
-    url: localhost:50052
+    url: localhost:50052 # Please use 50052 for ld and 50051 for single GRPC
 
 sampling:
   max_seq_len: 512

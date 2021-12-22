@@ -203,4 +203,4 @@ class MoleculeGenerator():
                                                     scaled_radius=row.scaled_radius,
                                                     force_unique=row.force_unique,
                                                     sanitize=row.sanitize)
-        self._insert_generated_smileprocessed(row.id, result)
+        self._insert_generated_smiles(row.id, result)

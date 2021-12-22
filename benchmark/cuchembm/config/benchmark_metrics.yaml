@@ -22,7 +22,7 @@ sampling:
   max_seq_len: 512
   sample_size: 10
   db: /data/db/embedding_cache_test.sqlite3
-  concurrent_requests: 4
+  concurrent_requests: 6
 
 output:
   path: /data/benchmark_output/

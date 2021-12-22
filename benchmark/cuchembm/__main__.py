@@ -42,10 +42,10 @@ def wait_for_megamolbart_service(inferrer):
     retry_count = 0
     while retry_count < 30:
         if inferrer.is_ready():
-            logging.info(f'Service found after {retry_count} retries.')
+            log.info(f'Service found after {retry_count} retries.')
             return True
         else:
-            logging.warning(f'Service not available. Retrying {retry_count}...')
+            log.warning(f'Service not available. Retrying {retry_count}...')
             retry_count += 1
             time.sleep(10)
             continue
@@ -89,7 +89,7 @@ def generate_sample(cfg, inferrer):
     for sampling_metric in [Validity, Unique, Novelty]:
         name = sampling_metric.name
         sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
-        radii.add(eval(f'cfg.metric.{name}.radius'))
+        radii.update(eval(f'cfg.metric.{name}.radius'))
         metric_cfg = eval(f'cfg.metric.{name}')
         if metric_cfg.enabled:
             sample_data_req = True
@@ -165,6 +165,7 @@ def main(cfg):
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
 
+    wait_for_megamolbart_service(inferrer)
     generate_sample(cfg, inferrer)
     # Metrics
     metric_list = []
@@ -244,7 +245,6 @@ def main(cfg):
                                                     metric_cfg.return_predictions,
                                                     metric_cfg.normalize_inputs)})
 
-    wait_for_megamolbart_service(inferrer)
 
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]

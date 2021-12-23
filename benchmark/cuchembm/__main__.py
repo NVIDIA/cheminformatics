@@ -118,7 +118,7 @@ def generate_sample(cfg, inferrer):
         data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv'] =\
             {'col_name': 'SMILES',
             'dataset_type': 'EMBEDDING',
-            'input_size': cfg.metric.modelability.physchem.input_size},
+            'input_size': cfg.metric.modelability.physchem.input_size}
         data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv'] =\
             {'col_name': 'SMILES',
             'dataset_type': 'EMBEDDING',

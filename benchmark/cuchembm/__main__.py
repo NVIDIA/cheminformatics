@@ -228,6 +228,7 @@ def main(cfg):
 
         n_splits = metric_cfg.n_splits
         gene_dataset = deepcopy(excape_dataset)
+        genes_cnt = 0
         for label, sm_ in excape_dataset.smiles.groupby(level='gene'):
             gene_dataset.smiles = sm_
 
@@ -244,7 +245,9 @@ def main(cfg):
                                                     n_splits,
                                                     metric_cfg.return_predictions,
                                                     metric_cfg.normalize_inputs)})
-
+            genes_cnt += 1
+            if genes_cnt > input_size:
+                break
 
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]

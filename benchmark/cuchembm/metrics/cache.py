@@ -8,8 +8,8 @@ import numpy as np
 import concurrent.futures
 
 from contextlib import closing
-from cuchembm.inference.megamolbart import MegaMolBARTWrapper
 from cuchemcommon.utils.smiles import validate_smiles
+from cuchembm.inference.megamolbart import GrpcMegaMolBARTWrapper
 
 format = '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
 logging.basicConfig(level=logging.INFO,
@@ -48,17 +48,13 @@ class MoleculeGenerator():
     def _insert_generated_smiles(self,
                                  smiles_id,
                                  smiles_df):
-        log.debug('Inserting benchmark data...')
+        log.info(f'Inserting samples for {smiles_id}...')
 
         generated_smiles = smiles_df['SMILES'].to_list()
         embeddings = smiles_df['embeddings'].to_list()
         embeddings_dim = smiles_df['embeddings_dim'].to_list()
 
         with closing(self.conn.cursor()) as cursor:
-            cursor.execute(
-                'UPDATE smiles set processed = 1 WHERE id = ?',
-                [smiles_id])
-
             generated = False
             for i in range(len(generated_smiles)):
                 gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
@@ -79,6 +75,10 @@ class MoleculeGenerator():
                     [smiles_id, gsmiles, sqlite3.Binary(embedding),
                      sqlite3.Binary(embedding_dim), is_valid, fp, generated])
                 generated = True
+
+            cursor.execute(
+                'UPDATE smiles set processed = 1 WHERE id = ?',
+                [smiles_id])
 
             self.conn.commit()
 
@@ -180,14 +180,18 @@ class MoleculeGenerator():
             log.warn(f"There are pending records in the database.")
             log.warn(f"Please rerun after this job to process {csv_data_files}.")
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
-            while True:
-                df = pd.read_sql_query(
-                    'SELECT * from smiles where processed = 0 LIMIT 1000',
-                    self.conn)
-                if df.shape[0] == 0:
-                    break
+        while True:
+            df = pd.read_sql_query('''
+                SELECT id, smiles, num_samples, scaled_radius,
+                        force_unique, sanitize
+                FROM smiles
+                WHERE processed = 0 LIMIT 1000
+                ''',
+                self.conn)
+            if df.shape[0] == 0:
+                break
 
+            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
                 futures = {executor.submit(self._sample, row): \
                     row for row in df.itertuples()}
                 for future in concurrent.futures.as_completed(futures):
@@ -195,12 +199,13 @@ class MoleculeGenerator():
                     try:
                         future.result()
                     except Exception as exc:
-                        log.warning(f'{smiles} generated an exception: {exc}')
+                        log.warning(f'{smiles.smiles} generated an exception: {exc}')
 
     def _sample(self, row):
-        result = self.inferrer.find_similars_smiles(row.smiles,
-                                                    num_requested=row.num_samples,
-                                                    scaled_radius=row.scaled_radius,
-                                                    force_unique=row.force_unique,
-                                                    sanitize=row.sanitize)
+        inferrer = GrpcMegaMolBARTWrapper()
+        result = inferrer.find_similars_smiles(row.smiles,
+                                               num_requested=row.num_samples,
+                                               scaled_radius=row.scaled_radius,
+                                               force_unique=(row.force_unique == 1),
+                                               sanitize=(row.sanitize == 1))
         self._insert_generated_smiles(row.id, result)

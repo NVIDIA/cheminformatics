@@ -62,6 +62,7 @@ services:
           devices:
           - driver: nvidia
             capabilities: [gpu]
+            count: 1
 
   nginx:
     image: nginx:1.20.0
@@ -74,20 +75,3 @@ services:
       - cuchemNet
     volumes:
       - ${NGINX_CONFIG}:/etc/nginx/nginx.conf:ro
-
-  cAdvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor
-    privileged: true
-    devices:
-      - /dev/kmsg
-    networks:
-      - cuchemNet
-    volumes:
-      - /:/rootfs:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
-    ports:
-      - "3003:8080"

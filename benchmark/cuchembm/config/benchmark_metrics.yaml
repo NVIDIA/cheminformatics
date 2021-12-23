@@ -11,18 +11,20 @@ root:
   handlers: [console]
 
 model:
+  # Please change following properties when changing model.name
+  #   - sampling.concurrent_requests
+  #   - model.params.url (50052 for lb grpc)
   name: cuchembm.inference.GrpcMegaMolBARTWrapper
   training_data: /data/db/zinc_train.sqlite3
   # training_data: /data/db/cddd_train.sqlite3
-  # name: CDDD
   params:
-    url: localhost:50052 # Please use 50052 for ld and 50051 for single GRPC
+    url: nginx:50052
 
 sampling:
   max_seq_len: 512
   sample_size: 10
   db: /data/db/embedding_cache_test.sqlite3
-  concurrent_requests: 6
+  concurrent_requests: 5
 
 output:
   path: /data/benchmark_output/
@@ -48,7 +50,7 @@ metric:
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
-    enabled: False
+    enabled: True
     input_size: -1
     top_k:
       - 50

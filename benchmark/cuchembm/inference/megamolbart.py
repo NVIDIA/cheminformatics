@@ -100,7 +100,7 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         return SmilesList(generatedSmiles=generated_smiles)
 
 
-class GrpcMegaMolBARTWrapper(metaclass=Singleton):
+class GrpcMegaMolBARTWrapper():
 
     def __init__(self) -> None:
 
@@ -145,7 +145,7 @@ class GrpcMegaMolBARTWrapper(metaclass=Singleton):
     def find_similars_smiles(self,
                              smiles: str,
                              num_requested: int = 10,
-                             scaled_radius=None,
+                             scaled_radius=1,
                              force_unique=False,
                              sanitize=True):
         spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,

@@ -23,8 +23,8 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_test.sqlite3
-  concurrent_requests: 5
+  db: /data/db/embedding_cache_megamolbart.sqlite3
+  concurrent_requests: 8
 
 output:
   path: /data/benchmark_output/
@@ -32,7 +32,7 @@ output:
 metric:
   validity:
     enabled: True
-    input_size: 100
+    input_size: 20000
     radius:
       - 1
       # - 2
@@ -59,15 +59,15 @@ metric:
 
   modelability:
     physchem:
-      enabled: False
+      enabled: True
       input_size: -1
       n_splits: 20
       normalize_inputs: True
       return_predictions: True
 
     bioactivity:
-      enabled: False
-      input_size: 10 # Number of genes to include, not number of molecules, -1 is all genes
+      enabled: True
+      input_size: -1 # Number of genes to include, not number of molecules, -1 is all genes
       n_splits: 20
       normalize_inputs: True
       return_predictions: True

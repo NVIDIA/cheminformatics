@@ -56,6 +56,7 @@ class MoleculeGenerator():
 
         with closing(self.conn.cursor()) as cursor:
             generated = False
+            # Replace this loop with pandas to SQLite insert
             for i in range(len(generated_smiles)):
                 gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
                                                         return_fingerprint=True)
@@ -183,7 +184,7 @@ class MoleculeGenerator():
         while True:
             df = pd.read_sql_query('''
                 SELECT id, smiles, num_samples, scaled_radius,
-                        force_unique, sanitize
+                        force_unique, sanitize, dataset_type
                 FROM smiles
                 WHERE processed = 0 LIMIT 1000
                 ''',
@@ -202,10 +203,21 @@ class MoleculeGenerator():
                         log.warning(f'{smiles.smiles} generated an exception: {exc}')
 
     def _sample(self, row):
-        inferrer = GrpcMegaMolBARTWrapper()
-        result = inferrer.find_similars_smiles(row.smiles,
-                                               num_requested=row.num_samples,
-                                               scaled_radius=row.scaled_radius,
-                                               force_unique=(row.force_unique == 1),
-                                               sanitize=(row.sanitize == 1))
+
+        if row.dataset_type == 'SAMPLE':
+            result = self.inferrer.find_similars_smiles(row.smiles,
+                                                        num_requested=row.num_samples,
+                                                        scaled_radius=row.scaled_radius,
+                                                        force_unique=(row.force_unique == 1),
+                                                        sanitize=(row.sanitize == 1))
+        else:
+            embedding_list = self.inferrer.smiles_to_embedding(row.smiles,
+                                                               None,
+                                                               scaled_radius=row.scaled_radius,
+                                                               sanitize=(row.sanitize == 1))
+            result = pd.DataFrame()
+            result['SMILES'] = [row.smiles]
+            result['embeddings'] = [embedding_list.embedding]
+            result['embeddings_dim'] = [embedding_list.dim]
+
         self._insert_generated_smiles(row.id, result)

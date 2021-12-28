@@ -217,7 +217,6 @@ def main(cfg):
 
     if cfg.metric.modelability.bioactivity.enabled:
         metric_cfg = cfg.metric.modelability.bioactivity
-        input_size = get_input_size(metric_cfg)
 
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
         embedding_cache = BioActivityEmbeddingData()
@@ -246,7 +245,7 @@ def main(cfg):
                                                     metric_cfg.return_predictions,
                                                     metric_cfg.normalize_inputs)})
             genes_cnt += 1
-            if genes_cnt > input_size:
+            if metric_cfg.input_size > 0 and genes_cnt > metric_cfg.input_size:
                 break
 
     for metric_dict in metric_list:

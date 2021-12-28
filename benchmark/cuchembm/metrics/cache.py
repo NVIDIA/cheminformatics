@@ -80,57 +80,7 @@ class MoleculeGenerator():
             cursor.execute(
                 'UPDATE smiles set processed = 1 WHERE id = ?',
                 [smiles_id])
-
             self.conn.commit()
-
-    def fetch_samples(self,
-                      smiles,
-                      num_samples,
-                      scaled_radius,
-                      force_unique,
-                      sanitize):
-        """
-        Fetch the benchmark data for a given set of parameters.
-        """
-        log.debug('Fetching benchmark data...')
-        with closing(self.conn.cursor()) as cursor:
-            cursor.execute(
-                '''
-                SELECT ss.smiles, ss.embedding, ss.embedding_dim, ss.is_valid
-                FROM smiles s, smiles_samples ss
-                WHERE s.id = ss.input_id
-                    AND s.model_name = ?
-                    AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
-                    AND s.smiles = ?
-                LIMIT ?;
-                ''',
-                [self.inferrer.__class__.__name__, smiles, scaled_radius,
-                 force_unique, sanitize, num_samples])
-            generated_smiles = cursor.fetchall()
-
-        return generated_smiles
-
-    def fetch_embedding(self, smiles):
-        """
-        Fetch the embedding of a given SMILES string.
-        """
-        log.debug('Fetching benchmark data...')
-        with closing(self.conn.cursor()) as cursor:
-            cursor.execute(
-                '''
-                SELECT ss.smiles, ss.embedding, ss.embedding_dim
-                FROM smiles as s, smiles_samples as ss
-                WHERE s.id = ss.input_id
-                    AND s.model_name = ?
-                    AND s.smiles = s.smiles
-                    AND s.smiles = ?
-                    LIMIT 1;
-                ''',
-                [self.inferrer.__class__.__name__, smiles])
-
-            return cursor.fetchone()
 
     def generate_and_store(self,
                            csv_data_files,
@@ -212,7 +162,7 @@ class MoleculeGenerator():
                                                         sanitize=(row.sanitize == 1))
         else:
             embedding_list = self.inferrer.smiles_to_embedding(row.smiles,
-                                                               None,
+                                                               512,
                                                                scaled_radius=row.scaled_radius,
                                                                sanitize=(row.sanitize == 1))
             result = pd.DataFrame()

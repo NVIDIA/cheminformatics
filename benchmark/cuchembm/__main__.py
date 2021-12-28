@@ -18,11 +18,9 @@ from cuchembm.datasets.bioactivity import ExCAPEDataset
 from cuchembm.inference.megamolbart import MegaMolBARTWrapper
 
 # Data caches
-from cuchembm.data import (PhysChemEmbeddingData,
-                           BioActivityEmbeddingData,
-                           ZINC15TrainDataset,
-                           CDDDTrainDataset,
-                           ChEMBLApprovedDrugsEmbeddingData)
+# from cuchembm.data import (PhysChemEmbeddingData,
+#                            BioActivityEmbeddingData,
+#                            ChEMBLApprovedDrugsEmbeddingData)
 
 # Metrics
 from cuchembm.metrics import (Validity,
@@ -183,12 +181,11 @@ def main(cfg):
         input_size = get_input_size(metric_cfg)
 
         smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
-        embedding_cache = ChEMBLApprovedDrugsEmbeddingData()
 
         smiles_dataset.load(data_len=input_size)
 
         metric_list.append({name: NearestNeighborCorrelation(inferrer,
-                                                             embedding_cache,
+                                                             cfg,
                                                              smiles_dataset)})
 
     if cfg.metric.modelability.physchem.enabled:
@@ -199,7 +196,7 @@ def main(cfg):
                                MoleculeNetFreeSolv(max_seq_len=max_seq_len),
                                MoleculeNetLipophilicity(max_seq_len=max_seq_len)]
 
-        embedding_cache = PhysChemEmbeddingData()
+        # embedding_cache = PhysChemEmbeddingData()
         n_splits = metric_cfg.n_splits
 
         for smiles_dataset in smiles_dataset_list:
@@ -209,7 +206,7 @@ def main(cfg):
             metric_list.append(
                 {smiles_dataset.table_name: Modelability('modelability-physchem',
                                                          inferrer,
-                                                         embedding_cache,
+                                                         cfg,
                                                          smiles_dataset,
                                                          n_splits,
                                                          metric_cfg.return_predictions,
@@ -219,9 +216,10 @@ def main(cfg):
         metric_cfg = cfg.metric.modelability.bioactivity
 
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
-        embedding_cache = BioActivityEmbeddingData()
+        # embedding_cache = BioActivityEmbeddingData()
 
-        excape_dataset.load(columns=['SMILES', 'Gene_Symbol'])
+        excape_dataset.load(columns=['SMILES', 'Gene_Symbol'],
+                            data_len=metric_cfg.input_size)
 
         log.info('Creating groups...')
 
@@ -239,13 +237,13 @@ def main(cfg):
 
             metric_list.append({label: Modelability('modelability-bioactivity',
                                                     inferrer,
-                                                    embedding_cache,
+                                                    cfg,
                                                     gene_dataset,
                                                     n_splits,
                                                     metric_cfg.return_predictions,
                                                     metric_cfg.normalize_inputs)})
             genes_cnt += 1
-            if metric_cfg.input_size > 0 and genes_cnt > metric_cfg.input_size:
+            if metric_cfg.gene_cnt > 0 and genes_cnt > metric_cfg.gene_cnt:
                 break
 
     for metric_dict in metric_list:
@@ -297,6 +295,8 @@ def main(cfg):
         else:
             return_predictions = False
         save_metric_results(cfg.model.name, result_list, output_dir, return_predictions=return_predictions)
+        metric.cleanup()
+
 
     # Plotting
     # create_aggregated_plots(output_dir)

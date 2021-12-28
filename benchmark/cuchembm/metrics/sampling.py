@@ -45,6 +45,8 @@ class BaseSampleMetric():
                 'radius': radius,
                 'num_samples': num_samples}
 
+    def cleanup(self):
+        pass
 
 class Validity(BaseSampleMetric):
     name = 'validity'

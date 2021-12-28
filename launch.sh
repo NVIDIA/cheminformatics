@@ -149,7 +149,7 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace/mDOCKER_CMDegamolbart/"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/megamolbart:/workspace/benchmark"
         CONT=${MEGAMOLBART_CONT}
     else

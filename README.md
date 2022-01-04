@@ -29,7 +29,6 @@ MEGAMOLBART_CONT=nvcr.io/nvstaging/clara/megamolbart:latest
 MEGAMOLBART_MODEL=nvstaging/clara/megamolbart:0.1
 PROJECT_PATH=/home/user_home/code/cheminformatics
 CONTENT_PATH=/home/user_home/data
-DATA_MOUNT_PATH=/data
 PLOTLY_PORT=5000
 DASK_PORT=9001
 SUBNET=192.177.100.0/16
@@ -102,7 +101,7 @@ Users can generate Morgan Fingerprints and store it in HDF5 files for later use.
 ./launch.sh cache -c /data/fp
 ```
 
-It is best to create the cache at `DATA_MOUNT_PATH` property defined in `~/.env`. Default value of this property is `/data/`. This is a mounted volumne from host and available for reuse beyond the container's lifetime.
+It is best to create the cache at `/data/`. This is a mounted volumne from host and available for reuse beyond the container's lifetime.
 
 Once generated, the cached fingerprints can be used for analysis using `-c` option.
 ```

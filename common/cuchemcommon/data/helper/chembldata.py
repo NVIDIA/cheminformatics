@@ -46,7 +46,7 @@ class ChEmblData(object, metaclass=Singleton):
 
         context = Context()
         db_file = context.get_config('data_mount_path', default='/data')
-        db_file = os.path.join(db_file, 'db/chembl_27.db')
+        db_file = os.path.join(db_file, 'db', 'chembl_27.db')
 
         if not os.path.exists(db_file):
             logger.error('%s not found', db_file)
@@ -260,7 +260,7 @@ class ChEmblData(object, metaclass=Singleton):
         records in a dataframe.
         """
 
-        logger.info('Fetching %d records starting %d...' % (batch_size, start))
+        logger.debug('Fetching %d records starting %d...' % (batch_size, start))
 
         imp_cols = ['cp.' + col for col in IMP_PROPS]
 
@@ -328,8 +328,7 @@ class ChEmblData(object, metaclass=Singleton):
         if num_recs is None or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
-        logger.info('num_recs %d', num_recs)
-        logger.info('batch_size %d', batch_size)
+        logger.debug(f'num_recs={num_recs}, batch_size={batch_size}')
         meta_df = self._meta_df(**transformation_kwargs)
 
         dls = []

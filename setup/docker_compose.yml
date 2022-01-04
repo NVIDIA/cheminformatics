@@ -2,7 +2,7 @@ version: "3.9"
 
 networks:
   cuchemNet:
-    name: cuchemNet${RUN_ID}
+    name: cuchemNet
     driver: bridge
     ipam:
       config:
@@ -10,21 +10,26 @@ networks:
 
 services:
   cuchemUI:
-    container_name: cuchemUI${RUN_ID}
-    image: "${CUCHEM_CONT}"
+    container_name: cuchemUI
+    image: ${CUCHEM_CONT}
     hostname: cuchemUI
+    user: $UID:$GID
+    environment:
+      - CUPY_CACHE_DIR=/workspace/.cupy/kernel_cache
+      - PYTHONPATH=${PYTHONPATH_CUCHEM}
     networks:
-      cuchemNet:
-        ipv4_address: ${IP_CUCHEM_UI}
+      - cuchemNet
     ports:
       - "${PLOTLY_PORT}:5000"
     volumes:
-      - "${WORKSPACE_DIR}/:/workspace"
+      - "./:/workspace"
       - "${CONTENT_PATH}/data:/data"
-    working_dir: ${CUCHEM_PATH}
+      - "${CONTENT_PATH}/logs:/logs"
+      - /etc/passwd:/etc/passwd:ro
+      - /etc/group:/etc/group:ro
+      - /etc/shadow:/etc/shadow:ro
+    working_dir: ${WORKING_DIR_CUCHEMUI}
     command: ${CUCHEM_UI_START_CMD}
-    extra_hosts:
-      - "megamolbart:${IP_MEGAMOLBART}"
     deploy:
       resources:
         reservations:
@@ -33,17 +38,23 @@ services:
             capabilities: [gpu]
 
   megamolbart:
-    container_name: megamolbart${RUN_ID}
-    image: "${MEGAMOLBART_CONT}"
-    hostname: 'megamolbart'
+    image: ${MEGAMOLBART_CONT}
+    user: $UID:$GID
+    environment:
+      - PYTHONPATH=${PYTHONPATH_MEGAMOLBART}
     networks:
-      cuchemNet:
-        ipv4_address: ${IP_MEGAMOLBART}
+      - cuchemNet
+    ports:
+      - "50051"
     volumes:
-        - './:/workspace'
-        - "${CONTENT_PATH}/data:/data"
-        - "${CONTENT_PATH}/models:/models"
-    working_dir: ${MEGAMOLBART_PATH}
+      - './:/workspace'
+      - "${CONTENT_PATH}/data:/data"
+      - "${CONTENT_PATH}/models:/models"
+      - "${CONTENT_PATH}/logs:/logs"
+      - /etc/passwd:/etc/passwd:ro
+      - /etc/group:/etc/group:ro
+      - /etc/shadow:/etc/shadow:ro
+    working_dir: ${WORKING_DIR_MEGAMOLBART}
     command: ${MEGAMOLBART_CMD}
     deploy:
       resources:
@@ -51,3 +62,16 @@ services:
           devices:
           - driver: nvidia
             capabilities: [gpu]
+            count: 1
+
+  nginx:
+    image: nginx:1.20.0
+    container_name: nginx
+    ports:
+      - "50052:50052"
+    depends_on:
+      - megamolbart
+    networks:
+      - cuchemNet
+    volumes:
+      - ${NGINX_CONFIG}:/etc/nginx/nginx.conf:ro

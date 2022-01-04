@@ -1,10 +1,10 @@
 import logging
-# import torch
 from functools import singledispatch
 from typing import List
 
 import numpy as np
 from cuchemcommon.data import GenerativeWfDao
+from cuchemcommon.fingerprint import BaseTransformation
 from rdkit.Chem import PandasTools, CanonSmiles
 
 logger = logging.getLogger(__name__)
@@ -27,14 +27,14 @@ def _(embedding, radius, cnt, shape):
     return distorteds
 
 
-class BaseGenerativeWorkflow:
+class BaseGenerativeWorkflow(BaseTransformation):
 
     def __init__(self, dao: GenerativeWfDao = None) -> None:
         self.dao = dao
         self.min_jitter_radius = None
 
-    def get_iteration(self):
-        NotImplemented
+    def is_ready(self, timeout: int = 10):
+        return True
 
     def smiles_to_embedding(self,
                             smiles: str,

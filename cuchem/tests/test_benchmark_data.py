@@ -2,7 +2,7 @@ import logging
 import sqlite3
 from contextlib import closing
 
-from cuchem.benchmark.data import ZINC15TrainDataset
+from cuchem.benchmark.data import ZINC15TrainDataset, CDDDTrainDataset
 from cuchemcommon.data.helper.chembldata import ChEmblData
 
 logger = logging.getLogger(__name__)
@@ -10,6 +10,22 @@ logger = logging.getLogger(__name__)
 
 def test_training_data_megatron_molbart():
     training_data = ZINC15TrainDataset()
+
+    cursor = training_data.conn.cursor()
+    cursor.execute('SELECT smiles FROM train_data limit 10')
+    smiles_strs = cursor.fetchall()
+
+    for smiles in smiles_strs:
+        logger.info(f'Looking for {smiles} in known smiles database...')
+        assert training_data.is_known_smiles(smiles[0]) == True
+
+    smiles = 'adasdadsasdasd'
+    logger.info(f'Looking for {smiles} in known smiles database...')
+    assert training_data.is_known_smiles(smiles) == False
+
+
+def test_training_data_cddd():
+    training_data = CDDDTrainDataset()
 
     cursor = training_data.conn.cursor()
     cursor.execute('SELECT smiles FROM train_data limit 10')

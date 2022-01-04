@@ -13,7 +13,6 @@
 .cudf/
 .keras/
 .vscode/
-cddd/
 .viminfo
 .conda/
 .gitconfig
@@ -36,6 +35,6 @@ chemportal/outputs/
 outputs/
 **/*.onnx
 
-data/
-models/
-
+./data/
+./models/
+./cddd/

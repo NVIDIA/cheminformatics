@@ -25,8 +25,8 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_test_1.sqlite3
-  concurrent_requests: 5
+  db: /data/db/embedding_cache_test_2.sqlite3
+  concurrent_requests: 10
 
 output:
   path: /data/benchmark_output/
@@ -52,7 +52,7 @@ metric:
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
-    enabled: True
+    enabled: False
     input_size: -1
     top_k:
       - 50
@@ -61,7 +61,7 @@ metric:
 
   modelability:
     physchem:
-      enabled: True
+      enabled: False
       input_size: -1
       n_splits: 20
       normalize_inputs: True

@@ -6,8 +6,11 @@ import tempfile
 import pandas as pd
 import numpy as np
 import concurrent.futures
+import threading
 
 from contextlib import closing
+from sqlalchemy.dialects.sqlite import insert
+from sqlalchemy import table, column
 from cuchemcommon.utils.smiles import validate_smiles
 from cuchembm.inference.megamolbart import GrpcMegaMolBARTWrapper
 
@@ -24,6 +27,8 @@ log = logging.getLogger('cuchembm.molecule_generator')
 
 __all__ = ['MoleculeGenerator']
 
+threadLocal = threading.local()
+
 
 class MoleculeGenerator():
     def __init__(self, inferrer, db_file=None) -> None:
@@ -34,12 +39,13 @@ class MoleculeGenerator():
             self.db = tempfile.NamedTemporaryFile(prefix='gsmiles_',
                                                   suffix='.sqlite3',
                                                   dir='/tmp')
-        execute_db_creation = False
-        if not os.path.exists(self.db):
-            execute_db_creation = True
 
         self.conn = sqlite3.connect(self.db, check_same_thread=False)
-        if execute_db_creation:
+        result = self.conn.execute('''
+            SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?
+            ''',
+            ['smiles']).fetchone()
+        if result[0] == 0:
             with closing(self.conn.cursor()) as cursor:
                 sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
@@ -48,39 +54,47 @@ class MoleculeGenerator():
     def _insert_generated_smiles(self,
                                  smiles_id,
                                  smiles_df):
+
+        conn = getattr(threadLocal, 'conn', None)
+        if conn is None:
+            log.info('Creating new connection...')
+            conn = sqlite3.connect(self.db, check_same_thread=False)
+            threadLocal.conn = conn
+
+
         log.info(f'Inserting samples for {smiles_id}...')
 
         generated_smiles = smiles_df['SMILES'].to_list()
         embeddings = smiles_df['embeddings'].to_list()
         embeddings_dim = smiles_df['embeddings_dim'].to_list()
 
-        with closing(self.conn.cursor()) as cursor:
-            generated = False
-            # Replace this loop with pandas to SQLite insert
-            for i in range(len(generated_smiles)):
-                gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
-                                                        return_fingerprint=True)
-                embedding = list(embeddings[i])
-                embedding_dim = list(embeddings_dim[i])
+        with conn:
+            with closing(conn.cursor()) as cursor:
+                generated = False
+                # Replace this loop with pandas to SQLite insert
+                for i in range(len(generated_smiles)):
+                    gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
+                                                            return_fingerprint=True)
+                    embedding = list(embeddings[i])
+                    embedding_dim = list(embeddings_dim[i])
 
-                embedding = pickle.dumps(embedding)
-                embedding_dim = pickle.dumps(embedding_dim)
-                fp = pickle.dumps(fp)
+                    embedding = pickle.dumps(embedding)
+                    embedding_dim = pickle.dumps(embedding_dim)
+                    fp = pickle.dumps(fp)
+                    cursor.execute(
+                        '''
+                        INSERT INTO smiles_samples(input_id, smiles, embedding,
+                                                embedding_dim, is_valid,
+                                                finger_print, is_generated)
+                        VALUES(?, ?, ?, ?, ?, ?, ?)
+                        ''',
+                        [smiles_id, gsmiles, sqlite3.Binary(embedding),
+                        sqlite3.Binary(embedding_dim), is_valid, fp, generated])
+                    generated = True
+
                 cursor.execute(
-                    '''
-                    INSERT INTO smiles_samples(input_id, smiles, embedding,
-                                               embedding_dim, is_valid,
-                                               finger_print, is_generated)
-                    VALUES(?, ?, ?, ?, ?, ?, ?)
-                    ''',
-                    [smiles_id, gsmiles, sqlite3.Binary(embedding),
-                     sqlite3.Binary(embedding_dim), is_valid, fp, generated])
-                generated = True
-
-            cursor.execute(
-                'UPDATE smiles set processed = 1 WHERE id = ?',
-                [smiles_id])
-            self.conn.commit()
+                    'UPDATE smiles set processed = 1 WHERE id = ?',
+                    [smiles_id])
 
     def generate_and_store(self,
                            csv_data_files,
@@ -98,18 +112,23 @@ class MoleculeGenerator():
 
         if new_sample_db:
             all_dataset_df = []
-            for csv_data_file in csv_data_files:
-                smiles_col_name = csv_data_files[csv_data_file]['col_name']
-                dataset_type = csv_data_files[csv_data_file]['dataset_type']
+            for spec_name in csv_data_files:
+                spec = csv_data_files[spec_name]
+                log.info(f'Reading {spec_name}...')
+                smiles_col_name = spec['col_name']
+                dataset_type = spec['dataset_type']
 
                 input_size = -1
-                if 'input_size' in csv_data_files[csv_data_file]:
-                    input_size = csv_data_files[csv_data_file]['input_size']
+                if 'input_size' in spec:
+                    input_size = spec['input_size']
 
-                if input_size > 0:
-                    file_df = pd.read_csv(csv_data_file, nrows=input_size)
+                if isinstance(spec['dataset'], str):
+                    if input_size > 0:
+                        file_df = pd.read_csv(spec['dataset'], nrows=input_size)
+                    else:
+                        file_df = pd.read_csv(spec['dataset'])
                 else:
-                    file_df = pd.read_csv(csv_data_file)
+                    file_df = spec['dataset']
 
                 dataset_df = pd.DataFrame()
                 dataset_df['smiles'] = file_df[smiles_col_name]

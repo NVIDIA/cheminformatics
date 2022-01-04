@@ -78,7 +78,7 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
-def generate_sample(cfg, inferrer):
+def identity_dataset(cfg, inferrer):
     sample_input = -1
     radii = set()
     data_files = {}
@@ -94,44 +94,37 @@ def generate_sample(cfg, inferrer):
 
     #TODO: the path to dataset restricts the usage in dev mode only.
     if sample_data_req:
-        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv'] =\
+        data_files['benchmark_ZINC15_test_split'] =\
             {'col_name': 'canonical_smiles',
-                'dataset_type': 'SAMPLE',
-                'input_size': sample_input}
-
-    for sampling_metric in [Validity, Unique, Novelty]:
-        name = sampling_metric.name
+             'dataset_type': 'SAMPLE',
+             'input_size': sample_input,
+             'dataset': '/workspace/benchmark/cuchembm/csv_data/benchmark_ZINC15_test_split.csv'}
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
-        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'] =\
+        data_files['benchmark_ChEMBL_approved_drugs_physchem'] =\
             {'col_name': 'canonical_smiles',
-            'dataset_type': 'EMBEDDING',
-            'input_size': cfg.metric.nearest_neighbor_correlation.input_size}
+             'dataset_type': 'EMBEDDING',
+             'input_size': cfg.metric.nearest_neighbor_correlation.input_size,
+             'dataset': '/workspace/benchmark/cuchembm/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'}
 
     if cfg.metric.modelability.physchem.enabled:
-        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'] =\
+        data_files['benchmark_MoleculeNet_Lipophilicity'] =\
             {'col_name': 'SMILES',
-            'dataset_type': 'EMBEDDING',
-            'input_size': cfg.metric.modelability.physchem.input_size}
-        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv'] =\
+             'dataset_type': 'EMBEDDING',
+             'input_size': cfg.metric.modelability.physchem.input_size,
+             'dataset': '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'}
+        data_files['benchmark_MoleculeNet_ESOL.csv'] =\
             {'col_name': 'SMILES',
-            'dataset_type': 'EMBEDDING',
-            'input_size': cfg.metric.modelability.physchem.input_size}
-        data_files['/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv'] =\
+             'dataset_type': 'EMBEDDING',
+             'input_size': cfg.metric.modelability.physchem.input_size,
+             'dataset': '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_ESOL.csv'}
+        data_files['benchmark_MoleculeNet_FreeSolv'] =\
             {'col_name': 'SMILES',
-            'dataset_type': 'EMBEDDING',
-            'input_size': cfg.metric.modelability.physchem.input_size}
+             'dataset_type': 'EMBEDDING',
+             'input_size': cfg.metric.modelability.physchem.input_size,
+             'dataset': '/workspace/benchmark/cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv'}
 
-    generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db)
-    for radius in radii:
-        log.info(f'Generating samples for radius {radius}...')
-        generator.generate_and_store(data_files,
-                                     num_requested=10,
-                                     scaled_radius=radius,
-                                     force_unique=False,
-                                     sanitize=True,
-                                     concurrent_requests=cfg.sampling.concurrent_requests)
-    generator.conn.close()
+    return data_files, radii
 
 def get_input_size(metric_cfg):
     input_size = None
@@ -162,9 +155,8 @@ def main(cfg):
         log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
-
     wait_for_megamolbart_service(inferrer)
-    generate_sample(cfg, inferrer)
+    data_files, radii = identity_dataset(cfg, inferrer)
     # Metrics
     metric_list = []
 
@@ -214,19 +206,37 @@ def main(cfg):
 
     if cfg.metric.modelability.bioactivity.enabled:
         metric_cfg = cfg.metric.modelability.bioactivity
+        metric_name = 'modelability-bioactivity'
 
         excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
-        # embedding_cache = BioActivityEmbeddingData()
-
         excape_dataset.load(columns=['SMILES', 'Gene_Symbol'],
                             data_len=metric_cfg.input_size)
 
         log.info('Creating groups...')
-
         n_splits = metric_cfg.n_splits
         gene_dataset = deepcopy(excape_dataset)
         genes_cnt = 0
+
+        data_files['benchmark_ExCAPE_Bioactivity'] =\
+            {'col_name': 'canonical_smiles',
+             'dataset_type': 'EMBEDDING',
+             'input_size': cfg.metric.modelability.bioactivity.input_size,
+             'dataset': excape_dataset.smiles}
+
+        # Get a list of genes already processed
+        results_file = os.path.join(output_dir, f'{cfg.model.name}_{metric_name}.csv')
+        if os.path.exists(results_file):
+            results_df = pd.read_csv(results_file)
+            processed_genes = set(results_df['gene'])
+        else:
+            processed_genes = set()
+
         for label, sm_ in excape_dataset.smiles.groupby(level='gene'):
+            # Skipping genes already processed
+            if label in processed_genes:
+                log.info(f'Skipping {label}')
+                continue
+
             gene_dataset.smiles = sm_
 
             index = sm_.index.get_level_values(gene_dataset.index_col)
@@ -235,16 +245,31 @@ def main(cfg):
 
             log.info(f'Creating bioactivity Modelability metric for {label}...')
 
-            metric_list.append({label: Modelability('modelability-bioactivity',
+            metric_list.append({label: Modelability(metric_name,
                                                     inferrer,
                                                     cfg,
                                                     gene_dataset,
+                                                    label,
                                                     n_splits,
                                                     metric_cfg.return_predictions,
-                                                    metric_cfg.normalize_inputs)})
+                                                    metric_cfg.normalize_inputs,
+                                                    data_file=data_files['benchmark_ExCAPE_Bioactivity']['dataset'])})
             genes_cnt += 1
             if metric_cfg.gene_cnt > 0 and genes_cnt > metric_cfg.gene_cnt:
                 break
+
+    generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db)
+    for radius in radii:
+        log.info(f'Generating samples for radius {radius}...')
+        generator.generate_and_store(data_files,
+                                     num_requested=10,
+                                     scaled_radius=radius,
+                                     force_unique=False,
+                                     sanitize=True,
+                                     concurrent_requests=cfg.sampling.concurrent_requests)
+    generator.conn.close()
+
+
 
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]

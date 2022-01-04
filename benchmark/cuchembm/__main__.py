@@ -200,6 +200,7 @@ def main(cfg):
                                                          inferrer,
                                                          cfg,
                                                          smiles_dataset,
+                                                         smiles_dataset.table_name,
                                                          n_splits,
                                                          metric_cfg.return_predictions,
                                                          metric_cfg.normalize_inputs)})

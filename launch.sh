@@ -243,7 +243,7 @@ jupyter() {
         --port=8888 \
         --ip=0.0.0.0 \
         --allow-root \
-        --notebook-dir=/workspace/misc/nbs/ \
+        --notebook-dir=/workspace \
         --NotebookApp.password='' \
         --NotebookApp.token='' \
         --NotebookApp.password_required=False

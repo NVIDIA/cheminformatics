@@ -59,7 +59,7 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
 
     if return_predictions:
         pickle_file = file_path + '.pkl'
-        logging.info(f'Writing predictions to {pickle_file}...')
+        log.info(f'Writing predictions to {pickle_file}...')
 
         if os.path.exists(pickle_file):
             pickle_df = pd.read_pickle(pickle_file)
@@ -78,7 +78,7 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
-def identity_dataset(cfg, inferrer):
+def create_dataset(cfg, inferrer):
     sample_input = -1
     radii = set()
     data_files = {}
@@ -156,7 +156,7 @@ def main(cfg):
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
     wait_for_megamolbart_service(inferrer)
-    data_files, radii = identity_dataset(cfg, inferrer)
+    data_files, radii = create_dataset(cfg, inferrer)
     # Metrics
     metric_list = []
 

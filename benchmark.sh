@@ -3,10 +3,10 @@ set -e
 SCRIPT_LOC=$(dirname "$0")
 
 ID=100
-ACTION="up -d --scale megamolbart=2"
+ACTION="up -d --scale megamolbart=1"
 GPU_ID="0"
 MODEL_DIR="/models"
-CONFIG_DIR="/workspace/benchmark/cuchembm/config"
+CONFIG_DIR="/workspace/benchmark/cuchembm/config2"
 SIZE=''
 NUM_LAYERS=4
 HIDDEN_SIZE=256

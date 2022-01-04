@@ -245,8 +245,8 @@ class Modelability(BaseEmbeddingMetric):
         # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
-            logging.debug(f"Grid search param {param}")
-
+            logger.info(f"Grid search param {param}")
+            logger.info(f'=============={self.n_splits}')
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []

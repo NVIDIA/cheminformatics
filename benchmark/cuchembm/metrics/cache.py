@@ -1,4 +1,3 @@
-import os
 import logging
 import pickle
 import sqlite3
@@ -10,9 +9,7 @@ import threading
 
 from contextlib import closing
 from sqlalchemy.dialects.sqlite import insert
-from sqlalchemy import table, column
 from cuchemcommon.utils.smiles import validate_smiles
-from cuchembm.inference.megamolbart import GrpcMegaMolBARTWrapper
 
 format = '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
 logging.basicConfig(level=logging.INFO,

@@ -2,7 +2,7 @@ import logging
 import os
 import pandas as pd
 from .base import GenericCSVDataset
-from cuchemcommon.utils.metrics import calculate_morgan_fingerprint
+from cuchemcommon.utils.smiles import calculate_morgan_fingerprint
 try:
     import dask.dataframe as dd
     DASK_AVAILABLE = True
@@ -59,7 +59,7 @@ GENE_SYMBOLS = ["ABL1", "ACHE", "ADAM17", "ADORA2A", "ADORA2B", "ADORA3", "ADRA1
              "PRKACA", "PRKCD", "PTGDR2", "PTGS2", "PTPN1", "REN", "ROCK1", "ROCK2", "S1PR1",
              "SCN9A", "SIGMAR1", "SLC6A2", "SLC6A3", "SRC", "TACR1", "TRPV1", "VDR"]
 
-class FullExCAPEDataset():    
+class FullExCAPEDataset():
     def __init__(self,
                  data_dir='/data/ExCAPE',
                  name = 'ExCAPE',

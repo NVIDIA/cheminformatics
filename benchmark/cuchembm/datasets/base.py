@@ -57,7 +57,7 @@ class GenericCSVDataset():
         for col in fp.columns: # TODO why are these floats
             fp[col] = fp[col].astype(np.float32)
         fp.index = data.index.astype(np.int64)
-        
+
         assert len(data) == len(fp)
         assert data.index.equals(fp.index)
         fp = fp.reset_index()
@@ -96,7 +96,7 @@ class GenericCSVDataset():
         generate_fingerprints_file = True
         if os.path.exists(self.fp_data_path):
             logger.info(f'Fingerprints file {self.fp_data_path} exists. Checking if indexes match data.')
-            
+
             # Check index
             fp_subset = pd.read_csv(self.fp_data_path, usecols=[self.index_col])
             if data.index.isin(fp_subset[self.index_col]).all():
@@ -107,7 +107,7 @@ class GenericCSVDataset():
 
         if generate_fingerprints_file:
             # Generate here so that column names are consistent with inputs
-            logger.info(f'Creating temporary fingerprints file {self.fp_data_path}')
+            logger.info(f'Creating temporary fingerprints file {self.fp_data_path} for {data.shape} input size.')
             self._generate_fingerprints(data, columns)
 
         cleaned_data = data[columns]
@@ -159,5 +159,3 @@ class GenericCSVDataset():
         assert len(self.fingerprints) == len(self.smiles) == len(self.properties), AssertionError('Dataframes for SMILES, properties, and fingerprints are not identical length.')
         assert self.smiles.index.equals(self.fingerprints.index) & self.smiles.index.equals(self.properties.index), AssertionError(f'Dataframe indexes are not equivalent')
 
-
-        

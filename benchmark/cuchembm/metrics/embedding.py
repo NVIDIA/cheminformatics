@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 
 import logging
-import pandas as pd
+import time
 import numpy as np
+import pandas as pd
+import pickle
+import sqlite3
+from contextlib import closing
 from sklearn.model_selection import ParameterGrid, KFold
+
 from cuchembm.data.memcache import Cache
 
 logger = logging.getLogger(__name__)
@@ -65,43 +70,49 @@ class BaseEmbeddingMetric():
     name = None
 
     """Base class for metrics based on embedding datasets"""
-    def __init__(self, inferrer, sample_cache, dataset):
+    def __init__(self, inferrer, cfg, dataset):
         self.name = self.__class__.__name__
         self.inferrer = inferrer
-        self.sample_cache = sample_cache
+        self.cfg = cfg
 
         self.dataset = dataset
         self.smiles_dataset = dataset.smiles
         self.fingerprint_dataset = dataset.fingerprints
         self.smiles_properties = dataset.properties
 
+        self.conn = sqlite3.connect(self.cfg.sampling.db,
+                                    uri=True,
+                                    check_same_thread=False)
+
+    def __len__(self):
+        return len(self.dataset.smiles)
+
     def variations(self):
         return NotImplemented
 
-    def _find_embedding(self,
-                        smiles,
-                        max_seq_len):
-
+    def _find_embedding(self, smiles):
         # Check db for results from a previous run
-        embedding_results = self.sample_cache.fetch_embedding_data(smiles)
-        if not embedding_results or len(embedding_results[1]) == 1:
-            # Generate new samples and update the database
-            embedding_results = self.inferrer.smiles_to_embedding(smiles,
-                                                                  max_seq_len)
-            embedding = embedding_results.embedding
-            embedding_dim = embedding_results.dim
+        result = self.conn.execute('''
+                SELECT ss.embedding, ss.embedding_dim
+                FROM smiles s, smiles_samples ss
+                WHERE s.id = ss.input_id
+                    AND s.model_name = ?
+                    AND s.force_unique = ?
+                    AND s.sanitize = ?
+                    AND ss.is_generated = 0
+                    AND s.processed = 1
+                    AND s.smiles = ?
+                LIMIT 1
+                ''',
+                [self.inferrer.__class__.__name__,  0, 1, smiles]).fetchone()
 
-            self.sample_cache.insert_embedding_data(smiles,
-                                                    embedding_results.embedding,
-                                                    embedding_results.dim)
-        else:
-            # Convert result to correct format
-            embedding, embedding_dim = embedding_results
-        return embedding, embedding_dim
+        embedding = pickle.loads(result[0])
+        embedding_dim = pickle.loads(result[1])
+        return (embedding, embedding_dim)
 
     def encode(self, smiles, zero_padded_vals, average_tokens, max_seq_len=None):
         """Encode a single SMILES to embedding from model"""
-        embedding, dim = self._find_embedding(smiles, max_seq_len)
+        embedding, dim = self._find_embedding(smiles)
         embedding = xpy.array(embedding).reshape(dim).squeeze()
 
         if zero_padded_vals:
@@ -136,13 +147,16 @@ class BaseEmbeddingMetric():
     def calculate(self):
         raise NotImplementedError
 
+    def cleanup(self):
+        pass
+
 
 class NearestNeighborCorrelation(BaseEmbeddingMetric):
     """Sperman's Rho for correlation of pairwise Tanimoto distances vs Euclidean distance from embeddings"""
     name = 'nearest neighbor correlation'
 
-    def __init__(self, inferrer, sample_cache, smiles_dataset):
-        super().__init__(inferrer, sample_cache, smiles_dataset)
+    def __init__(self, inferrer, cfg, smiles_dataset):
+        super().__init__(inferrer, cfg, smiles_dataset)
         self.name = NearestNeighborCorrelation.name
 
     def variations(self, cfg, **kwargs):
@@ -162,10 +176,23 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
     def calculate(self, top_k=None, **kwargs):
 
-        embeddings = self.encode_many(zero_padded_vals=True,
-                                      average_tokens=False)
-        embeddings = xpy.asarray(embeddings)
-        fingerprints = xpy.asarray(self.fingerprint_dataset)
+        start_time = time.time()
+        cache = Cache()
+        embeddings = cache.get_data('NN_embeddings')
+
+        if embeddings is None:
+            embeddings = self.encode_many(zero_padded_vals=True,
+                                          average_tokens=False)
+            logger.info(f'Embedding len and type {len(embeddings)}  {type(embeddings[0])}')
+            embeddings = xpy.vstack(embeddings)
+            fingerprints = xpy.asarray(self.fingerprint_dataset)
+
+            cache.set_data('NN_embeddings', embeddings)
+            cache.set_data('NN_fingerprints', fingerprints)
+        else:
+            fingerprints = cache.get_data('NN_fingerprints')
+
+        logging.info('Encoding time: {}'.format(time.time() - start_time))
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
         metric = xpy.nanmean(metric)
@@ -176,17 +203,29 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
         return {'name': self.name, 'value': metric, 'top_k': top_k}
 
+    def cleanup(self):
+        cache = Cache()
+        cache.delete('NN_embeddings')
+        cache.delete('NN_fingerprints')
+
 
 class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, name, inferrer, sample_cache, dataset, n_splits=4, return_predictions=False, normalize_inputs=False):
-        super().__init__(inferrer, sample_cache, dataset)
+    def __init__(self, name, inferrer, cfg, dataset, label,
+                 n_splits=4,
+                 return_predictions=False,
+                 normalize_inputs=False,
+                 data_file=None):
+        super().__init__(inferrer, cfg, dataset)
         self.name = name
         self.model_dict = get_model_dict()
         self.n_splits = n_splits
         self.return_predictions = return_predictions
+        self.label = label
+        self.data_file = data_file
+
         if normalize_inputs:
             self.norm_data, self.norm_prop = StandardScaler(), StandardScaler()
         else:
@@ -206,8 +245,8 @@ class Modelability(BaseEmbeddingMetric):
         # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
-            logging.debug(f"Grid search param {param}")
-
+            logger.info(f"Grid search param {param}")
+            logger.info(f'=============={self.n_splits}')
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
@@ -250,27 +289,107 @@ class Modelability(BaseEmbeddingMetric):
             fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[xpy.newaxis, :]).squeeze()
             embedding_pred = self.norm_prop.inverse_transform(embedding_pred[xpy.newaxis, :]).squeeze()
 
-        results = {'value': ratio, 
-                   'fingerprint_error': fingerprint_error, 
-                   'embedding_error': embedding_error, 
-                   'fingerprint_param': fingerprint_param, 
+        results = {'value': ratio,
+                   'fingerprint_error': fingerprint_error,
+                   'embedding_error': embedding_error,
+                   'fingerprint_param': fingerprint_param,
                    'embedding_param': embedding_param,
-                   'predictions': {'fingerprint_pred': fingerprint_pred, 
+                   'predictions': {'fingerprint_pred': fingerprint_pred,
                                    'embedding_pred': embedding_pred} }
         return results
 
+    def encode_bulk(self, zero_padded_vals=True, average_tokens=False):
+        tmp_table = self.name.replace('-', '_')
+        tmp_table += '_' + self.label
+
+        # Create temp table if not already created
+        result = self.conn.execute('''
+                SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?
+                ''',
+                [tmp_table]).fetchone()
+        if result[0] == 0:
+            logger.info(f'Creating temporary table {tmp_table} for bulk encoding...')
+            self.conn.execute(f'''
+                    CREATE TABLE {tmp_table} (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        smiles TEXT NULL,
+                        UNIQUE(smiles)
+                    )
+                    ''')
+            self.conn.execute(f'''
+                CREATE INDEX IF NOT EXISTS {tmp_table}_smiles_index
+                    ON {tmp_table} (smiles);
+                ''')
+
+
+        # Insert data into temp table if not already inserted
+        result = self.conn.execute(f'SELECT count(*) FROM {tmp_table}').fetchone()
+        if result[0] == 0:
+            dataset_df = pd.DataFrame()
+            dataset_df['smiles'] = self.smiles_dataset['canonical_smiles']
+            dataset_df = dataset_df.drop_duplicates()
+            dataset_df.to_sql(tmp_table, self.conn, index=False, if_exists='append')
+
+            result = self.conn.execute(f'SELECT count(*) FROM {tmp_table}').fetchone()
+        logger.info(f'{result[0]} SMILES to encode')
+
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(f'''
+                    SELECT ss.embedding, ss.embedding_dim, s.smiles
+                    FROM smiles s, smiles_samples ss, {tmp_table} tmp
+                    WHERE s.id = ss.input_id
+                        AND s.model_name = ?
+                        AND s.force_unique = ?
+                        AND s.sanitize = ?
+                        AND ss.is_generated = 0
+                        AND s.processed = 1
+                        AND s.smiles = tmp.smiles
+                    ''',
+                    [self.inferrer.__class__.__name__,  0, 1])
+            embeddings = []
+            while True:
+                recs = cursor.fetchmany(1000)
+
+                if not recs:
+                    break
+                for rec in recs:
+                    dim = pickle.loads(rec[1])
+                    embedding = pickle.loads(rec[0])
+                    embedding = xpy.array(embedding).reshape(dim).squeeze()
+
+                    smiles = rec[2]
+
+                    if zero_padded_vals:
+                        if dim == 2:
+                            embedding[len(smiles):, :] = 0.0
+                        else:
+                            embedding[len(smiles):] = 0.0
+
+                    if average_tokens:
+                        embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
+                    else:
+                        embedding = embedding.flatten()
+
+                    embeddings.append(embedding)
+        return embeddings
+
     def calculate(self, estimator, param_dict, **kwargs):
 
-        # TODO DEBUG RAJESH
-        embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
-        # embeddings = Cache().get_data('embeddings')
-        # if embeddings is None:
-        #     logger.info("Retrieving embeddings...")
-        #     embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
-        #     Cache().set_data('embeddings', embeddings)
+        logger.info(f'Processing for gene {self.label}...')
+        cache = Cache()
+        embeddings = cache.get_data(f'Modelability_{self.label}_embeddings')
+        if embeddings is None:
+            # if self.data_file is None:
+            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
+            # else:
+            #     embeddings = self.encode_bulk(zero_padded_vals=False, average_tokens=True)
+            embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
+            fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
 
-        embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
-        fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
+            cache.set_data(f'Modelability_{self.label}_embeddings', embeddings)
+            cache.set_data(f'Modelability_{self.label}_fingerprints', fingerprints)
+        else:
+            fingerprints = cache.get_data('Modelability_' + self.label + '_fingerprints')
 
         logger.info("Computing metric...")
         results = self._calculate_metric(embeddings,
@@ -280,3 +399,8 @@ class Modelability(BaseEmbeddingMetric):
         results['property'] = self.smiles_properties.columns[0]
         results['name'] = self.name
         return results
+
+    def cleanup(self):
+        cache = Cache()
+        cache.delete('Modelability_' + self.label + '_embeddings')
+        cache.delete('Modelability_' + self.label + '_fingerprints')

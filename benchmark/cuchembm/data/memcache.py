@@ -9,6 +9,9 @@ class Cache(metaclass=Singleton):
     def __init__(self):
         self._data = {}
 
+    def delete(self, property):
+        self._data.pop(property)
+
     def set_data(self, property, value):
         """
         Stores data in local cache.

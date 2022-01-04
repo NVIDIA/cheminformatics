@@ -1,26 +1,22 @@
 #!/usr/bin/env bash
 set -e
-
 SCRIPT_LOC=$(dirname "$0")
 
 ID=100
-ACTION="up"
+ACTION="up -d --scale megamolbart=1"
 GPU_ID="0"
 MODEL_DIR="/models"
-CONFIG_DIR="/workspace/benchmark/scripts"
+CONFIG_DIR="/workspace/benchmark/cuchembm/config2"
 SIZE=''
 NUM_LAYERS=4
 HIDDEN_SIZE=256
 NUM_ATTENTION_HEADS=8
 
+SOURCE_ROOT=.
+
 while [[ $# -gt 0 ]]; do
   key="$1"
   case $key in
-  --id)
-    ID=$2
-    shift
-    shift
-    ;;
   --gpu)
     GPU_ID=$2
     shift
@@ -29,20 +25,9 @@ while [[ $# -gt 0 ]]; do
   --stop)
     ACTION=stop
     shift
-    shift
-    ;;
-  --ckp)
-    MODEL_DIR=$2
-    shift
-    shift
     ;;
   --config-dir)
     CONFIG_DIR=$2
-    shift
-    shift
-    ;;
-  --size)
-    SIZE=$2
     shift
     shift
     ;;
@@ -51,29 +36,23 @@ while [[ $# -gt 0 ]]; do
     ;;
   esac
 done
-source ${SCRIPT_LOC}/.env
-export RUN_ID="_${ID}"
-export PLOTLY_PORT="5${ID}"
 
-export SUBNET=192.${ID}.100.0/16
-export IP_CUCHEM_UI=192.${ID}.100.1
-export IP_MEGAMOLBART=192.${ID}.100.2
+source ${SOURCE_ROOT}/.env
 
+#TODO: Noop for now
 export CUCHEM_UI_START_CMD="python3 -m cuchembm --config-dir ${CONFIG_DIR}"
-
 export MEGAMOLBART_CMD="bash -c 'CUDA_VISIBLE_DEVICES=${GPU_ID} python3 -m megamolbart'"
 
-CHEMINFO_DIR='/workspace'
-export PYTHONPATH_CUCHEM="${CHEMINFO_DIR}/benchmark:${CHEMINFO_DIR}/cuchem:${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
-export PYTHONPATH_MEGAMOLBART="${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
+export WORKSPACE=/workspace
+export MEGAMOLBART_PATH=/workspace/megamolbart
+export NGINX_CONFIG=${PROJECT_PATH}/setup/config/nginx.conf
+export PYTHONPATH_CUCHEM="${WORKSPACE}/common:${WORKSPACE}/common/generated"
+export PYTHONPATH_CUCHEM="${PYTHONPATH_CUCHEM}:${WORKSPACE}/benchmark:${WORKSPACE}/cuchem:"
 
-export WORKING_DIR_CUCHEMUI=/workspace
-export WORKING_DIR_MEGAMOLBART=/workspace/megamolbart
-# export UID=$(id -u)
-export GID=$(id -g)
+export PYTHONPATH_MEGAMOLBART="${WORKSPACE}/common:${WORKSPACE}/common/generated:${WORKSPACE}/megamolbart"
+export PYTHONPATH_MEGAMOLBART="${PYTHONPATH_MEGAMOLBART}:${WORKSPACE}/benchmark:${WORKSPACE}/cuchem:"
 
 docker-compose \
-  -f ${SCRIPT_LOC}/setup/docker_compose.yml \
-  --project-directory ${SCRIPT_LOC}/ \
-  --project-name "megamolbart${RUN_ID}" \
+  -f ${SOURCE_ROOT}/setup/docker_compose.yml \
+  --project-directory ${SOURCE_ROOT} \
   ${ACTION}

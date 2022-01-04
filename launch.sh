@@ -242,9 +242,10 @@ jupyter() {
     ${DOCKER_CMD} -it ${CUCHEM_CONT} jupyter-lab --no-browser \
         --port=8888 \
         --ip=0.0.0.0 \
+        --allow-root \
         --notebook-dir=/workspace \
-        --NotebookApp.password=\"\" \
-        --NotebookApp.token=\"\" \
+        --NotebookApp.password='' \
+        --NotebookApp.token='' \
         --NotebookApp.password_required=False
 }
 

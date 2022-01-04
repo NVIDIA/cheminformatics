@@ -4,11 +4,9 @@ from abc import ABC
 from enum import Enum
 
 import numpy as np
-import pandas as pd
-from cddd.inference import InferenceModel
-from cuchem.utils.data_peddler import download_cddd_models
 from rdkit import Chem
 from rdkit.Chem import AllChem
+
 
 logger = logging.getLogger(__name__)
 
@@ -108,26 +106,3 @@ class MorganFingerprint(BaseTransformation):
 
     def __len__(self):
         return self.kwargs['nBits']
-
-
-# TODO RAJESH this will have to be moved to a different file during refactor due to TensorFlow requirement
-class Embeddings(BaseTransformation):
-
-    def __init__(self, use_gpu=True, cpu_threads=5, model_dir=None, **kwargs):
-        self.name = __class__.__name__.split('.')[-1]
-        self.kwargs = TransformationDefaults[self.name].value
-        self.kwargs.update(kwargs)
-        model_dir = download_cddd_models()
-        self.func = InferenceModel(model_dir, use_gpu=use_gpu, cpu_threads=cpu_threads)
-
-    def transform(self, data):
-        data = data['transformed_smiles']
-        return self.func.seq_to_emb(data).squeeze()
-
-    def inverse_transform(self, embeddings):
-        "Embedding array -- individual compound embeddings are in rows"
-        embeddings = np.asarray(embeddings)
-        return self.func.emb_to_seq(embeddings)
-
-    def __len__(self):
-        return self.func.hparams.emb_size

@@ -2,13 +2,12 @@
 
 import logging
 from functools import partial
-from pathlib import Path
 from typing import List
+import concurrent.futures
 from rdkit import Chem
 
 import torch
 import pandas as pd
-from omegaconf import OmegaConf
 from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 
 from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMolBARTModel
@@ -40,7 +39,7 @@ class MegaMolBART(BaseGenerativeWorkflow):
 
         self.device = 'cuda'  # Megatron arg loading seems to only work with GPU
         self.min_jitter_radius = 1.0
-        self.model = self.load_model(model_dir)
+        self.model, self.version = self.load_model(model_dir)
         self.max_model_position_embeddings = self.model.max_seq_len
         self.tokenizer = self.model.tokenizer
 
@@ -56,7 +55,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
         model = MegaMolBARTModel.restore_from(checkpoint_path)
         model = model.cuda()
         model.eval()
-        return model
+
+        # TODO: get version from model (self.megamolbart.model)
+        return model, '0.2.0'
 
     def smiles2embedding(self, smiles, pad_length=None):
         """Calculate embedding and padding mask for smiles with optional extra padding
@@ -90,36 +91,71 @@ class MegaMolBART(BaseGenerativeWorkflow):
         torch.cuda.empty_cache()
         return embedding, pad_mask
 
+    def _inverse_transform(self, memory, mem_pad_mask, batch_size, sanitize, k):
+        with torch.no_grad():
+            decode_fn = partial(self.model.model._decode_fn,
+                                mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
+                                memory=memory)
+
+            mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
+                                                        batch_size=batch_size,
+                                                        device='cuda',
+                                                        k=k)
+            mol_strs = sum(mol_strs, [])  # flatten list
+            g_smiles = None
+            for smiles in mol_strs:
+                g_smiles = smiles
+                if sanitize:
+                    mol = Chem.MolFromSmiles(g_smiles, sanitize=sanitize)
+                    if mol:
+                        g_smiles = Chem.MolToSmiles(mol)
+                        break
+                else:
+                    break
+
+            logger.debug(f'Sanitized SMILES {g_smiles} added...')
+            return g_smiles
+
     def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
         mem_pad_mask = mem_pad_mask.clone()
         smiles_interp_list = []
 
-        batch_size = 1  # TODO: parallelize this loop as a batch
+        batch_size = 1
         with torch.no_grad():
-            for memory in embeddings:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = {executor.submit(self._inverse_transform, memory, mem_pad_mask, batch_size, sanitize, k): \
+                    memory for memory in embeddings}
 
-                if isinstance(memory, list):
-                    memory = torch.FloatTensor(memory).cuda()
+                for future in concurrent.futures.as_completed(futures):
+                    smiles = futures[future]
 
-                decode_fn = partial(self.model.model._decode_fn,
-                                    mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
-                                    memory=memory)
+                    try:
+                        g_smiles = future.result()
+                        smiles_interp_list.append(g_smiles)
+                    except Exception as exc:
+                        logger.warning(f'{smiles.smiles} generated an exception: {exc}')
 
-                mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
-                                                             batch_size=batch_size,
-                                                             device='cuda',
-                                                             k=k)
-                mol_strs = sum(mol_strs, [])  # flatten list
+                # for memory in embeddings:
+                #     if isinstance(memory, list):
+                #         memory = torch.FloatTensor(memory).cuda()
+                #     decode_fn = partial(self.model.model._decode_fn,
+                #                         mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
+                #                         memory=memory)
+                #     mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
+                #                                                 batch_size=batch_size,
+                #                                                 device='cuda',
+                #                                                 k=k)
+                #     mol_strs = sum(mol_strs, [])  # flatten list
 
-                for smiles in mol_strs:
-                    if sanitize:
-                        mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
-                        if mol:
-                            sanitized_smiles = Chem.MolToSmiles(mol)
-                            smiles_interp_list.append(sanitized_smiles)
-                            logger.debug(f'Sanitized SMILES {sanitized_smiles} added...')
-                            break
-                    smiles_interp_list.append(smiles)
+                #     for smiles in mol_strs:
+                #         if sanitize:
+                #             mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
+                #             if mol:
+                #                 sanitized_smiles = Chem.MolToSmiles(mol)
+                #                 smiles_interp_list.append(sanitized_smiles)
+                #                 logger.debug(f'Sanitized SMILES {sanitized_smiles} added...')
+                #                 break
+                #         smiles_interp_list.append(smiles)
 
         return smiles_interp_list
 
@@ -250,8 +286,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
             embeddings = []
             for interpolated_embedding in interpolated_embeddings:
                 embeddings.append(interpolated_embedding.flatten().tolist())
-
-            logger.info(f'-------------- {type(interpolated_mol[0])} {type(embeddings[0])}  {dims}   {type(dims[0])} ')
 
             interp_df = pd.DataFrame({'SMILES': interpolated_mol,
                                       'embeddings': embeddings,

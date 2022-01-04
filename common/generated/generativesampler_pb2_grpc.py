@@ -35,10 +35,10 @@ class GenerativeSamplerStub(object):
                 request_serializer=generativesampler__pb2.GenerativeSpec.SerializeToString,
                 response_deserializer=generativesampler__pb2.SmilesList.FromString,
                 )
-        self.GetIteration = channel.unary_unary(
-                '/nvidia.cheminformatics.grpc.GenerativeSampler/GetIteration',
+        self.GetVersion = channel.unary_unary(
+                '/nvidia.cheminformatics.grpc.GenerativeSampler/GetVersion',
                 request_serializer=google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-                response_deserializer=generativesampler__pb2.IterationVal.FromString,
+                response_deserializer=generativesampler__pb2.Version.FromString,
                 )
 
 
@@ -69,7 +69,7 @@ class GenerativeSamplerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetIteration(self, request, context):
+    def GetVersion(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -98,10 +98,10 @@ def add_GenerativeSamplerServicer_to_server(servicer, server):
                     request_deserializer=generativesampler__pb2.GenerativeSpec.FromString,
                     response_serializer=generativesampler__pb2.SmilesList.SerializeToString,
             ),
-            'GetIteration': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetIteration,
+            'GetVersion': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetVersion,
                     request_deserializer=google_dot_protobuf_dot_empty__pb2.Empty.FromString,
-                    response_serializer=generativesampler__pb2.IterationVal.SerializeToString,
+                    response_serializer=generativesampler__pb2.Version.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -182,7 +182,7 @@ class GenerativeSampler(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def GetIteration(request,
+    def GetVersion(request,
             target,
             options=(),
             channel_credentials=None,
@@ -192,8 +192,8 @@ class GenerativeSampler(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/nvidia.cheminformatics.grpc.GenerativeSampler/GetIteration',
+        return grpc.experimental.unary_unary(request, target, '/nvidia.cheminformatics.grpc.GenerativeSampler/GetVersion',
             google_dot_protobuf_dot_empty__pb2.Empty.SerializeToString,
-            generativesampler__pb2.IterationVal.FromString,
+            generativesampler__pb2.Version.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

@@ -5,7 +5,6 @@ from functools import wraps
 
 # import dask
 # import dask_cudf
-import dash
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -32,6 +31,7 @@ def report_ui_error(num_returns):
     return values are set to dash.no_update. The function decorator needs to
     pass number of return values.
     """
+    import dash
 
     def _report_ui_error(func):
 

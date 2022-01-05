@@ -1,4 +1,5 @@
 import logging
+import os
 import grpc
 import pandas as pd
 
@@ -21,7 +22,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         super().__init__(dao)
 
         self.min_jitter_radius = 1
-        channel = grpc.insecure_channel('megamolbart:50051')
+        channel = grpc.insecure_channel(os.getenv('Megamolbart', 'megamolbart:50051'))
         self.stub = GenerativeSamplerStub(channel)
 
     def get_iteration(self):

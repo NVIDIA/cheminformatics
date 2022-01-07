@@ -13,7 +13,7 @@ from generativesampler_pb2 import (GenerativeSpec,
                                    GenerativeModel,
                                    google_dot_protobuf_dot_empty__pb2)
 
-from cuchemcommon.utils.singleton import Singleton
+from cuchembm.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 

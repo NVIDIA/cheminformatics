@@ -1,6 +1,6 @@
 import logging
 
-from cuchemcommon.utils.singleton import Singleton
+from cuchembm.utils.singleton import Singleton
 from .base import GenericCSVDataset
 
 

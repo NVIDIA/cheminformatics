@@ -6,7 +6,7 @@ ID=100
 ACTION="up -d --scale megamolbart=1"
 GPU_ID="0"
 MODEL_DIR="/models"
-CONFIG_DIR="/workspace/benchmark/cuchembm/config2"
+CONFIG_DIR="/workspace/benchmark/cuchembm/config"
 SIZE=''
 NUM_LAYERS=4
 HIDDEN_SIZE=256
@@ -39,7 +39,6 @@ done
 
 source ${SOURCE_ROOT}/.env
 
-#TODO: Noop for now
 export CUCHEM_UI_START_CMD="python3 -m cuchembm --config-dir ${CONFIG_DIR}"
 export MEGAMOLBART_CMD="bash -c 'CUDA_VISIBLE_DEVICES=${GPU_ID} python3 -m megamolbart'"
 

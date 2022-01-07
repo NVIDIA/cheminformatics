@@ -6,7 +6,7 @@ import hydra
 import pandas as pd
 from datetime import datetime
 from copy import deepcopy
-from cuchembm.metrics.cache import MoleculeGenerator
+from cuchembm.data import MoleculeGenerator
 from cuchembm.plot import (create_aggregated_plots, make_model_plots)
 
 # Dataset classess

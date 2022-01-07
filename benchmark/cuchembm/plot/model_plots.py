@@ -13,17 +13,17 @@ def make_model_plots(max_seq_len, plot_type, output_dir):
 
     if plot_type == 'physchem':
         input_data_func = load_physchem_input_data
-        pkl_path = os.path.join(output_dir, '*physchem.pkl')
+        pkl_path = os.path.join(output_dir, '**', '*physchem.pkl')
         group_col = 'property'
         output_path = os.path.join(output_dir, 'Physchem_Single_Property_Plots.png')
     elif plot_type == 'bioactivity':
         input_data_func = load_bioactivity_input_data
-        pkl_path = os.path.join(output_dir, '*bioactivity.pkl')
+        pkl_path = os.path.join(output_dir, '**', '*bioactivity.pkl')
         group_col = 'gene'
         output_path = os.path.join(output_dir, 'Bioactivity_Single_Gene_Plots.png')
 
     input_data = input_data_func(max_seq_len=max_seq_len)
-    pred_data = load_plot_data(pred_path=pkl_path, input_data=input_data, group_col=group_col)
+    pred_data = load_plot_data(pkl_path=pkl_path, input_data=input_data, group_col=group_col)
 
     g = sns.FacetGrid(pred_data, 
                     col='model', 

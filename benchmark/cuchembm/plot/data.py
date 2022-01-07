@@ -11,7 +11,7 @@ from cuchembm.datasets.bioactivity import ExCAPEDataset
 def load_aggregated_metric_results(output_dir):
     """Load aggregated metric results from CSV files"""
     custom_date_parser = lambda x: datetime.strptime(x, "%Y%m%d_%H%M%S")
-    file_list = glob.glob(os.path.join(output_dir, '*.csv'))
+    file_list = glob.glob(os.path.join(output_dir, '**', '*.csv'), recursive=True)
     metric_df = list()
 
     for file in file_list:
@@ -19,7 +19,9 @@ def load_aggregated_metric_results(output_dir):
         metric_df.append(df)
 
     metric_df = pd.concat(metric_df, axis=0).reset_index(drop=True)
+    metric_df['timestamp'] = metric_df['timestamp'].dt.to_period('M') # Floor by month
     metric_df['name'] = metric_df['name'].str.replace('modelability-', '')
+    metric_df['inferrer'] = metric_df['inferrer'].str.extract(r"""(?:cuchembm.inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""", expand=False)
     return metric_df
 
 
@@ -69,11 +71,12 @@ def load_bioactivity_input_data(max_seq_len):
     return input_data
 
 
-def load_plot_data(pred_path, input_data, group_col):
+def load_plot_data(pkl_path, input_data, group_col):
     """Create dataframe with predictions and input data"""
     
     results_data = []
-    for results in glob.glob(pred_path):
+    file_list = glob.glob(pkl_path, recursive=True)
+    for results in file_list:
         pkl_df = pd.read_pickle(results)
         for _, row in pkl_df.iterrows():
             df = pd.DataFrame(row['predictions']).rename(columns=lambda x: x.replace('_pred', ''))

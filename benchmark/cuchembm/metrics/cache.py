@@ -25,7 +25,7 @@ log = logging.getLogger('cuchembm.molecule_generator')
 __all__ = ['MoleculeGenerator']
 
 threadLocal = threading.local()
-
+lock = threading.Lock()
 
 class MoleculeGenerator():
     def __init__(self, inferrer, db_file=None) -> None:
@@ -69,6 +69,7 @@ class MoleculeGenerator():
             with closing(conn.cursor()) as cursor:
                 generated = False
                 # Replace this loop with pandas to SQLite insert
+                lock.acquire(blocking=True, timeout=-1)
                 for i in range(len(generated_smiles)):
                     gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
                                                             return_fingerprint=True)
@@ -92,6 +93,7 @@ class MoleculeGenerator():
                 cursor.execute(
                     'UPDATE smiles set processed = 1 WHERE id = ?',
                     [smiles_id])
+                lock.release()
 
     def generate_and_store(self,
                            csv_data_files,

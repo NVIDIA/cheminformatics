@@ -1,5 +1,5 @@
 import logging
-from cuchemcommon.utils.singleton import Singleton
+from cuchembm.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 

@@ -9,7 +9,7 @@ import threading
 
 from contextlib import closing
 from sqlalchemy.dialects.sqlite import insert
-from cuchemcommon.utils.smiles import validate_smiles
+from cuchembm.utils.smiles import validate_smiles
 
 format = '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
 logging.basicConfig(level=logging.INFO,
@@ -121,12 +121,15 @@ class MoleculeGenerator():
                 if 'input_size' in spec:
                     input_size = spec['input_size']
 
+                # Input must be a CSV file or dataframe. Anything else will fail.
                 if isinstance(spec['dataset'], str):
+                    # If input dataset is a csv file
                     if input_size > 0:
                         file_df = pd.read_csv(spec['dataset'], nrows=input_size)
                     else:
                         file_df = pd.read_csv(spec['dataset'])
                 else:
+                    # If input dataset is a dataframe
                     file_df = spec['dataset']
 
                 dataset_df = pd.DataFrame()

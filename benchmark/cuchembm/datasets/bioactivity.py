@@ -2,7 +2,7 @@ import logging
 import os
 import pandas as pd
 from .base import GenericCSVDataset
-from cuchemcommon.utils.smiles import calculate_morgan_fingerprint
+from cuchembm.utils.smiles import calculate_morgan_fingerprint
 try:
     import dask.dataframe as dd
     DASK_AVAILABLE = True

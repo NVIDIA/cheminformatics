@@ -20,7 +20,7 @@ try:
     from cuml.linear_model import LinearRegression, ElasticNet
     from cuml.svm import SVR
     from cuml.ensemble import RandomForestRegressor
-    from cuchemcommon.utils.metrics import spearmanr
+    from cuchembm.utils.metrics import spearmanr
     from cuchem.utils.distance import tanimoto_calculate
     from cuml.experimental.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = True

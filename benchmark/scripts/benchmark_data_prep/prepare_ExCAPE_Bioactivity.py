@@ -19,7 +19,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchembm.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +28,8 @@ logger = logging.getLogger(__name__)
 # Data as provided by AstraZeneca
 # Location of original data: https://zenodo.org/record/2543724/files/pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv.xz?download=1
 
-DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent,
-                                'csv_data')
-columns = ['SMILES'] 
+DATA_BENCHMARK_DIR = '/workspace/benchmark/cuchembm/csv_data'
+columns = ['SMILES']
 physchem_columns = ['pXC50']
 
 if __name__ == '__main__':
@@ -39,15 +38,15 @@ if __name__ == '__main__':
 
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?
     fp = calc_morgan_fingerprints(benchmark_df, smiles_col=columns[0])
-    fp = fp.to_pandas()
+    # fp = fp.to_pandas()
     fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
     for col in fp.columns: # TODO why are these floats
         fp[col] = fp[col].astype(np.float32)
     fp.index = benchmark_df.index.astype(np.int64)
-        
+
     assert len(benchmark_df) == len(fp)
     assert benchmark_df.index.equals(fp.index)
-    
+
     # Write results
     fp = fp.reset_index()
     fp.to_csv(os.path.join(DATA_BENCHMARK_DIR, 'fingerprints_ExCAPE_Bioactivity.csv'), index=False)

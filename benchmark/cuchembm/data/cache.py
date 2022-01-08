@@ -8,7 +8,6 @@ import concurrent.futures
 import threading
 
 from contextlib import closing
-from sqlalchemy.dialects.sqlite import insert
 from cuchembm.utils.smiles import validate_smiles
 
 format = '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
@@ -24,8 +23,8 @@ log = logging.getLogger('cuchembm.molecule_generator')
 
 __all__ = ['MoleculeGenerator']
 
-threadLocal = threading.local()
 lock = threading.Lock()
+
 
 class MoleculeGenerator():
     def __init__(self, inferrer, db_file=None) -> None:
@@ -52,24 +51,17 @@ class MoleculeGenerator():
                                  smiles_id,
                                  smiles_df):
 
-        conn = getattr(threadLocal, 'conn', None)
-        if conn is None:
-            log.info('Creating new connection...')
-            conn = sqlite3.connect(self.db, check_same_thread=False)
-            threadLocal.conn = conn
-
-
         log.info(f'Inserting samples for {smiles_id}...')
 
         generated_smiles = smiles_df['SMILES'].to_list()
         embeddings = smiles_df['embeddings'].to_list()
         embeddings_dim = smiles_df['embeddings_dim'].to_list()
 
-        with conn:
+        lock.acquire(blocking=True, timeout=-1)
+        with self.conn as conn:
             with closing(conn.cursor()) as cursor:
                 generated = False
                 # Replace this loop with pandas to SQLite insert
-                lock.acquire(blocking=True, timeout=-1)
                 for i in range(len(generated_smiles)):
                     gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
                                                             return_fingerprint=True)
@@ -93,7 +85,7 @@ class MoleculeGenerator():
                 cursor.execute(
                     'UPDATE smiles set processed = 1 WHERE id = ?',
                     [smiles_id])
-                lock.release()
+        lock.release()
 
     def generate_and_store(self,
                            csv_data_files,

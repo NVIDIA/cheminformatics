@@ -3,7 +3,7 @@ set -e
 SCRIPT_LOC=$(dirname "$0")
 
 ID=100
-ACTION="up -d --scale megamolbart=4"
+ACTION="up -d --scale megamolbart=35"
 GPU_ID="0"
 MODEL_DIR="/models"
 CONFIG_DIR="/workspace/benchmark/cuchembm/config"

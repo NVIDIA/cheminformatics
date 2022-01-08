@@ -74,7 +74,6 @@ class ChEmblData(object):
             else:
                 return cur.fetchall()
 
-
     def fetch_approved_drugs_physchem(self, with_labels=False):
         """Fetch approved drugs with phase >=3 as dataframe, merging in physchem properties
 

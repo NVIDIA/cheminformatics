@@ -15,3 +15,10 @@ Configuration file for manipulating benchmark run is located at benchmark/script
 
 # Results
 Benchmark test results can be found at /data/benchmark_output folder.
+
+
+# Create env
+conda env update -n base --file env.yml
+export PYTHONPATH=$PYTHONPATH:/workspace/common/generated
+export PYTHONPATH=$PYTHONPATH:/workspace/megamolbart
+export PYTHONPATH=$PYTHONPATH:/workspace/common/

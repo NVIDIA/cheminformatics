@@ -7,7 +7,7 @@ ARG CHEMINFO_HOME=/opt/nvidia/cheminfomatics
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 docker.io\
     && rm -rf /var/lib/apt/lists/*
 
 ## Environment setup

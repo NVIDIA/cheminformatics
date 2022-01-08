@@ -13,24 +13,52 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
+import logging
+import pynvml as nv
+from subprocess import run, PIPE
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('megamolbart')
+formatter = logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s')
+
+
+def _fetch_gpu_counts():
+    nv.nvmlInit()
+    return nv.nvmlDeviceGetCount()
+
+def _set_cuda_device():
+    """
+    Fetch the container ID.
+    """
+    result = run(['bash', '-c',
+                    'docker ps -a --format "table {{.ID}}\t{{.Names}}" | grep $HOSTNAME'],
+                    stdout=PIPE, stderr=PIPE)
+    result_lines = result.stdout.decode("utf-8")
+    logger.info(f'Container info result: {result_lines}')
+    if result.returncode != 0:
+        logger.error(f'Container info result: {result.stderr}')
+    else:
+        container_id = int(result_lines.split('_')[-1])
+        gpu_cnt = _fetch_gpu_counts()
+        if gpu_cnt > 1:
+            if container_id is not None:
+                gpu_to_use = container_id % gpu_cnt
+                logger.info(f'Using GPU {gpu_to_use}')
+                os.environ['CUDA_VISIBLE_DEVICES'] = str(gpu_to_use)
+
+_set_cuda_device()
+
+
 import sys
 import shutil
-import logging
 import argparse
 import pathlib
-from subprocess import run
 
 import grpc
 import generativesampler_pb2_grpc
 
 from concurrent import futures
 from megamolbart.service import GenerativeSampler
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger('megamolbart')
-formatter = logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
 
 class Launcher(object):

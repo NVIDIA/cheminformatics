@@ -21,7 +21,7 @@ try:
     from cuml.svm import SVR
     from cuml.ensemble import RandomForestRegressor
     from cuchembm.utils.metrics import spearmanr
-    from cuchem.utils.distance import tanimoto_calculate
+    from cuchembm.utils.distance import tanimoto_calculate
     from cuml.experimental.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = True
     logger.info('RAPIDS installation found. Using cupy and cudf where possible.')
@@ -34,7 +34,7 @@ except ModuleNotFoundError as e:
     from sklearn.svm import SVR
     from sklearn.ensemble import RandomForestRegressor
     from scipy.stats import spearmanr
-    from cuchem.utils.distance import tanimoto_calculate
+    from cuchembm.utils.distance import tanimoto_calculate
     from sklearn.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = False
 

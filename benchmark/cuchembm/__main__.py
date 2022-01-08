@@ -15,7 +15,6 @@ from cuchembm.datasets.physchem import (ChEMBLApprovedDrugs,
                                         MoleculeNetFreeSolv,
                                         MoleculeNetLipophilicity)
 from cuchembm.datasets.bioactivity import ExCAPEDataset
-from cuchembm.inference.megamolbart import MegaMolBARTWrapper
 
 # Data caches
 # from cuchembm.data import (PhysChemEmbeddingData,
@@ -147,6 +146,7 @@ def main(cfg):
 
     # Inferrer (DL model)
     if cfg.model.name == 'MegaMolBART':
+        from cuchembm.inference.megamolbart import MegaMolBARTWrapper
         inferrer = MegaMolBARTWrapper()
     elif cfg.model.name == 'CDDD':
         from cuchembm.inference.cddd import CdddWrapper

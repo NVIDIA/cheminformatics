@@ -1,12 +1,23 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import math
 import numpy as np
 from datetime import datetime
 import matplotlib.dates as mdates
 from .data import load_aggregated_metric_results, make_aggregated_embedding_df
 
 __ALL__ = ['create_aggregated_plots']
+
+def _label_bars(ax):
+    """Add value labels to all bars in a bar plot"""
+    for p in ax.patches:
+        value = p.get_height()
+        if not math.isclose(value, 0.0):
+            label = "{:.2f}".format(value)
+            x, y = p.get_x() * 1.005, value * 1.005
+            ax.annotate(label, (x, y))
+
 
 def make_sampling_plots(metric_df, output_dir):
     # """Make aggregate plots for validity, uniqueness, novelty --
@@ -46,13 +57,8 @@ def make_sampling_plots(metric_df, output_dir):
                              values='value', 
                              index='inferrer')
             .plot(kind='bar', ax=ax, rot=0, legend=show_legend))
-        for p in ax.patches:
-            value = p.get_height()
-            if value > 0.0:
-                label = "{:.2f}".format(value)
-                x, y = p.get_x() * 1.005, value * 1.005
-                ax.annotate(label, (x, y))
-
+         
+        _label_bars(ax)
         ax.set_ylim(0, 1.1)
         ax.set(title=metric.title(), xlabel='Model (Latest Benchmark)', ylabel='Percentage')
 
@@ -77,6 +83,7 @@ def make_nearest_neighbor_plot(embedding_df, output_dir):
 
     dat = embedding_df[embedding_df.name == 'nearest neighbor correlation']
     dat = dat[['timestamp', 'inferrer', 'top_k', 'value']].drop_duplicates()
+    dat['top_k'] = dat['top_k'].astype(int)
     
     fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(4*2, 4))
     
@@ -85,7 +92,11 @@ def make_nearest_neighbor_plot(embedding_df, output_dir):
     idx = dat.groupby(['inferrer', 'top_k'])['timestamp'].idxmax()
     bar_dat = dat.loc[idx].pivot(index='inferrer', columns='top_k', values='value')
     bar_dat.plot(kind='bar', ax=ax, rot=0)
+    _label_bars(ax)
     ylim = ax.get_ylim()
+    if ylim[0] < 0:
+        ax.axhline(0, 0, 1, color='black', lw=0.5)
+    ax.legend().set_zorder(-1)
     ax.set(title='Nearest Neighbor Metric', ylabel="Speaman's Rho", xlabel='Model (Latest Benchmark)')
     
     ax = axes[1]

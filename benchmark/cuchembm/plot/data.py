@@ -1,12 +1,15 @@
 import pandas as pd
 import glob
 import os
+import re
 import numpy as np
 from datetime import datetime
 from cuchembm.datasets.physchem import (MoleculeNetESOL,
                                         MoleculeNetFreeSolv,
                                         MoleculeNetLipophilicity)
 from cuchembm.datasets.bioactivity import ExCAPEDataset
+
+MODEL_RENAME_REGEX = re.compile(r"""(?:cuchembm.inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""")
 
 def load_aggregated_metric_results(output_dir):
     """Load aggregated metric results from CSV files"""
@@ -21,7 +24,7 @@ def load_aggregated_metric_results(output_dir):
     metric_df = pd.concat(metric_df, axis=0).reset_index(drop=True)
     metric_df['timestamp'] = metric_df['timestamp'].dt.to_period('M') # Floor by month
     metric_df['name'] = metric_df['name'].str.replace('modelability-', '')
-    metric_df['inferrer'] = metric_df['inferrer'].str.extract(r"""(?:cuchembm.inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""", expand=False)
+    metric_df['inferrer'] = metric_df['inferrer'].str.extract(MODEL_RENAME_REGEX, expand=False)
     return metric_df
 
 
@@ -94,6 +97,7 @@ def load_plot_data(pkl_path, input_data, group_col):
             results_data.append(df)
 
     results_data = pd.concat(results_data, axis=0)
+    results_data['inferrer'] = results_data['inferrer'].str.extract(MODEL_RENAME_REGEX, expand=False)
     results_data = results_data.set_index(['property', 'inferrer', 'model', 'value']).stack().reset_index().rename(columns={'level_4':'feature', 0:'prediction'})
     results_data['row'] = results_data.apply(lambda x: ', '.join([x['property'], x['inferrer']]), axis=1)
     return results_data

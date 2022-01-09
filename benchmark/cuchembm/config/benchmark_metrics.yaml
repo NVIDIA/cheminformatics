@@ -25,8 +25,8 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/megamolbart_samples_r0.75.sqlite3
-  concurrent_requests: 35
+  db: /data/db/embedding_cache_megamolbart_1.0r.sqlite3
+  concurrent_requests: 10
 
 output:
   path: /data/benchmark_output/

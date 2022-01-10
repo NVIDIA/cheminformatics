@@ -23,6 +23,8 @@ RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /
 # NeMo_MegaMolBART
 RUN git clone https://${GITHUB_ACCESS_TOKEN}@github.com/clara-parabricks/NeMo_MegaMolBART.git \
     --branch ${GITHUB_BRANCH} /opt/NeMo_MegaMolBART \
+    && cd /opt/NeMo_MegaMolBART \
+    && git checkout c218e4b9a22e6880fca9e7b130dea9b336af5afa \
     && rm -rf ${NEMO_HOME} \
     && mv /opt/NeMo_MegaMolBART ${NEMO_HOME} \
     && ln -s ${NEMO_HOME}/nemo/collections/chem /opt/conda/lib/python3.8/site-packages/nemo/collections/chem

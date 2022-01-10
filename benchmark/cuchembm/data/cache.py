@@ -183,9 +183,7 @@ class MoleculeGenerator():
                                                         sanitize=(row.sanitize == 1))
         else:
             embedding_list = self.inferrer.smiles_to_embedding(row.smiles,
-                                                               512,
-                                                               scaled_radius=row.scaled_radius,
-                                                               sanitize=(row.sanitize == 1))
+                                                               512)
             result = pd.DataFrame()
             result['SMILES'] = [row.smiles]
             result['embeddings'] = [embedding_list.embedding]

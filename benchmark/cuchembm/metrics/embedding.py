@@ -271,22 +271,12 @@ class Modelability(BaseEmbeddingMetric):
         prop_name = properties.columns[0]
         properties = xpy.asarray(properties[prop_name], dtype=xpy.float32)
 
-        if self.norm_data:
-            embeddings = self.norm_data.fit_transform(embeddings)
-        if self.norm_prop:
-            properties = self.norm_prop.fit_transform(properties[xpy.newaxis, :]).squeeze()
-
         embedding_error, embedding_param, embedding_pred = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
         fingerprint_error, fingerprint_param, fingerprint_pred = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
+        ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
         if self.return_predictions & RAPIDS_AVAILABLE:
             embedding_pred, fingerprint_pred = xpy.asnumpy(embedding_pred), xpy.asnumpy(fingerprint_pred)
-
-        ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
-
-        if (self.norm_prop is not False) & self.return_predictions:
-            fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[xpy.newaxis, :]).squeeze()
-            embedding_pred = self.norm_prop.inverse_transform(embedding_pred[xpy.newaxis, :]).squeeze()
 
         results = {'value': ratio,
                    'fingerprint_error': fingerprint_error,

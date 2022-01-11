@@ -61,10 +61,10 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
             g.add_legend(handletextpad=0.01, borderpad=0.02, frameon=True)
 
             legend_data = g._legend_data
-            legend_colors = dict([(x, y.get_facecolor()) for x, y in legend_data.items()])
+            legend_colors = dict([(x, y.get_facecolor()) for x,y in legend_data.items()])
 
             for (row, model), ax in g.axes_dict.items():
-                prop, inferrer = row[0].split(', ')
+                prop, inferrer = row.split(', ')
                 error_vals = metric_df.loc[inferrer, prop, model]
 
                 if ax.is_first_row():
@@ -76,7 +76,7 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
 
                 error_str = []
                 for feature_type in legend_colors:
-                    # color = legend_colors[feature_type]
+                    color = legend_colors[feature_type]
                     error = error_vals[f'{feature_type}_error']
                     error_str += [f'{feature_type.title()}: {error:.3f}']
 

@@ -120,33 +120,41 @@ def make_physchem_plots(embedding_df, output_dir):
     """Plots of phychem property results"""
     # TODO convert xaxis label from units to property
     dat = embedding_df[embedding_df.name == 'physchem']
-    d = dat[['timestamp', 'inferrer', 'property', 'model', 'value']].drop_duplicates()
+    d = dat[['timestamp', 'inferrer', 'property', 'model', 'value']]
+    timestamp_lim = (d['timestamp'].min() - 1, d['timestamp'].max() + 1)
 
     grouper = d.groupby('inferrer')
     n_models = len(grouper)
-    fig, axes = plt.subplots(ncols=2, nrows=2, figsize=(16, 4*n_models))
+    fig, axes = plt.subplots(ncols=2, nrows=n_models, figsize=(16, 4*n_models))
+    axes = axes[np.newaxis, :] if axes.ndim == 1 else axes
 
-    for row, (inferrer,dat) in enumerate(grouper):
-        # Timeseries plot
-        ax = axes[row, 0]
-        _ = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean').plot(kind='line', marker='o', legend=False, ax=ax, rot=0)
-        
-        ax.set_title('Physchem Property Prediction (Mean of All Properties as Timeseries)') if ax.is_first_row() else ax.set_title('')
-        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
-        ax.set_xlabel('Timestamp') if ax.is_last_row() else ax.set_xlabel('')
-        
+    for row, (inferrer, dat) in enumerate(grouper):
         # Latest values plot
-        ax = axes[row, 1]
+        ax = axes[row, 0]
         last_timestep = dat.sort_values('timestamp').groupby(['inferrer', 'property', 'model']).last().reset_index()
         _ = last_timestep.pivot(columns=['model'], values='value', index='property').plot(kind='bar', width=0.8, legend=False, ax=ax, rot=0)
-        ax.set_ylim(0,50)
-        
+        ax.set_ylim(0, 50)
+        _label_bars(ax, 45)
         ax.set_title('Physchem Property Prediction (Most Recent Benchmark)') if ax.is_first_row() else ax.set_title('')
         ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
         ax.set_xlabel('Property') if ax.is_last_row() else ax.set_xlabel('')
-        
+
+        if row == 0:
+            handles, labels = ax.get_legend_handles_labels()
+
+        # Timeseries plot
+        ax = axes[row, 1]
+        _ = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean').plot(kind='line', marker='o', legend=False, ax=ax, rot=0)
+
+        ax.set_xlim(*timestamp_lim)
+        ax.set_title('Physchem Property Prediction (Mean of All Properties as Timeseries)') if ax.is_first_row() else ax.set_title('')
+        ax.set_ylabel(f'Average MSE Ratio (All Properties)')
+        ax.set_xlabel('Timestamp') if ax.is_last_row() else ax.set_xlabel('')
+
     fig = plt.gcf()
-    fig.legend(loc=7)
+    fig.legend(handles=handles, labels=labels, loc=7)
+
+
     plt.tight_layout()
     fig.savefig(os.path.join(output_dir, 'Physchem_Aggregated_Benchmark.png'), dpi=300)
 
@@ -160,7 +168,7 @@ def make_bioactivity_plots(embedding_df, output_dir):
     fig, axes = plt.subplots(ncols=2, nrows=2, figsize=(16, 4*n_models))
     # labels = sorted(d['gene'].unique())
 
-    for row, (inferrer,dat) in enumerate(grouper):
+    for row, (inferrer, dat) in enumerate(grouper):
         # Timeseries plot
         ax = axes[row, 0]
         _ = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean').plot(kind='line', marker='o', legend=False, ax=ax, rot=0)

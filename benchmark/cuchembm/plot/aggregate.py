@@ -9,22 +9,25 @@ from .data import load_aggregated_metric_results, make_aggregated_embedding_df
 
 __ALL__ = ['create_aggregated_plots']
 
-def _label_bars(ax):
+# PoR acceptance criteria
+ACCEPTANCE_CRITERIA = {'validity': 0.98, 'novelty': 0.50}
+
+
+def _label_bars(ax, max_value=None):
     """Add value labels to all bars in a bar plot"""
     for p in ax.patches:
         value = p.get_height()
         if not math.isclose(value, 0.0):
             label = "{:.2f}".format(value)
             x, y = p.get_x() * 1.005, value * 1.005
+            if max_value:
+                y = min(y, max_value)
             ax.annotate(label, (x, y))
 
 
 def make_sampling_plots(metric_df, output_dir):
-    # """Make aggregate plots for validity, uniqueness, novelty --
-    #    will be bar chart for single date or timeseries for multiple"""
-    
-    # PoR acceptance criteria
-    ac_val = {'validity': 0.98, 'novelty': 0.50}
+    """Make aggregate plots for validity, uniqueness, novelty --
+       will be bar chart for single date or timeseries for multiple"""
 
     # Select data
     generative_mask = metric_df['name'].isin(['validity', 'unique', 'novelty'])
@@ -37,6 +40,7 @@ def make_sampling_plots(metric_df, output_dir):
     grouper = generative_df.groupby('name')
     n_plots = len(grouper)
     fig, axes = plt.subplots(ncols=n_plots, nrows=2, figsize=(n_plots*4, 2*4))
+    timestamp_lim = (metric_df['timestamp'].min() - 1, metric_df['timestamp'].max() + 1)
 
     for col, (metric, dat) in enumerate(grouper):
         if not isinstance(dat, pd.DataFrame):
@@ -47,9 +51,9 @@ def make_sampling_plots(metric_df, output_dir):
         # First row is bar plot of most recent benchmark for all models
         row = 0
         ax = axes[row, col]
-        
-        if metric in ac_val:
-            ax.axhline(y=ac_val[metric], xmin=0, xmax=1, color='red', lw=1.0, zorder=-1)
+
+        if metric in ACCEPTANCE_CRITERIA:
+            ax.axhline(y=ACCEPTANCE_CRITERIA[metric], xmin=0, xmax=1, color='red', lw=1.0, zorder=-1)
 
         idx = dat.groupby(['inferrer', 'radius'])['timestamp'].idxmax()
         bar_dat = dat.loc[idx]
@@ -57,7 +61,7 @@ def make_sampling_plots(metric_df, output_dir):
                              values='value', 
                              index='inferrer')
             .plot(kind='bar', ax=ax, rot=0, legend=show_legend))
-         
+
         _label_bars(ax)
         ax.set_ylim(0, 1.1)
         ax.set(title=metric.title(), xlabel='Model (Latest Benchmark)', ylabel='Percentage')
@@ -71,6 +75,7 @@ def make_sampling_plots(metric_df, output_dir):
                              index='timestamp')
             .plot(kind='line', marker='o', ax=ax, legend=show_legend))
         ax.set_ylim(0, 1.1)
+        ax.set_xlim(*timestamp_lim)
         ax.set(xlabel='Benchmark Date (Development Models)', ylabel='Percentage')
 
         plt.tight_layout()

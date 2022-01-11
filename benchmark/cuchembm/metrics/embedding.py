@@ -229,7 +229,7 @@ class Modelability(BaseEmbeddingMetric):
         if normalize_inputs:
             self.norm_data, self.norm_prop = StandardScaler(), StandardScaler()
         else:
-            self.norm_data, self.norm_prop = False, False
+            self.norm_data, self.norm_prop = None, None
 
     def variations(self, model_dict=None, **kwargs):
         if model_dict:

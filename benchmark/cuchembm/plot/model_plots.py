@@ -25,11 +25,13 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
         input_data_func = load_physchem_input_data
         pkl_path = os.path.join(output_dir, '**', '*physchem.pkl')
         group_col = 'property'
+        index_cols = ['inferrer', 'property', 'model']
         output_path = os.path.join(output_dir, 'Physchem_Single_Property_Plots.pdf')
     elif plot_type == 'bioactivity':
         input_data_func = load_bioactivity_input_data
         pkl_path = os.path.join(output_dir, '**', '*bioactivity.pkl')
         group_col = 'gene'
+        index_cols = ['inferrer', 'gene', 'model']
         output_path = os.path.join(output_dir, 'Bioactivity_Single_Gene_Plots.pdf')
 
     input_data = input_data_func(max_seq_len=max_seq_len)
@@ -38,14 +40,13 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
     metric_df = load_aggregated_metric_results(output_dir)
     metric_df = metric_df[metric_df['name'] == plot_type].dropna(axis=1, how='all')
 
-    index_cols = ['inferrer', 'property', 'model']
     keep_cols = index_cols + ['fingerprint_error', 'embedding_error']
     metric_df = metric_df[keep_cols].set_index(index_cols)
 
     with PdfPages(output_path) as pdf:
-
         for pred_data_page in grouper(pred_data.groupby(['row']), n_plots_page):
             pred_data_page = pd.concat([x[1] for x in pred_data_page], axis=0)
+            
             g = sns.FacetGrid(pred_data_page, 
                             col='model', 
                             row='row', 

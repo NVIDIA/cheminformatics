@@ -284,7 +284,7 @@ class Modelability(BaseEmbeddingMetric):
 
         ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
-        if (self.norm_prop is not None and self.norm_prop) & self.return_predictions:
+        if (self.norm_prop is not False) & self.return_predictions:
             fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[xpy.newaxis, :]).squeeze()
             embedding_pred = self.norm_prop.inverse_transform(embedding_pred[xpy.newaxis, :]).squeeze()
 

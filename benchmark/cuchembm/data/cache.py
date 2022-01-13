@@ -97,7 +97,14 @@ class MoleculeGenerator():
 
         new_sample_db = False
         with closing(self.conn.cursor()) as cursor:
-            recs = cursor.execute('SELECT count(*) from smiles').fetchone()
+            recs = cursor.execute('''
+                SELECT count(*) from smiles s
+                WHERE s.model_name = ?
+                    AND s.scaled_radius = ?
+                    AND s.force_unique = ?
+                    AND s.sanitize = ?
+                ''',
+                [self.inferrer.__class__.__name__, scaled_radius, force_unique, sanitize]).fetchone()
             if recs[0] == 0:
                 new_sample_db = True
 

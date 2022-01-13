@@ -246,19 +246,23 @@ class Modelability(BaseEmbeddingMetric):
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
             logger.info(f"Grid search param {param}")
+
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
+
             for train_idx, test_idx in kfold_gen.split(xdata, ydata):
                 xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
 
                 if self.norm_data is not None:
+                    xtrain, xtest = xtrain.copy(), xtest.copy() # Prevent repeated transforms of same data in memory
                     xtrain = self.norm_data.fit_transform(xtrain) # Must fit transform here to avoid test set leakage
                     xtest = self.norm_data.transform(xtest)
 
                 if self.norm_prop is not None:
-                    ytrain = self.norm_data.fit_transform(ytrain)
-                    ytest = self.norm_data.transform(ytest)  
+                    ytrain, ytest = ytrain.copy(), ytest.copy()
+                    ytrain = self.norm_prop.fit_transform(ytrain[:, xpy.newaxis]).squeeze()
+                    ytest = self.norm_prop.transform(ytest[:, xpy.newaxis]).squeeze()
 
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
@@ -277,10 +281,17 @@ class Modelability(BaseEmbeddingMetric):
             avg_mse = np.nanmean(np.array(kfold_mse))
             if avg_mse < best_score:
                 best_score, best_param = avg_mse, param
+
                 if self.return_predictions:
-                    xdata = self.norm_data.transform(xdata) if self.norm_data is not None else xdata
-                    best_pred = estimator.predict(xdata)
+                    xdata_pred = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
+                    ydata_pred = self.norm_prop.fit_transform(ydata) if self.norm_prop is not None else ydata
+
+                    estimator.set_params(**best_param)
+                    estimator.fit(xdata_pred, ydata_pred)
+
+                    best_pred = estimator.predict(xdata_pred)
                     best_pred = self.norm_prop.inverse_transform(best_pred[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else best_pred
+
         return best_score, best_param, best_pred
 
     def _calculate_metric(self, embeddings, fingerprints, estimator, param_dict):

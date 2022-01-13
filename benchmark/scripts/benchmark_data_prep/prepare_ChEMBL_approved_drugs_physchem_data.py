@@ -19,21 +19,21 @@ import logging
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchemcommon.data.helper.chembldata import ChEmblData # TODO RAJESH if this is problematic to refactor, let's talk. Could skip porting the scripts.
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchembm.utils.chembldata import ChEmblData
+from cuchembm.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent,
                                 'csv_data')
-columns = ['molregno', 'canonical_smiles', 'max_phase_for_ind'] 
+columns = ['molregno', 'canonical_smiles', 'max_phase_for_ind']
 physchem_columns = ['mw_freebase', 'alogp', 'hba', 'hbd', 'psa', 'rtb', \
                     'ro3_pass', 'num_ro5_violations', 'cx_logp', 'cx_logd', \
                     'full_mwt', 'aromatic_rings', 'heavy_atoms', 'qed_weighted', \
                     'mw_monoisotopic', 'hba_lipinski', 'hbd_lipinski', 'num_lipinski_ro5_violations']
 
 if __name__ == '__main__':
-    results = ChEmblData(fp_type=None).fetch_approved_drugs_physchem(with_labels=True)
+    results = ChEmblData().fetch_approved_drugs_physchem(with_labels=True)
     benchmark_df = pd.DataFrame(results[0], columns=results[1])
     benchmark_df = benchmark_df[columns + physchem_columns]
     benchmark_df = benchmark_df.rename(columns={'molregno': 'index'})
@@ -53,7 +53,7 @@ if __name__ == '__main__':
 
     assert len(benchmark_df) == len(fp)
     assert benchmark_df.index.equals(fp.index)
-    
+
     # Write results
     benchmark_df = benchmark_df.reset_index()
     fp = fp.reset_index()

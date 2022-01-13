@@ -23,35 +23,6 @@ else:
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-# TODO RAJESH the morgan fingerprint class and this function will need to be separated from those which require TF here
-def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_invalid=True):
-    """Calculate Morgan fingerprints on SMILES strings
-
-    Args:
-        dataframe (pandas/cudf.DataFrame): dataframe containing a SMILES column for calculation
-        remove_invalid (bool): remove fingerprints from failed SMILES conversion, default: True
-
-    Returns:
-        pandas/cudf.DataFrame: new dataframe containing fingerprints
-    """
-    mf = MorganFingerprint()
-    fp = mf.transform(dataframe, col_name=smiles_col)
-    fp = xdf.DataFrame(fp)
-    fp.index = dataframe.index
-
-    # Check for invalid smiles
-    # Prune molecules which failed to convert or throw error and exit
-    valid_molecule_mask = (fp.sum(axis=1) > 0)
-    num_invalid_molecules = int(valid_molecule_mask.shape[0] - valid_molecule_mask.sum())
-    if num_invalid_molecules > 0:
-        logger.warn(f'WARNING: Found {num_invalid_molecules} invalid fingerprints due to invalid SMILES during fingerprint creation')
-        if remove_invalid:
-            logger.info(f'Removing {num_invalid_molecules} invalid fingerprints due to invalid SMILES during fingerprint creation')
-            fp = fp[valid_molecule_mask]
-
-    return fp
-
-
 class TransformationDefaults(Enum):
     MorganFingerprint = {'radius': 2, 'nBits': 512}
     Embeddings = {}

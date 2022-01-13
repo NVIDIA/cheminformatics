@@ -20,8 +20,8 @@ try:
     from cuml.linear_model import LinearRegression, ElasticNet
     from cuml.svm import SVR
     from cuml.ensemble import RandomForestRegressor
-    from cuchemcommon.utils.metrics import spearmanr
-    from cuchem.utils.distance import tanimoto_calculate
+    from cuchembm.utils.metrics import spearmanr
+    from cuchembm.utils.distance import tanimoto_calculate
     from cuml.experimental.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = True
     logger.info('RAPIDS installation found. Using cupy and cudf where possible.')
@@ -34,7 +34,7 @@ except ModuleNotFoundError as e:
     from sklearn.svm import SVR
     from sklearn.ensemble import RandomForestRegressor
     from scipy.stats import spearmanr
-    from cuchem.utils.distance import tanimoto_calculate
+    from cuchembm.utils.distance import tanimoto_calculate
     from sklearn.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = False
 
@@ -246,7 +246,6 @@ class Modelability(BaseEmbeddingMetric):
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
             logger.info(f"Grid search param {param}")
-            logger.info(f'=============={self.n_splits}')
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
@@ -285,7 +284,7 @@ class Modelability(BaseEmbeddingMetric):
 
         ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
-        if (self.norm_prop is not None) & self.return_predictions:
+        if (self.norm_prop is not False) & self.return_predictions:
             fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[xpy.newaxis, :]).squeeze()
             embedding_pred = self.norm_prop.inverse_transform(embedding_pred[xpy.newaxis, :]).squeeze()
 

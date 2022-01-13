@@ -4,7 +4,7 @@ import logging
 import pandas as pd
 import numpy as np
 import tempfile
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchembm.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class GenericCSVDataset():
 
     def _generate_fingerprints(self, data, columns):
         fp = calc_morgan_fingerprints(data, smiles_col=columns[0])
-        fp = fp.to_pandas()
+        # fp = fp.to_pandas()
         fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
         for col in fp.columns: # TODO why are these floats
             fp[col] = fp[col].astype(np.float32)

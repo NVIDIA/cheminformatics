@@ -13,7 +13,7 @@ from generativesampler_pb2 import (GenerativeSpec,
                                    GenerativeModel,
                                    google_dot_protobuf_dot_empty__pb2)
 
-from cuchemcommon.utils.singleton import Singleton
+from cuchembm.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,9 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         # TODO: make this configurable/resuable accross all modules.
         checkpoint_file = 'megamolbart_checkpoint.nemo'
         files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
+        if len(files) == 0:
+            raise ValueError(f'Checkpoint file "{checkpoint_file}"" in "/models".')
+
         dir = files[-1].absolute().parent.as_posix()
 
         from megamolbart.inference import MegaMolBART

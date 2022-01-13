@@ -54,6 +54,7 @@ services:
       - /etc/passwd:/etc/passwd:ro
       - /etc/group:/etc/group:ro
       - /etc/shadow:/etc/shadow:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     working_dir: ${WORKING_DIR_MEGAMOLBART}
     command: ${MEGAMOLBART_CMD}
     deploy:
@@ -62,11 +63,10 @@ services:
           devices:
           - driver: nvidia
             capabilities: [gpu]
-            count: 1
 
   nginx:
     image: nginx:1.20.0
-    container_name: nginx
+    container_name: cuchemLB
     ports:
       - "50052:50052"
     depends_on:

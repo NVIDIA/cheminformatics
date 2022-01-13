@@ -6,7 +6,7 @@ import hydra
 import pandas as pd
 from datetime import datetime
 from copy import deepcopy
-from cuchembm.metrics.cache import MoleculeGenerator
+from cuchembm.data import MoleculeGenerator
 from cuchembm.plot import (create_aggregated_plots, make_model_plots)
 
 # Dataset classess
@@ -15,7 +15,6 @@ from cuchembm.datasets.physchem import (ChEMBLApprovedDrugs,
                                         MoleculeNetFreeSolv,
                                         MoleculeNetLipophilicity)
 from cuchembm.datasets.bioactivity import ExCAPEDataset
-from cuchembm.inference.megamolbart import MegaMolBARTWrapper
 
 # Data caches
 # from cuchembm.data import (PhysChemEmbeddingData,
@@ -78,7 +77,7 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
-def create_dataset(cfg, inferrer):
+def create_dataset(cfg):
     sample_input = -1
     radii = set()
     data_files = {}
@@ -147,6 +146,7 @@ def main(cfg):
 
     # Inferrer (DL model)
     if cfg.model.name == 'MegaMolBART':
+        from cuchembm.inference.megamolbart import MegaMolBARTWrapper
         inferrer = MegaMolBARTWrapper()
     elif cfg.model.name == 'CDDD':
         from cuchembm.inference.cddd import CdddWrapper
@@ -156,7 +156,7 @@ def main(cfg):
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
     wait_for_megamolbart_service(inferrer)
-    data_files, radii = create_dataset(cfg, inferrer)
+    data_files, radii = create_dataset(cfg)
     # Metrics
     metric_list = []
 

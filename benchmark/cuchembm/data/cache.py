@@ -8,8 +8,7 @@ import concurrent.futures
 import threading
 
 from contextlib import closing
-from sqlalchemy.dialects.sqlite import insert
-from cuchemcommon.utils.smiles import validate_smiles
+from cuchembm.utils.smiles import validate_smiles
 
 format = '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
 logging.basicConfig(level=logging.INFO,
@@ -24,7 +23,7 @@ log = logging.getLogger('cuchembm.molecule_generator')
 
 __all__ = ['MoleculeGenerator']
 
-threadLocal = threading.local()
+lock = threading.Lock()
 
 
 class MoleculeGenerator():
@@ -52,20 +51,14 @@ class MoleculeGenerator():
                                  smiles_id,
                                  smiles_df):
 
-        conn = getattr(threadLocal, 'conn', None)
-        if conn is None:
-            log.info('Creating new connection...')
-            conn = sqlite3.connect(self.db, check_same_thread=False)
-            threadLocal.conn = conn
-
-
         log.info(f'Inserting samples for {smiles_id}...')
 
         generated_smiles = smiles_df['SMILES'].to_list()
         embeddings = smiles_df['embeddings'].to_list()
         embeddings_dim = smiles_df['embeddings_dim'].to_list()
 
-        with conn:
+        lock.acquire(blocking=True, timeout=-1)
+        with self.conn as conn:
             with closing(conn.cursor()) as cursor:
                 generated = False
                 # Replace this loop with pandas to SQLite insert
@@ -92,6 +85,7 @@ class MoleculeGenerator():
                 cursor.execute(
                     'UPDATE smiles set processed = 1 WHERE id = ?',
                     [smiles_id])
+        lock.release()
 
     def generate_and_store(self,
                            csv_data_files,
@@ -119,12 +113,15 @@ class MoleculeGenerator():
                 if 'input_size' in spec:
                     input_size = spec['input_size']
 
+                # Input must be a CSV file or dataframe. Anything else will fail.
                 if isinstance(spec['dataset'], str):
+                    # If input dataset is a csv file
                     if input_size > 0:
                         file_df = pd.read_csv(spec['dataset'], nrows=input_size)
                     else:
                         file_df = pd.read_csv(spec['dataset'])
                 else:
+                    # If input dataset is a dataframe
                     file_df = spec['dataset']
 
                 dataset_df = pd.DataFrame()
@@ -178,9 +175,7 @@ class MoleculeGenerator():
                                                         sanitize=(row.sanitize == 1))
         else:
             embedding_list = self.inferrer.smiles_to_embedding(row.smiles,
-                                                               512,
-                                                               scaled_radius=row.scaled_radius,
-                                                               sanitize=(row.sanitize == 1))
+                                                               512)
             result = pd.DataFrame()
             result['SMILES'] = [row.smiles]
             result['embeddings'] = [embedding_list.embedding]

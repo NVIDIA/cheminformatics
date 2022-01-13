@@ -6,7 +6,7 @@ from typing import List
 
 from generativesampler_pb2 import EmbeddingList, SmilesList
 
-from cuchemcommon.utils.singleton import Singleton
+from cuchembm.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 

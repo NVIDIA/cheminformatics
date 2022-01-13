@@ -99,7 +99,7 @@ class ChEmblData(object, metaclass=Singleton):
                 FROM molecule_dictionary as md
                     join compound_properties cp on md.molregno = cp.molregno
                     left join compound_structures cs on cp.molregno = cs.molregno
-                WHERE  md.chembl_id in in (%s)
+                WHERE  md.chembl_id in (%s)
             ''' % "'%s'" % "','".join(chemblIds)
             cur.execute(select_stmt)
             return cur.fetchall()
@@ -129,98 +129,6 @@ class ChEmblData(object, metaclass=Singleton):
                 FROM molecule_dictionary md
                 WHERE md.molregno in (%s)
             ''' % ", ".join(list(map(str, molregnos)))
-            cur.execute(select_stmt)
-            return cur.fetchall()
-
-    def fetch_approved_drugs(self, with_labels=False):
-        """Fetch approved drugs with phase >=3 as dataframe
-
-        Args:
-            with_labels (bool): return column labels as list, Default: False
-        Returns:
-            pd.DataFrame: dataframe containing SMILES strings and molecule index
-        """
-        logger.debug('Fetching ChEMBL approved drugs...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
-                closing(con.cursor()) as cur:
-            select_stmt = """SELECT
-                di.molregno,
-                cs.canonical_smiles,
-                di.max_phase_for_ind
-            FROM
-                drug_indication AS di
-            LEFT JOIN compound_structures AS cs ON di.molregno = cs.molregno
-            WHERE
-                di.max_phase_for_ind >= 3
-                AND cs.canonical_smiles IS NOT NULL;"""
-            cur.execute(select_stmt)
-            if with_labels:
-                labels = [x[0] for x in cur.description]
-                return cur.fetchall(), labels
-            else:
-                return cur.fetchall()
-
-    def fetch_approved_drugs_physchem(self, with_labels=False):
-        """Fetch approved drugs with phase >=3 as dataframe, merging in physchem properties
-
-        Args:
-            with_labels (bool): return column labels as list, Default: False
-        Returns:
-            pd.DataFrame: dataframe containing SMILES strings and molecule index
-        """
-        logger.debug('Fetching ChEMBL approved drugs with physchem properties...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
-                closing(con.cursor()) as cur:
-
-            select_stmt = '''
-                SELECT cs.canonical_smiles,
-                di.max_phase_for_ind,
-                cp.*
-            FROM
-                drug_indication AS di,
-                compound_structures AS cs,
-                compound_properties AS cp
-            WHERE
-                di.molregno = cs.molregno
-                AND di.molregno = cp.molregno
-                AND di.max_phase_for_ind >= 3
-                AND canonical_smiles is not null
-            GROUP BY cp.molregno,
-                cs.canonical_smiles
-            HAVING di.max_phase_for_ind = max(di.max_phase_for_ind);
-            '''
-            cur.execute(select_stmt)
-            if with_labels:
-                labels = [x[0] for x in cur.description]
-                return cur.fetchall(), labels
-            else:
-                return cur.fetchall()
-
-    def fetch_random_samples(self, num_samples, max_len):
-        """Fetch random samples from ChEMBL as dataframe
-
-        Args:
-            num_samples (int): number of samples to select
-            chembl_db_path (string): path to chembl sqlite database
-        Returns:
-            pd.DataFrame: dataframe containing SMILES strings and molecule index
-        """
-        logger.debug('Fetching ChEMBL random samples...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
-                closing(con.cursor()) as cur:
-            select_stmt = """SELECT
-                cs.molregno,
-                cs.canonical_smiles,
-                LENGTH(cs.canonical_smiles) as len
-            FROM
-                compound_structures AS cs
-            WHERE
-                cs.canonical_smiles IS NOT NULL
-            AND
-                len <= """ + f'{max_len}' + """
-            ORDER BY RANDOM()
-            LIMIT """ + f'{num_samples};'
-
             cur.execute(select_stmt)
             return cur.fetchall()
 

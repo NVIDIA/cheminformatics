@@ -152,6 +152,11 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/megamolbart:/workspace/benchmark"
         CONT=${MEGAMOLBART_CONT}
+    elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
+        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
+        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
+        CONT="gpuci/miniconda-cuda:11.5-devel-ubuntu20.04"
     else
         DOCKER_CMD="${DOCKER_CMD} --privileged"
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
@@ -193,6 +198,7 @@ start() {
         export WORKING_DIR_CUCHEMUI=/workspace
         export WORKING_DIR_MEGAMOLBART=/workspace/megamolbart
         export PYTHONPATH_MEGAMOLBART="${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
+        export NGINX_CONFIG=${PROJECT_PATH}/setup/config/nginx.conf
 
         docker-compose --env-file .env  \
                 -f setup/docker_compose.yml \

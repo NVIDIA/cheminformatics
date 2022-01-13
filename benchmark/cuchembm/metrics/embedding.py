@@ -58,7 +58,7 @@ def get_model_dict():
         rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0) # n_streams=12 -- did not seem to improve runtime
     else:
         rf_estimator = RandomForestRegressor(criterion='mse', random_state=0)
-    rf_param_dict = {'n_estimators': [10, 50, 100, 150, 200]}
+    rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
     return {'linear_regression': [lr_estimator, lr_param_dict],
             'elastic_net': [en_estimator, en_param_dict],
@@ -282,15 +282,15 @@ class Modelability(BaseEmbeddingMetric):
             if avg_mse < best_score:
                 best_score, best_param = avg_mse, param
 
-                if self.return_predictions:
-                    xdata_pred = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
-                    ydata_pred = self.norm_prop.fit_transform(ydata[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else ydata
+        if self.return_predictions:
+            xdata_pred = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
+            ydata_pred = self.norm_prop.fit_transform(ydata[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else ydata
 
-                    estimator.set_params(**best_param)
-                    estimator.fit(xdata_pred, ydata_pred)
+            estimator.set_params(**best_param)
+            estimator.fit(xdata_pred, ydata_pred)
 
-                    best_pred = estimator.predict(xdata_pred)
-                    best_pred = self.norm_prop.inverse_transform(best_pred[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else best_pred
+            best_pred = estimator.predict(xdata_pred)
+            best_pred = self.norm_prop.inverse_transform(best_pred[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else best_pred
 
         return best_score, best_param, best_pred
 

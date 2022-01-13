@@ -77,7 +77,7 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
-def create_dataset(cfg, inferrer):
+def create_dataset(cfg):
     sample_input = -1
     radii = set()
     data_files = {}
@@ -156,7 +156,7 @@ def main(cfg):
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
     wait_for_megamolbart_service(inferrer)
-    data_files, radii = create_dataset(cfg, inferrer)
+    data_files, radii = create_dataset(cfg)
     # Metrics
     metric_list = []
 

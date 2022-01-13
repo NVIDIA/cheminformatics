@@ -241,6 +241,10 @@ class Modelability(BaseEmbeddingMetric):
         logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
+        # Normalize data if required
+        xdata_xform = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
+        ydata_xform = self.norm_prop.fit_transform(ydata[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else ydata
+
         best_score, best_param, best_pred = np.inf, None, None
         # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
@@ -249,12 +253,21 @@ class Modelability(BaseEmbeddingMetric):
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
-            for train_idx, test_idx in kfold_gen.split(xdata, ydata):
-                xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
+            for train_idx, test_idx in kfold_gen.split(xdata_xform, ydata_xform):
+                xtrain, xtest, ytrain, ytest = xdata_xform[train_idx], xdata_xform[test_idx], ydata_xform[train_idx], ydata_xform[test_idx]
 
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
-                mse = mean_squared_error(ypred, ytest).item() # NOTE: convert to negative MSE and maximize metric if SKLearn GridSearch is ever used
+
+                # Ensure error is calculated on untransformed data
+                if self.norm_prop is not None:
+                    ytest_unxform = self.norm_prop.inverse_transform(ytest[:, xpy.newaxis]).squeeze()
+                    ypred_unxform = self.norm_prop.inverse_transform(ypred[:, xpy.newaxis]).squeeze()
+                else:
+                    ytest_unxform, ypred_unxform = ytest, ypred
+
+                # NOTE: convert to negative MSE and maximize metric if SKLearn GridSearch is ever used
+                mse = mean_squared_error(ypred_unxform, ytest_unxform).item() 
                 kfold_mse.append(mse)
 
             avg_mse = np.nanmean(np.array(kfold_mse))
@@ -262,6 +275,7 @@ class Modelability(BaseEmbeddingMetric):
                 best_score, best_param = avg_mse, param
                 if self.return_predictions:
                     best_pred = estimator.predict(xdata)
+                    best_pred = self.norm_prop.inverse_transform(best_pred[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else best_pred
         return best_score, best_param, best_pred
 
     def _calculate_metric(self, embeddings, fingerprints, estimator, param_dict):

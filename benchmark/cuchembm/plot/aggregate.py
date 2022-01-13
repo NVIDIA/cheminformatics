@@ -5,7 +5,7 @@ import math
 import numpy as np
 from datetime import datetime
 import matplotlib.dates as mdates
-from .data import load_aggregated_metric_results, make_aggregated_embedding_df
+from .data import PHYSCHEM_UNIT_RENAMER, load_aggregated_metric_results, make_aggregated_embedding_df
 
 __ALL__ = ['create_aggregated_plots']
 
@@ -116,25 +116,28 @@ def make_nearest_neighbor_plot(embedding_df, output_dir):
     fig.savefig(os.path.join(output_dir, 'Nearest_Neighbor_Aggregated_Benchmark.png'))
 
 
-def make_physchem_plots(embedding_df, output_dir):
+def make_physchem_plots(embedding_df, output_dir, max_plot_ratio=50):
     """Plots of phychem property results"""
     # TODO convert xaxis label from units to property
     dat = embedding_df[embedding_df.name == 'physchem']
-    d = dat[['timestamp', 'inferrer', 'property', 'model', 'value']]
-    timestamp_lim = (d['timestamp'].min() - 1, d['timestamp'].max() + 1)
+    dat['property'] = dat['property'].map(lambda x: PHYSCHEM_UNIT_RENAMER[x])
+    dat = dat[['timestamp', 'inferrer', 'property', 'model', 'value']]
+    timestamp_lim = (dat['timestamp'].min() - 1, dat['timestamp'].max() + 1)
 
-    grouper = d.groupby('inferrer')
+    grouper = dat.groupby('inferrer')
     n_models = len(grouper)
     fig, axes = plt.subplots(ncols=2, nrows=n_models, figsize=(16, 4*n_models))
     axes = axes[np.newaxis, :] if axes.ndim == 1 else axes
 
-    for row, (inferrer, dat) in enumerate(grouper):
+    for row, (inferrer, dat_) in enumerate(grouper):
         # Latest values plot
         ax = axes[row, 0]
-        last_timestep = dat.sort_values('timestamp').groupby(['inferrer', 'property', 'model']).last().reset_index()
-        _ = last_timestep.pivot(columns=['model'], values='value', index='property').plot(kind='bar', width=0.8, legend=False, ax=ax, rot=0)
-        ax.set_ylim(0, 50)
-        _label_bars(ax, 45)
+        last_timestep = dat_.sort_values('timestamp').groupby(['inferrer', 'property', 'model']).last().reset_index()
+        last_timestep = last_timestep.pivot(columns=['model'], values='value', index='property')
+        _ = last_timestep.plot(kind='bar', width=0.8, legend=False, ax=ax, rot=0)
+        ax.set_xticklabels(ax.get_xticklabels(), fontsize='small')
+        ax.set_ylim(0, max_plot_ratio)
+        _label_bars(ax, int(0.9 * max_plot_ratio))
         ax.set_title('Physchem Property Prediction (Most Recent Benchmark)') if ax.is_first_row() else ax.set_title('')
         ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
         ax.set_xlabel('Property') if ax.is_last_row() else ax.set_xlabel('')
@@ -144,8 +147,8 @@ def make_physchem_plots(embedding_df, output_dir):
 
         # Timeseries plot
         ax = axes[row, 1]
-        _ = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean').plot(kind='line', marker='o', legend=False, ax=ax, rot=0)
-
+        timeseries_data = dat_.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean')
+        _ = timeseries_data.plot(kind='line', marker='o', legend=False, ax=ax, rot=0)
         ax.set_xlim(*timestamp_lim)
         ax.set_title('Physchem Property Prediction (Mean of All Properties as Timeseries)') if ax.is_first_row() else ax.set_title('')
         ax.set_ylabel(f'Average MSE Ratio (All Properties)')
@@ -153,40 +156,43 @@ def make_physchem_plots(embedding_df, output_dir):
 
     fig = plt.gcf()
     fig.legend(handles=handles, labels=labels, loc=7)
-
-
     plt.tight_layout()
     fig.savefig(os.path.join(output_dir, 'Physchem_Aggregated_Benchmark.png'), dpi=300)
 
 
 def make_bioactivity_plots(embedding_df, output_dir):
     dat = embedding_df[embedding_df.name == 'bioactivity']
-    d = dat[['timestamp', 'inferrer', 'gene', 'model', 'value']].drop_duplicates()
+    dat = dat[['timestamp', 'inferrer', 'gene', 'model', 'value']]
+    dat.sort_values('gene', inplace=True)
 
-    grouper = d.groupby('inferrer')
+    grouper = dat.groupby('inferrer')
     n_models = len(grouper)
-    fig, axes = plt.subplots(ncols=2, nrows=2, figsize=(16, 4*n_models))
-    # labels = sorted(d['gene'].unique())
+
+    fig = plt.figure(figsize=(32, 4*n_models))
+    plot_dims = (n_models, 3)
+
+    labels = dat['gene'].unique()
+    timestamp_lim = (dat['timestamp'].min() - 1, dat['timestamp'].max() + 1)
 
     for row, (inferrer, dat) in enumerate(grouper):
-        # Timeseries plot
-        ax = axes[row, 0]
-        _ = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean').plot(kind='line', marker='o', legend=False, ax=ax, rot=0)
-        ax.set_title('Bioactivity Metrics Timeseries (Mean over all Genes)') if ax.is_first_row() else ax.set_title('')
-        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
-        ax.set_xlabel('Timestamp') if ax.is_last_row() else ax.set_xlabel('')
-        
-        ax = axes[row, 1]
+        # Line plot of last timestep
+        ax = plt.subplot2grid(plot_dims, (row, 0), colspan=2)
         last_timestep = dat.sort_values('timestamp').groupby(['inferrer', 'gene', 'model']).last().reset_index()
-        _ = last_timestep.pivot(columns=['model'], values='value', index='gene').plot(kind='bar', width=0.8, legend=True, ax=ax, rot=70)
-        # ax.set_xticklabels(labels) # TODO figure out how to align genes if they're different 
-        
-        ax.set_title('Bioactivity Metrics (Latest)') if ax.is_first_row() else ax.set_title('')
-        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
-        ax.set_xlabel('Gene') if ax.is_last_row() else ax.set_xlabel('')
-    
-    fig = plt.gcf()
-    fig.legend(loc=7)
+        last_timestep = last_timestep.pivot(columns=['model'], values='value', index='gene')
+        _ = last_timestep.plot(kind='line', marker='o', legend=False, ax=ax, rot=70)
+        ax.set_xlim(-0.5, len(labels) + 0.5)
+        ax.set_xticks(range(0, len(last_timestep)))
+        ax.set_xticklabels(labels, fontsize='8') # TODO figure out how to align genes if they're different
+        ax.set(title='Bioactivity Prediction (Most Recent Benchmark)', xlabel='Gene', ylabel=f'{inferrer}\nMSE Ratio')
+
+        # Timeseries plot
+        ax = plt.subplot2grid(plot_dims, (row, 2))
+        timeseries = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean')
+        legend = True if row == 0 else false
+        _ = timeseries.plot(kind='line', marker='o', legend=legend, ax=ax, rot=0)
+        ax.set_xlim(*timestamp_lim)
+        ax.set(title='Bioactivity Timeseries (Mean over all Genes)', xlabel='Timestamp', ylabel=f'{inferrer}\nMSE Average Ratio')
+
     plt.tight_layout()
     fig.savefig(os.path.join(output_dir, 'Bioactivity_Aggregated_Benchmark.png'), dpi=300)
 

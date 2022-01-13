@@ -11,6 +11,12 @@ from cuchembm.datasets.bioactivity import ExCAPEDataset
 
 MODEL_RENAME_REGEX = re.compile(r"""(?:cuchembm.inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""")
 
+
+PHYSCHEM_UNIT_RENAMER = {'logD': 'Lipophilicity (log[D])', 
+                         'log_solubility_(mol_per_L)': 'ESOL (log[solubility], mol/L)', 
+                         'hydration_free_energy': 'FreeSolv (hydration energy, deltaH)'}
+                         
+
 def load_aggregated_metric_results(output_dir):
     """Load aggregated metric results from CSV files"""
     custom_date_parser = lambda x: datetime.strptime(x, "%Y%m%d_%H%M%S")
@@ -99,5 +105,4 @@ def load_plot_data(pkl_path, input_data, group_col):
     results_data = pd.concat(results_data, axis=0)
     results_data['inferrer'] = results_data['inferrer'].str.extract(MODEL_RENAME_REGEX, expand=False)
     results_data = results_data.set_index(['property', 'inferrer', 'model', 'value']).stack().reset_index().rename(columns={'level_4':'feature', 0:'prediction'})
-    results_data['row'] = results_data.apply(lambda x: ', '.join([x['property'], x['inferrer']]), axis=1)
     return results_data

@@ -3,7 +3,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import os
 import pandas as pd
-from .data import (load_aggregated_metric_results, 
+from .data import (PHYSCHEM_UNIT_RENAMER,
+                   load_aggregated_metric_results, 
                    load_physchem_input_data, 
                    load_bioactivity_input_data, 
                    load_plot_data)
@@ -34,13 +35,19 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
         index_cols = ['inferrer', 'gene', 'model']
         output_path = os.path.join(output_dir, 'Bioactivity_Single_Gene_Plots.pdf')
 
+    keep_cols = index_cols + ['fingerprint_error', 'embedding_error']
+
     input_data = input_data_func(max_seq_len=max_seq_len)
     pred_data = load_plot_data(pkl_path=pkl_path, input_data=input_data, group_col=group_col)
 
     metric_df = load_aggregated_metric_results(output_dir)
     metric_df = metric_df[metric_df['name'] == plot_type].dropna(axis=1, how='all')
 
-    keep_cols = index_cols + ['fingerprint_error', 'embedding_error']
+    if plot_type == 'physchem':
+        pred_data['property'] = pred_data['property'].map(lambda x: PHYSCHEM_UNIT_RENAMER[x])
+        metric_df['property'] = metric_df['property'].map(lambda x: PHYSCHEM_UNIT_RENAMER[x])
+
+    pred_data['row'] = pred_data.apply(lambda x: '+'.join([x['property'], x['inferrer']]), axis=1)
     metric_df = metric_df[keep_cols].set_index(index_cols)
 
     with PdfPages(output_path) as pdf:
@@ -62,10 +69,10 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
             g.add_legend(handletextpad=0.01, borderpad=0.02, frameon=True)
 
             legend_data = g._legend_data
-            legend_colors = dict([(x, y.get_facecolor()) for x,y in legend_data.items()])
+            legend_colors = dict([(x, y.get_facecolor()) for x, y in legend_data.items()])
 
             for (row, model), ax in g.axes_dict.items():
-                prop, inferrer = row.split(', ')
+                prop, inferrer = row.split('+')
                 error_vals = metric_df.loc[inferrer, prop, model]
 
                 if ax.is_first_row():

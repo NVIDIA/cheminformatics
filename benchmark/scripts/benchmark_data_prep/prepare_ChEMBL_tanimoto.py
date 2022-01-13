@@ -18,25 +18,26 @@ import os
 import logging
 import numpy as np
 import pandas as pd
-from cuchemcommon.data.helper.chembldata import ChEmblData # TODO RAJESH if this is problematic to refactor, let's talk. Could skip porting the scripts.
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchembm.utils.chembldata import ChEmblData
+from cuchembm.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
-DATA_BENCHMARK_DIR = '/workspace/cuchem/cuchem/cheminformatics/data'
+DATA_BENCHMARK_DIR = '/workspace/benchmark/scripts/data'
 DEFAULT_MAX_SEQ_LEN = 512
 
 if __name__ == '__main__':
 
     num_samples = 20000
-    benchmark_df = pd.DataFrame(ChEmblData.fetch_random_samples(num_samples, DEFAULT_MAX_SEQ_LEN))
+    benchmark_df = pd.DataFrame(ChEmblData().fetch_random_samples(num_samples, DEFAULT_MAX_SEQ_LEN))
     benchmark_df.rename(columns={'len': 'length'}, inplace=True)
 
     # TODO: benchmark SMILES have not been canonicalized. Should this be done?
-    fp = calc_morgan_fingerprints(benchmark_df)
+    print(benchmark_df.head())
+    fp = calc_morgan_fingerprints(benchmark_df, smiles_col=1)
     fp.columns = fp.columns.astype(np.int64)
     fp.index = benchmark_df.index.astype(np.int64) # TODO is this needed?
-    
+
     for col in fp.columns:
         fp[col] = fp[col].astype(np.int) # TODO is this needed?
         # fp[col] = fp[col].astype(np.float32)

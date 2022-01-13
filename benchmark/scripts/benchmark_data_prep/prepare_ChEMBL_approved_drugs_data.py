@@ -19,16 +19,16 @@ import logging
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchemcommon.data.helper.chembldata import ChEmblData
-from cuchemcommon.fingerprint import calc_morgan_fingerprints
+from cuchembm.utils.chembldata import ChEmblData
+from cuchembm.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent.parent,
-                                  'tests', 'data')
+                                  'scripts', 'data')
 
 if __name__ == '__main__':
-    results = ChEmblData(fp_type=None).fetch_approved_drugs(with_labels=True)
+    results = ChEmblData().fetch_approved_drugs(with_labels=True)
     benchmark_df = pd.DataFrame(results[0], columns=results[1])
 
     # TODO: benchmark SMILES have not been explicitly canonicalized with RDKit. Should this be done?

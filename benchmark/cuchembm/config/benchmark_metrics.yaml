@@ -25,34 +25,33 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_test_2.sqlite3
-  concurrent_requests: 10
+  db: /data/db/megamolbart_samples_r0.75.sqlite3
+  concurrent_requests: 35
 
 output:
   path: /data/benchmark_output/
 
 metric:
   validity:
-    enabled: False
-    input_size: 100
+    enabled: True
+    input_size: 20000
     radius:
-      - 1
-      # - 2
+      - 0.75
 
   unique:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: True
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
-    enabled: False
+    enabled: True
     input_size: -1
     top_k:
       - 50
@@ -61,7 +60,7 @@ metric:
 
   modelability:
     physchem:
-      enabled: False
+      enabled: True
       input_size: -1
       n_splits: 20
       normalize_inputs: True

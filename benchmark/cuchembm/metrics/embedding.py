@@ -58,7 +58,7 @@ def get_model_dict():
         rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0) # n_streams=12 -- did not seem to improve runtime
     else:
         rf_estimator = RandomForestRegressor(criterion='mse', random_state=0)
-    rf_param_dict = {'n_estimators': [10, 50, 100, 150, 200]}
+    rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
     return {'linear_regression': [lr_estimator, lr_param_dict],
             'elastic_net': [en_estimator, en_param_dict],
@@ -229,7 +229,7 @@ class Modelability(BaseEmbeddingMetric):
         if normalize_inputs:
             self.norm_data, self.norm_prop = StandardScaler(), StandardScaler()
         else:
-            self.norm_data, self.norm_prop = False, False
+            self.norm_data, self.norm_prop = None, None
 
     def variations(self, model_dict=None, **kwargs):
         if model_dict:
@@ -246,22 +246,52 @@ class Modelability(BaseEmbeddingMetric):
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
             logger.info(f"Grid search param {param}")
+
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
+
             for train_idx, test_idx in kfold_gen.split(xdata, ydata):
                 xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
 
+                if self.norm_data is not None:
+                    xtrain, xtest = xtrain.copy(), xtest.copy() # Prevent repeated transforms of same data in memory
+                    xtrain = self.norm_data.fit_transform(xtrain) # Must fit transform here to avoid test set leakage
+                    xtest = self.norm_data.transform(xtest)
+
+                if self.norm_prop is not None:
+                    ytrain, ytest = ytrain.copy(), ytest.copy()
+                    ytrain = self.norm_prop.fit_transform(ytrain[:, xpy.newaxis]).squeeze()
+                    ytest = self.norm_prop.transform(ytest[:, xpy.newaxis]).squeeze()
+
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
-                mse = mean_squared_error(ypred, ytest).item() # NOTE: convert to negative MSE and maximize metric if SKLearn GridSearch is ever used
+
+                # Ensure error is calculated on untransformed data for external comparison
+                if self.norm_prop is not None:
+                    ytest_unxform = self.norm_prop.inverse_transform(ytest[:, xpy.newaxis]).squeeze()
+                    ypred_unxform = self.norm_prop.inverse_transform(ypred[:, xpy.newaxis]).squeeze()
+                else:
+                    ytest_unxform, ypred_unxform = ytest, ypred
+
+                # NOTE: convert to negative MSE and maximize metric if SKLearn GridSearch is ever used
+                mse = mean_squared_error(ypred_unxform, ytest_unxform).item() 
                 kfold_mse.append(mse)
 
             avg_mse = np.nanmean(np.array(kfold_mse))
             if avg_mse < best_score:
                 best_score, best_param = avg_mse, param
-                if self.return_predictions:
-                    best_pred = estimator.predict(xdata)
+
+        if self.return_predictions:
+            xdata_pred = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
+            ydata_pred = self.norm_prop.fit_transform(ydata[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else ydata
+
+            estimator.set_params(**best_param)
+            estimator.fit(xdata_pred, ydata_pred)
+
+            best_pred = estimator.predict(xdata_pred)
+            best_pred = self.norm_prop.inverse_transform(best_pred[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else best_pred
+
         return best_score, best_param, best_pred
 
     def _calculate_metric(self, embeddings, fingerprints, estimator, param_dict):
@@ -271,22 +301,12 @@ class Modelability(BaseEmbeddingMetric):
         prop_name = properties.columns[0]
         properties = xpy.asarray(properties[prop_name], dtype=xpy.float32)
 
-        if self.norm_data:
-            embeddings = self.norm_data.fit_transform(embeddings)
-        if self.norm_prop:
-            properties = self.norm_prop.fit_transform(properties[xpy.newaxis, :]).squeeze()
-
         embedding_error, embedding_param, embedding_pred = self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
         fingerprint_error, fingerprint_param, fingerprint_pred = self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
+        ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
         if self.return_predictions & RAPIDS_AVAILABLE:
             embedding_pred, fingerprint_pred = xpy.asnumpy(embedding_pred), xpy.asnumpy(fingerprint_pred)
-
-        ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
-
-        if (self.norm_prop is not False) & self.return_predictions:
-            fingerprint_pred = self.norm_prop.inverse_transform(fingerprint_pred[xpy.newaxis, :]).squeeze()
-            embedding_pred = self.norm_prop.inverse_transform(embedding_pred[xpy.newaxis, :]).squeeze()
 
         results = {'value': ratio,
                    'fingerprint_error': fingerprint_error,
@@ -374,7 +394,7 @@ class Modelability(BaseEmbeddingMetric):
 
     def calculate(self, estimator, param_dict, **kwargs):
 
-        logger.info(f'Processing for gene {self.label}...')
+        logger.info(f'Processing {self.label}...')
         cache = Cache()
         embeddings = cache.get_data(f'Modelability_{self.label}_embeddings')
         if embeddings is None:

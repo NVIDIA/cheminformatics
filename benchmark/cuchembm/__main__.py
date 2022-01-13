@@ -16,11 +16,6 @@ from cuchembm.datasets.physchem import (ChEMBLApprovedDrugs,
                                         MoleculeNetLipophilicity)
 from cuchembm.datasets.bioactivity import ExCAPEDataset
 
-# Data caches # TODO RAJESH can these be removed here and in commented lines below?
-# from cuchembm.data import (PhysChemEmbeddingData,
-#                            BioActivityEmbeddingData,
-#                            ChEMBLApprovedDrugsEmbeddingData)
-
 # Metrics
 from cuchembm.metrics import (Validity,
                               Unique,
@@ -188,7 +183,6 @@ def main(cfg):
                                MoleculeNetFreeSolv(max_seq_len=max_seq_len),
                                MoleculeNetLipophilicity(max_seq_len=max_seq_len)]
 
-        # embedding_cache = PhysChemEmbeddingData()
         n_splits = metric_cfg.n_splits
 
         for smiles_dataset in smiles_dataset_list:

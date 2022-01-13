@@ -118,7 +118,6 @@ def make_nearest_neighbor_plot(embedding_df, output_dir):
 
 def make_physchem_plots(embedding_df, output_dir, max_plot_ratio=50):
     """Plots of phychem property results"""
-    # TODO convert xaxis label from units to property
     dat = embedding_df[embedding_df.name == 'physchem']
     dat['property'] = dat['property'].map(lambda x: PHYSCHEM_UNIT_RENAMER[x])
     dat = dat[['timestamp', 'inferrer', 'property', 'model', 'value']]
@@ -182,7 +181,7 @@ def make_bioactivity_plots(embedding_df, output_dir):
         _ = last_timestep.plot(kind='line', marker='o', legend=False, ax=ax, rot=70)
         ax.set_xlim(-0.5, len(labels) + 0.5)
         ax.set_xticks(range(0, len(last_timestep)))
-        ax.set_xticklabels(labels, fontsize='8') # TODO figure out how to align genes if they're different
+        ax.set_xticklabels(labels, fontsize='8')
         ax.set(title='Bioactivity Prediction (Most Recent Benchmark)', xlabel='Gene', ylabel=f'{inferrer}\nMSE Ratio')
 
         # Timeseries plot

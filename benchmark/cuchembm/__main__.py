@@ -16,7 +16,7 @@ from cuchembm.datasets.physchem import (ChEMBLApprovedDrugs,
                                         MoleculeNetLipophilicity)
 from cuchembm.datasets.bioactivity import ExCAPEDataset
 
-# Data caches
+# Data caches # TODO RAJESH can these be removed here and in commented lines below?
 # from cuchembm.data import (PhysChemEmbeddingData,
 #                            BioActivityEmbeddingData,
 #                            ChEMBLApprovedDrugsEmbeddingData)
@@ -270,8 +270,6 @@ def main(cfg):
                                      concurrent_requests=cfg.sampling.concurrent_requests)
     generator.conn.close()
 
-
-
     for metric_dict in metric_list:
         metric_key, metric = list(metric_dict.items())[0]
         iter_dict = metric.variations(cfg=cfg)
@@ -305,7 +303,7 @@ def main(cfg):
             result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
             result['run_time'] = run_time
             result['timestamp'] = timestamp
-            #TODO: inputsize as dataset size is bad assumption
+            # TODO: inputsize as dataset size is bad assumption
             result['data_size'] = len(metric)
 
             # Updates to irregularly used arguments
@@ -323,11 +321,10 @@ def main(cfg):
         save_metric_results(cfg.model.name, result_list, output_dir, return_predictions=return_predictions)
         metric.cleanup()
 
-
     # Plotting
-    # create_aggregated_plots(output_dir)
-    # make_model_plots(max_seq_len, 'physchem', output_dir)
-    # make_model_plots(max_seq_len, 'bioactivity', output_dir)
+    create_aggregated_plots(output_dir) # TODO: improve test handling if specific metric data is absent
+    make_model_plots(max_seq_len, 'physchem', output_dir)
+    make_model_plots(max_seq_len, 'bioactivity', output_dir)
 
 
 if __name__ == '__main__':

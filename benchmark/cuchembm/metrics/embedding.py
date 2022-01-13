@@ -241,10 +241,6 @@ class Modelability(BaseEmbeddingMetric):
         logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
-        # Normalize data if required
-        xdata_xform = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
-        ydata_xform = self.norm_prop.fit_transform(ydata[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else ydata
-
         best_score, best_param, best_pred = np.inf, None, None
         # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
@@ -253,13 +249,21 @@ class Modelability(BaseEmbeddingMetric):
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
-            for train_idx, test_idx in kfold_gen.split(xdata_xform, ydata_xform):
-                xtrain, xtest, ytrain, ytest = xdata_xform[train_idx], xdata_xform[test_idx], ydata_xform[train_idx], ydata_xform[test_idx]
+            for train_idx, test_idx in kfold_gen.split(xdata, ydata):
+                xtrain, xtest, ytrain, ytest = xdata[train_idx], xdata[test_idx], ydata[train_idx], ydata[test_idx]
+
+                if self.norm_data is not None:
+                    xtrain = self.norm_data.fit_transform(xtrain) # Must fit transform here to avoid test set leakage
+                    xtest = self.norm_data.transform(xtest)
+
+                if self.norm_prop is not None:
+                    ytrain = self.norm_data.fit_transform(ytrain)
+                    ytest = self.norm_data.transform(ytest)  
 
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
 
-                # Ensure error is calculated on untransformed data
+                # Ensure error is calculated on untransformed data for external comparison
                 if self.norm_prop is not None:
                     ytest_unxform = self.norm_prop.inverse_transform(ytest[:, xpy.newaxis]).squeeze()
                     ypred_unxform = self.norm_prop.inverse_transform(ypred[:, xpy.newaxis]).squeeze()
@@ -274,6 +278,7 @@ class Modelability(BaseEmbeddingMetric):
             if avg_mse < best_score:
                 best_score, best_param = avg_mse, param
                 if self.return_predictions:
+                    xdata = self.norm_data.transform(xdata) if self.norm_data is not None else xdata
                     best_pred = estimator.predict(xdata)
                     best_pred = self.norm_prop.inverse_transform(best_pred[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else best_pred
         return best_score, best_param, best_pred
@@ -378,7 +383,7 @@ class Modelability(BaseEmbeddingMetric):
 
     def calculate(self, estimator, param_dict, **kwargs):
 
-        logger.info(f'Processing for gene {self.label}...')
+        logger.info(f'Processing {self.label}...')
         cache = Cache()
         embeddings = cache.get_data(f'Modelability_{self.label}_embeddings')
         if embeddings is None:

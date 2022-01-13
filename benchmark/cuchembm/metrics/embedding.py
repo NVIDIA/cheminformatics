@@ -284,7 +284,7 @@ class Modelability(BaseEmbeddingMetric):
 
                 if self.return_predictions:
                     xdata_pred = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
-                    ydata_pred = self.norm_prop.fit_transform(ydata) if self.norm_prop is not None else ydata
+                    ydata_pred = self.norm_prop.fit_transform(ydata[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else ydata
 
                     estimator.set_params(**best_param)
                     estimator.fit(xdata_pred, ydata_pred)

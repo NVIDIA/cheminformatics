@@ -114,17 +114,19 @@ class BaseEmbeddingMetric():
         """Encode a single SMILES to embedding from model"""
         embedding, dim = self._find_embedding(smiles)
         embedding = xpy.array(embedding).reshape(dim).squeeze()
+        n_dim = embedding.ndim
 
         if zero_padded_vals:
-            if dim == 2:
+            if n_dim == 2:
                 embedding[len(smiles):, :] = 0.0
             else:
                 embedding[len(smiles):] = 0.0
 
-        if average_tokens:
-            embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
-        else:
-            embedding = embedding.flatten()
+        if n_dim == 2:
+            if average_tokens:
+                embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
+            else:
+                embedding = embedding.flatten()
 
         return embedding
 
@@ -340,7 +342,6 @@ class Modelability(BaseEmbeddingMetric):
                     ON {tmp_table} (smiles);
                 ''')
 
-
         # Insert data into temp table if not already inserted
         result = self.conn.execute(f'SELECT count(*) FROM {tmp_table}').fetchone()
         if result[0] == 0:
@@ -398,10 +399,7 @@ class Modelability(BaseEmbeddingMetric):
         cache = Cache()
         embeddings = cache.get_data(f'Modelability_{self.label}_embeddings')
         if embeddings is None:
-            # if self.data_file is None:
             embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
-            # else:
-            #     embeddings = self.encode_bulk(zero_padded_vals=False, average_tokens=True)
             embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
             fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
 
@@ -409,6 +407,10 @@ class Modelability(BaseEmbeddingMetric):
             cache.set_data(f'Modelability_{self.label}_fingerprints', fingerprints)
         else:
             fingerprints = cache.get_data('Modelability_' + self.label + '_fingerprints')
+
+        assert embeddings.ndim == 2, AssertionError('Embeddings are not of dimension 2')
+        assert fingerprints.ndim == 2, AssertionError('Fingerprints are not of dimension 2')
+        assert embeddings.shape[0] == fingerprints.shape[0], AssertionError('Number of samples in embeddings and fingerprints do not match')
 
         logger.info("Computing metric...")
         results = self._calculate_metric(embeddings,

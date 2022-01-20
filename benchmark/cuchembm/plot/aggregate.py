@@ -187,7 +187,7 @@ def make_bioactivity_plots(embedding_df, output_dir):
         # Timeseries plot
         ax = plt.subplot2grid(plot_dims, (row, 2))
         timeseries = dat.pivot_table(columns=['model'], values='value', index='timestamp', aggfunc='mean')
-        legend = True if row == 0 else false
+        legend = True if row == 0 else False
         _ = timeseries.plot(kind='line', marker='o', legend=legend, ax=ax, rot=0)
         ax.set_xlim(*timestamp_lim)
         ax.set(title='Bioactivity Timeseries (Mean over all Genes)', xlabel='Timestamp', ylabel=f'{inferrer}\nMSE Average Ratio')

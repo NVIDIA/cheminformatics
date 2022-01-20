@@ -52,7 +52,7 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
     pred_data['model'] = pred_data['model'].astype(model_dtype)
 
     metric_df = metric_df[keep_cols].set_index(index_cols)
-    assert metric_df.groupby(['inferrer', 'property', 'model']).size().max() == 1, AssertionError(f'Duplicate entries are present for {plot_type} metrics.')
+    assert metric_df.groupby(['inferrer', group_col, 'model']).size().max() == 1, AssertionError(f'Duplicate entries are present for {plot_type} metrics.')
 
     with PdfPages(output_path) as pdf:
         for pred_data_page in grouper(pred_data.groupby(['row']), n_plots_page):

@@ -195,9 +195,9 @@ def main(cfg):
                                                          cfg,
                                                          smiles_dataset,
                                                          smiles_dataset.table_name,
-                                                         n_splits,
-                                                         metric_cfg.return_predictions,
-                                                         metric_cfg.normalize_inputs)})
+                                                         n_splits=n_splits,
+                                                         return_predictions=metric_cfg.return_predictions,
+                                                         normalize_inputs=metric_cfg.normalize_inputs)})
 
     if cfg.metric.modelability.bioactivity.enabled:
         metric_cfg = cfg.metric.modelability.bioactivity

@@ -10,16 +10,7 @@ from rdkit.Chem import AllChem
 
 logger = logging.getLogger(__name__)
 
-try:
-    import cupy # TODO is there a better way to check for RAPIDS?
-except:
-    logger.info('RAPIDS installation not found. Numpy and pandas will be used instead.')
-    import numpy as xpy
-    import pandas as xdf
-else:
-    logger.info('RAPIDS installation found. Using cupy and cudf where possible.')
-    import cupy as xpy
-    import cudf as xdf
+import cupy
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -62,7 +53,7 @@ class MorganFingerprint(BaseTransformation):
             logger.warn(f'WARNING: Invalid SMILES identified {smiles}')
             fp = np.array([0 for _ in range(self.kwargs['nBits'])], dtype=np.uint8)
 
-        fp = xpy.asarray(fp)
+        fp = cupy.asarray(fp)
         return fp
 
     def transform(self, data, col_name='transformed_smiles'):
@@ -72,7 +63,7 @@ class MorganFingerprint(BaseTransformation):
         for smiles in data:
             fp = self.transform_single(smiles)
             fp_array.append(fp)
-        fp_array = xpy.stack(fp_array)
+        fp_array = cupy.stack(fp_array)
         return fp_array
 
     def __len__(self):

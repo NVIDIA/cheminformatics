@@ -25,7 +25,7 @@ def calculate_morgan_fingerprint(smiles, radius, nbits):
         mol = Chem.MolFromSmiles(smiles[i])
         if mol:
             fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=nbits)
-            fp = np.frombuffer(fp.ToBitString().encode(), 'b1')
+            fp = np.fromstring(fp.ToBitString(), 'u1') - ord('0')
         else:
             fp = np.zeros(nbits, dtype=bool)
 
@@ -67,7 +67,7 @@ def validate_smiles(smiles: str,
 
             if return_fingerprint:
                 fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=nbits)
-                fp = np.frombuffer(fp.ToBitString().encode(), 'b1')
+                fp = np.fromstring(fp.ToBitString(), 'u1') - ord('0')
         else:
             is_valid = False
             if return_fingerprint:

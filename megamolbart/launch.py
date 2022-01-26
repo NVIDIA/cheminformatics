@@ -16,15 +16,12 @@
 
 import os
 import sys
-import atexit
 import logging
 import shutil
 
 import logging
-import warnings
 import argparse
-
-from datetime import datetime
+from subprocess import run
 
 import grpc
 import generativesampler_pb2_grpc
@@ -70,18 +67,29 @@ class Launcher(object):
 
         logger.info(f'Maximum decoded sequence length is set to {args.max_decode_length}')
 
-        if not os.path.exists(DEFAULT_VOCAB_PATH):
-            os.makedirs(os.path.dirname(DEFAULT_VOCAB_PATH), exist_ok=True)
-            shutil.copy('/opt/MolBART/bart_vocab.txt', DEFAULT_VOCAB_PATH)
+        if not os.path.exists('/models/megamolbart/checkpoints/'):
+            self.download_megamolbart_model()
         from megamolbart.service import GenerativeSampler
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(GenerativeSampler(decoder_max_seq_len=args.max_decode_length), server)
+        generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(
+            GenerativeSampler(decoder_max_seq_len=args.max_decode_length), server)
         server.add_insecure_port(f'[::]:{args.port}')
         server.start()
         server.wait_for_termination()
 
-
+    def download_megamolbart_model(self):
+            """
+            Downloads MegaMolBART model from NGC.
+            """
+            download_script = '/opt/nvidia/megamolbart/scripts/download_model.sh'
+            if os.path.exists(download_script):
+                logger.info('Triggering model download...')
+                result = run(['bash', '-c', download_script])
+                logger.info(f'Model download result: {result.stdout}')
+                logger.info(f'Model download result: {result.stderr}')
+                if result.returncode != 0:
+                    raise Exception('Error downloading model')
 def main():
     Launcher()
 

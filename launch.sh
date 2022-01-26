@@ -105,7 +105,7 @@ build() {
     if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "2" ]]; then
         IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
         echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
-        docker build --no-cache --network host \
+        docker build --network host \
             -t ${MEGAMOLBART_CONT_BASENAME}:latest \
             -t ${MEGAMOLBART_CONT} \
             --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT} \

@@ -18,6 +18,7 @@ import os
 import sys
 import atexit
 import logging
+import shutil
 
 import logging
 import warnings
@@ -28,7 +29,7 @@ from datetime import datetime
 import grpc
 import generativesampler_pb2_grpc
 from concurrent import futures
-from megamolbart.service import GenerativeSampler
+from util import DEFAULT_VOCAB_PATH
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('megamolbart')
@@ -68,6 +69,11 @@ class Launcher(object):
             logger.setLevel(logging.DEBUG)
 
         logger.info(f'Maximum decoded sequence length is set to {args.max_decode_length}')
+
+        if not os.path.exists(DEFAULT_VOCAB_PATH):
+            os.makedirs(os.path.dirname(DEFAULT_VOCAB_PATH), exist_ok=True)
+            shutil.copy('/opt/MolBART/bart_vocab.txt', DEFAULT_VOCAB_PATH)
+        from megamolbart.service import GenerativeSampler
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(GenerativeSampler(decoder_max_seq_len=args.max_decode_length), server)

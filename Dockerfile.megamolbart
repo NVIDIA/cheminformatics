@@ -41,7 +41,10 @@ COPY common/generated ${CHEMINFO_HOME}/cuchemcommon/grpc
 COPY setup/env.sh ${CHEMINFO_HOME}/cuchemcommon/
 COPY setup/launch ${CHEMINFO_HOME}/cuchemcommon/
 
-ENV PYTHONPATH ${CHEMINFO_HOME}/common/generated:${CHEMINFO_HOME}/common:$PYTHONPATH
+# Comment this before production rollout
+COPY ./models/ /models
 
+ENV PYTHONPATH ${CHEMINFO_HOME}/cuchemcommon/grpc/:${CHEMINFO_HOME}/common:$PYTHONPATH
+ENV CHEMINFO_HOME ${CHEMINFO_HOME}
 COPY megamolbart/ ${CHEMINFO_HOME}/megamolbart/
 CMD cd ${CHEMINFO_HOME}/megamolbart && python3 -m megamolbart

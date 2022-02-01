@@ -14,18 +14,18 @@ model:
   # Please change following properties when changing model.name
   #   - sampling.concurrent_requests
   #   - model.params.url (50052 for lb grpc)
-  # name: CDDD
-  # training_data: /data/db/cddd_train.sqlit
+  name: CDDD
+  training_data: /data/db/cddd_train.sqlit
 
-  name:  cuchembm.inference.GrpcMegaMolBARTWrapper
-  training_data: /data/db/zinc_train.sqlite3
-  params:
-    url: nginx:50052
+  # name:  cuchembm.inference.GrpcMegaMolBARTWrapper
+  # training_data: /data/db/zinc_train.sqlite3
+  # params:
+  #   url: nginx:50052
 
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_1.0r.sqlite3
+  db: /data/db/embedding_cache_cddd.sqlite3
   concurrent_requests: 10
 
 output:
@@ -33,25 +33,25 @@ output:
 
 metric:
   validity:
-    enabled: True
+    enabled: False
     input_size: 20000
     radius:
-      - 0.75
+      - 1
 
   unique:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
-    remove_invalid: True
+    remove_invalid: False
     radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
-    enabled: True
+    enabled: False
     input_size: -1
     top_k:
       - 50

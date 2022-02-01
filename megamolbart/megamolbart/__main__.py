@@ -129,15 +129,16 @@ class Launcher(object):
         """
         Downloads MegaMolBART model from NGC.
         """
-        download_script = '/opt/nvidia/cuchemcommon/launch'
+        download_script = '/opt/nvidia/cheminfomatics/cuchemcommon/launch'
         if os.path.exists(download_script):
             logger.info('Triggering model download...')
             result = run(['bash', '-c',
-                          'cd /opt/nvidia/cuchemcommon/ && /opt/nvidia/cuchemcommon/launch download_model'])
+                          'cd /opt/nvidia/cheminfomatics/cuchemcommon/ && /opt/nvidia/cheminfomatics/cuchemcommon/launch download_model'])
             logger.info(f'Model download result: {result.stdout}')
             logger.info(f'Model download result: {result.stderr}')
             if result.returncode != 0:
                 raise Exception('Error downloading model')
+
 
 def main():
     Launcher()

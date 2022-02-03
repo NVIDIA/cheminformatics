@@ -72,7 +72,7 @@ class ChEmblData(object, metaclass=Singleton):
             cols = list(map(lambda x: x[0], cur.description))
             return cols, cur.fetchall()
 
-    def fetch_props_by_chemble(self, chemble_ids):
+    def fetch_props_by_chembl(self, chembl_ids):
         """
         Returns compound properties and structure filtered by ChEMBL IDs along
         with a list of columns.
@@ -88,7 +88,7 @@ class ChEmblData(object, metaclass=Singleton):
             """
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
-            select_stmt = sql_stml % "'%s'" % "','".join([x.strip().upper() for x in chemble_ids])
+            select_stmt = sql_stml % "'%s'" % "','".join([x.strip().upper() for x in chembl_ids])
             cur.execute(select_stmt)
 
             cols = list(map(lambda x: x[0], cur.description))
@@ -207,13 +207,18 @@ class ChEmblData(object, metaclass=Singleton):
 
             return cur.fetchone()[0]
 
-    def _meta_df(self, **transformation_kwargs):
+    def _meta_df(self, columns=[], **transformation_kwargs):
         transformation = self.fp_type(**transformation_kwargs)
 
         prop_meta = {'id': pandas.Series([], dtype='int64')}
         prop_meta.update(dict(zip(IMP_PROPS + ADDITIONAL_FEILD,
                                   IMP_PROPS_TYPE + ADDITIONAL_FEILD_TYPE)))
-        prop_meta.update({i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
+        prop_meta.update(
+            {i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
+        # New columns containing the fingerprint as uint64s:
+        for column in columns:
+            if isinstance(column, str) and column.startswith('fp'):
+                prop_meta.update({column: pandas.Series([], dtype='uint64')})
 
         return pandas.DataFrame(prop_meta)
 
@@ -226,7 +231,9 @@ class ChEmblData(object, metaclass=Singleton):
         Returns compound properties and structure for the first N number of
         records in a dataframe.
         """
-
+        # TODO: loading compounds from the database and computing fingerprints need to be separated
+        # We may need to recompute fingerprints but not reload compounds.
+        # TODO: user must be able to load compounds by specifying start and batch_size
         logger.info('Fetching %d records starting %d...' % (batch_size, start))
 
         imp_cols = ['cp.' + col for col in IMP_PROPS]
@@ -253,8 +260,9 @@ class ChEmblData(object, metaclass=Singleton):
                 LIMIT %d, %d
             ''' % (', '.join(imp_cols), " ,".join(list(map(str, molregnos))), start, batch_size)
 
-        df = pandas.read_sql(select_stmt,
-                             sqlite3.connect(self.chembl_db, uri=True))
+        df = pandas.read_sql(
+            select_stmt,
+            sqlite3.connect(self.chembl_db, uri=True))
 
         # Smiles -> Smiles transformation and filtering
         # TODO: Discuss internally to find use or refactor this code to remove
@@ -269,16 +277,22 @@ class ChEmblData(object, metaclass=Singleton):
         # Conversion to fingerprints or embeddings
         # transformed_smiles = df['transformed_smiles']
         transformation = self.fp_type(**transformation_kwargs)
-        cache_data = transformation.transform(df)
+        cache_data, raw_fp_list = transformation.transform(df, return_fp=True)
+        #cache_data = transformation.transform(df)
         return_df = pandas.DataFrame(cache_data)
-
         return_df = pandas.DataFrame(
             return_df,
             columns=pandas.RangeIndex(start=0,
                                       stop=len(transformation))).astype('float32')
 
         return_df = df.merge(return_df, left_index=True, right_index=True)
+        # TODO: expect to run into the issue that the fingerprint cannot be a cudf column
+        # TODO: compute here so that chemvisualize does not have to
+        #return_df['fp'] = raw_fp_list
+        for i, fp_col in enumerate(raw_fp_list):
+	        return_df[f'fp{i}'] = fp_col
         return_df.rename(columns={'molregno': 'id'}, inplace=True)
+        logger.info(f'_fetch_mol_embedding returning: {list(return_df.columns)}\n{return_df.head()}')
         return return_df
 
     def fetch_mol_embedding(self,

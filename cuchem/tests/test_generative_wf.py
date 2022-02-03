@@ -13,14 +13,14 @@ def interpolation(wf, num_points=20, force_unique=False):
 
     smiles = ['CHEMBL6328', 'CHEMBL415286']
     # smiles = ['CHEMBL10454', 'CHEMBL10469']
-    genreated_df = wf.interpolate_by_id(smiles,
+    generated_df = wf.interpolate_by_id(smiles,
                                         num_points=num_points,
                                         force_unique=force_unique)
 
-    genreated_df = MolecularStructureDecorator().decorate(genreated_df)
-    genreated_df = LipinskiRuleOfFiveDecorator().decorate(genreated_df)
-    logger.info(genreated_df.shape)
-    return genreated_df
+    generated_df = MolecularStructureDecorator().decorate(generated_df)
+    generated_df = LipinskiRuleOfFiveDecorator().decorate(generated_df)
+    logger.info(generated_df.shape)
+    return generated_df
 
 
 def test_cddd_interpolation():

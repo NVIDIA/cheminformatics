@@ -156,7 +156,7 @@ class BaseGenerativeWorkflow:
 
     def interpolate_by_id(self,
                           ids: List,
-                          id_type: str = 'chembleid',
+                          id_type: str = 'chemblid',
                           num_points=10,
                           force_unique=False,
                           scaled_radius: int = 1):
@@ -165,21 +165,56 @@ class BaseGenerativeWorkflow:
         if not self.min_jitter_radius:
             raise Exception('Property `radius_scale` must be defined in model class.')
 
-        if id_type.lower() == 'chembleid':
+        if id_type.lower() == 'chemblid':
             smiles = [row[2] for row in self.dao.fetch_id_from_chembl(ids)]
             if len(smiles) != len(ids):
                 raise Exception('One of the ids is invalid %s', ids)
         else:
             raise Exception('id type %s not supported' % id_type)
 
-        return self.interpolate_smiles(smiles,
-                                       num_points=num_points,
-                                       scaled_radius=scaled_radius,
-                                       force_unique=force_unique)
+        return self.interpolate_smiles(
+            smiles,
+            compound_ids=ids,
+            num_points=num_points,
+            scaled_radius=scaled_radius,
+            force_unique=force_unique
+        )
+
+    def extrapolate_from_cluster(self,
+                                  compounds_df,
+                                  compound_property: str,
+                                  cluster_id: int = 0,
+                                  n_compounds_to_transform=10,
+                                  num_points: int = 10,
+                                  step_size: float = 0.01,
+                                  force_unique = False,
+                                  scaled_radius: int = 1):
+         """
+         The embedding vector is calculated for the specified cluster_id and applied over it.
+         TO DO: We should have a table of direction vectors in embedded space listed, just like the list of compoun    d IDs.
+         The user should choose one to be applied to the selected compounds, or to a cluster number.
+         """
+         smiles_list = None
+
+         if not self.radius_scale:
+             raise Exception('Property `radius_scale` must be defined in model class.')
+         else:
+             radius = float(scaled_radius * self.radius_scale)
+         # TO DO: User must be able to extrapolate directly from smiles in the table;
+         # these may themselves be generated compounds without any chemblid.
+         df_cluster = compounds_df[ compounds_df['cluster'] == cluster_id ].dropna().reset_index(drop=True).compute    ()
+         return self.extrapolate_from_smiles(df_cluster['transformed_smiles'].to_array(),
+                                             compound_property_vals=df_cluster[compound_property].to_array(),
+                                             num_points=num_points,
+                                             n_compounds_to_transform=n_compounds_to_transform,
+                                             step_size=step_size,
+                                             radius=scaled_radius,
+                                             force_unique=force_unique)
+
 
     def find_similars_smiles_by_id(self,
-                                   chemble_id: str,
-                                   id_type: str = 'chembleid',
+                                   chembl_id: str,
+                                   id_type: str = 'chemblid',
                                    num_requested=10,
                                    force_unique=False,
                                    scaled_radius: int = 1):
@@ -188,14 +223,17 @@ class BaseGenerativeWorkflow:
         if not self.min_jitter_radius:
             raise Exception('Property `radius_scale` must be defined in model class.')
 
-        if id_type.lower() == 'chembleid':
-            smiles = [row[2] for row in self.dao.fetch_id_from_chembl(chemble_id)]
-            if len(smiles) != len(chemble_id):
-                raise Exception('One of the ids is invalid %s' + chemble_id)
+        if id_type.lower() == 'chemblid':
+            smiles = [row[2] for row in self.dao.fetch_id_from_chembl(chembl_id)]
+            if len(smiles) != len(chembl_id):
+                raise Exception('One of the ids is invalid %s' + chembl_id)
         else:
             raise Exception('id type %s not supported' % id_type)
 
-        return self.find_similars_smiles(smiles[0],
-                                         num_requested=num_requested,
-                                         scaled_radius=scaled_radius,
-                                         force_unique=force_unique)
+        return self.find_similars_smiles(
+            smiles[0],
+            num_requested=num_requested,
+            scaled_radius=scaled_radius,
+            force_unique=force_unique,
+            compound_id=str(chembl_id)
+        )

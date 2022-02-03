@@ -31,13 +31,17 @@ from cuml.metrics import mean_squared_error
 from math import sqrt
 
 logger = logging.getLogger(__name__)
+PAD_TOKEN = 0 # TODO: use tokenizer.pad_token instead
 
 
 class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(None)) -> None:
         super().__init__(dao)
-
+        if torch.cuda.is_available():
+            self.device = 'cuda'
+        else:
+            self.device = 'cpu' 
         self.min_jitter_radius = 1
         channel = grpc.insecure_channel(os.getenv('Megamolbart', 'megamolbart:50051'))
         self.stub = GenerativeSamplerStub(channel)
@@ -74,7 +78,8 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                              num_requested: int = 10,
                              scaled_radius=None,
                              force_unique=False,
-                             sanitize=True):
+                             sanitize=True,
+                             compound_id=None):
         spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
                               smiles=smiles,
                               radius=scaled_radius,
@@ -89,20 +94,33 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         for embedding in result.embeddings:
             embeddings.append(list(embedding.embedding))
             dims.append(embedding.dim)
-
-        generated_df = pd.DataFrame({'SMILES': generatedSmiles,
-                                     'embeddings': embeddings,
-                                     'embeddings_dim': dims,
-                                     'Generated': [True for i in range(len(generatedSmiles))]})
-        generated_df['Generated'].iat[0] = False
+        if not compound_id:
+            compound_id = 'source'
+        generated_df = pd.DataFrame({
+            'SMILES': generatedSmiles,
+            'embeddings': embeddings,
+            'embeddings_dim': dims,
+            'Generated': [False] + [True] * (len(generatedSmiles) - 1),
+            'id': [
+                str(compound_id)] + [f'{compound_id}-g{i + 1}' 
+                for i in range(len(generatedSmiles) - 1)
+            ],
+        })
+        #generated_df['Generated'].iat[0] = False
 
         return generated_df
 
-    def interpolate_smiles(self,
-                           smiles: List,
-                           num_points: int = 10,
-                           scaled_radius=None,
-                           force_unique=False):
+    def interpolate_smiles(
+        self,
+        smiles: List,
+        num_points: int = 10,
+        scaled_radius=None,
+        force_unique=False,
+        compound_ids=[]
+    ):
+        if len(compound_ids) == 0:
+            compound_ids = [f'source{i}' for i in range(len(smiles))]
+
         spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
                               smiles=smiles,
                               radius=scaled_radius,
@@ -111,11 +129,27 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
 
         result = self.stub.Interpolate(spec)
         result = result.generatedSmiles
-
-        generated_df = pd.DataFrame({'SMILES': result,
-                                     'Generated': [True for i in range(len(result))]})
-        generated_df.iat[0, 1] = False
-        generated_df.iat[-1, 1] = False
+        n_pairs = len(compound_ids) - 1
+        n_generated = num_points + 2
+        n_generated_total = n_generated * n_pairs
+        assert len(result) == n_generated_total, f"Expected generator to return {n_generated} compounds between each of the {n_pairs} compound-pairs but got {len(result)}"
+        generated_df = pd.DataFrame({
+            'SMILES': result,
+            'Generated': [
+                i % n_generated not in [0, n_generated - 1]
+                for i in range(n_generated_total)
+            ],
+            'id': [
+                str(compound_ids[i // n_generated]) if i % n_generated == 0 
+                else str(compound_ids[1 + i // n_generated]) if i % n_generated == n_generated - 1  
+                else f'{compound_ids[i // n_generated]}-{compound_ids[1 + i // n_generated]}_i{i % n_generated}' 
+                for i in range(n_generated_total)
+            ],
+        })
+        #generated_df = pd.DataFrame({'SMILES': result,
+        #                             'Generated': [True for i in range(len(result))]})
+        #generated_df.iat[0, 1] = False
+        #generated_df.iat[-1, 1] = False
         return generated_df
 
    
@@ -239,8 +273,8 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         avg_tani = 0
         embeddings = []
         for i, smiles in enumerate(smiles_list):
-            spec = generativesampler_pb2.GenerativeSpec(
-                model=generativesampler_pb2.GenerativeModel.MegaMolBART,
+            spec = GenerativeSpec(
+                model=GenerativeModel.MegaMolBART,
                 smiles=smiles,
             )
             result = self.stub.SmilesToEmbedding(spec)
@@ -248,7 +282,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
             mask = result.pad_mask
             emb_shape = result.dim
             if debug:
-                spec = generativesampler_pb2.EmbeddingList(
+                spec = EmbeddingList(
                     embedding=emb,
                     dim=emb_shape,
                     pad_mask=mask
@@ -311,7 +345,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                 extrap_embedding = list(extrap_embeddings[i,:])
                 logger.info(f'embedding: {type(extrap_embedding)}, {len(extrap_embeddings)};'\
                             f' dim: {type(emb_shape)}, {len(emb_shape)}; pad_mask={type(full_mask)}, {len(full_mask)}')
-                spec = generativesampler_pb2.EmbeddingList(
+                spec = EmbeddingList(
                     embedding=extrap_embedding,
                     dim=emb_shape,
                     pad_mask=full_mask
@@ -363,8 +397,12 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         the train and test set.
         """
         logger.info(f'cluster_id_train={cluster_id_train}, cluster_id_test={cluster_id_test}, compound_property={compound_property}, compounds_df: {len(compounds_df)}, {type(compounds_df)}')
-        df_train = compounds_df[ compounds_df['cluster'] == int(cluster_id_train) ].dropna().reset_index(drop=True).compute()
-        df_test = compounds_df[ compounds_df['cluster'] == int(cluster_id_test) ].dropna().reset_index(drop=True).compute()
+        df_train = compounds_df[ compounds_df['cluster'] == int(cluster_id_train) ].dropna().reset_index(drop=True)#.compute()
+        if hasattr(df_train, 'compute'): 
+            df_train = df_train.compute()
+        df_test = compounds_df[ compounds_df['cluster'] == int(cluster_id_test) ].dropna().reset_index(drop=True)#.compute()
+        if hasattr(df_test, 'compute'):
+            df_test = df_test.compute()
         n_train = len(df_train)
         n_test = len(df_test)
 
@@ -382,8 +420,8 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         #radius = self._compute_radius(scaled_radius)
 
         for i, smiles in enumerate(smiles_list):
-            spec = generativesampler_pb2.GenerativeSpec(
-                model=generativesampler_pb2.GenerativeModel.MegaMolBART,
+            spec = GenerativeSpec(
+                model=GenerativeModel.MegaMolBART,
                 smiles=smiles,
                 #radius=radius
             )
@@ -396,7 +434,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
             #emb = emb[2:]
 
             if debug:
-                spec = generativesampler_pb2.EmbeddingList(
+                spec = EmbeddingList(
                     embedding=emb,
                     dim=emb_shape,
                     pad_mask=mask
@@ -420,7 +458,8 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
             logger.info(f'{n_recovered} / {len(smiles_list)} compounds yielded something after embedding, with avg tani = {avg_tani / n_recovered if n_recovered > 0 else 0}')
         
         #full_mask = full_mask.bool().cuda()
-        embeddings = torch.nn.utils.rnn.pad_sequence(embeddings, batch_first=True, padding_value=PAD_TOKEN)
+        embeddings = torch.nn.utils.rnn.pad_sequence(
+            embeddings, batch_first=True, padding_value=PAD_TOKEN)
         embeddings_train = embeddings[:n_train,:]
         embeddings_test = embeddings[n_train:,:]
         logger.info(f'emb train: {type(embeddings_train)} of {type(embeddings_train[0])}, {embeddings_train.shape}')

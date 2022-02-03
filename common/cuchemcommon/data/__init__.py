@@ -12,16 +12,16 @@ class ClusterWfDAO(object):
         """
         return NotImplemented
 
-    def fetch_molecular_embedding(self, n_molecules: int, cache_directory: str = None):
+    def fetch_molecular_embedding(self, n_molecules: int, cache_directory: str = None, radius = 2, nBits = 512):
         """
         Fetch molecular properties from database/cache into a dask array.
         """
         return NotImplemented
 
-    def fetch_molecular_embedding_by_id(self, molecule_id: List):
+    def fetch_molecular_embedding_by_id(self, molecule_id: List, radius=2, nBits=512):
         """
         Fetch molecular properties from database for the given id. Id depends on
-        the backend databse. For chemble DB it should be molregid.
+        the backend databse. For chembl DB it should be molregid.
         """
         return NotImplemented
 
@@ -29,7 +29,7 @@ class ClusterWfDAO(object):
         """
         Fetch molecular details for a list of molecules. The values in the list
         of molecules depends on database/service used. For e.g. it could be
-        ChemblId or molreg_id for Chemble database.
+        ChemblId or molreg_id for Chembl database.
         """
         return NotImplemented
 
@@ -40,6 +40,6 @@ class GenerativeWfDao(object):
         """
         Fetch molecular details for a list of molecules. The values in the list
         of molecules depends on database/service used. For e.g. it could be
-        ChemblId or molreg_id for Chemble database.
+        ChemblId or molreg_id for Chembl database.
         """
         return NotImplemented

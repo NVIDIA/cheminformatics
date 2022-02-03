@@ -19,8 +19,11 @@ FINGER_PRINT_FILES = 'filter_*.h5'
 
 class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
 
-    def __init__(self, fp_type):
+    def __init__(self, fp_type, radius=2, nBits=512):
+        logger.info(f'ChemblClusterWfDao({fp_type})')
         self.chem_data = ChEmblData(fp_type)
+        self.radius = radius
+        self.nBits = nBits
 
     def meta_df(self):
         chem_data = ChEmblData()
@@ -28,29 +31,55 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
 
     def fetch_molecular_embedding(self,
                                   n_molecules: int,
-                                  cache_directory: str = None):
+                                  cache_directory: str = None, 
+                                  radius=2, 
+                                  nBits=512):
+        # Since we allow the user to change the fingerprint radius and length (nBits),
+        # the fingerprints need to be cached in separate subdirectories.
+        # Note: the precomputed ones are not presumed to be of a specific radius or length
         context = Context()
         if cache_directory:
-            hdf_path = os.path.join(cache_directory, FINGER_PRINT_FILES)
+            cache_subdir = f'{cache_dir}/fp_r{radius}_n{nBits}'
+            hdf_path = os.path.join(cache_subdir, FINGER_PRINT_FILES)
+        else:
+            cache_subdir = None
+        if cache_directory and os.path.isdir(cache_subdir): # and (self.radius == radius) and (self.nBits == nBits):
             logger.info('Reading %d rows from %s...', n_molecules, hdf_path)
             mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
-
+            if len(mol_df) == 0:
+                logger.info(f'Zero molecules found in {hdf_path}! Caching error?')
             if n_molecules > 0:
                 npartitions = math.ceil(n_molecules / BATCH_SIZE)
                 mol_df = mol_df.head(n_molecules, compute=False, npartitions=npartitions)
         else:
-            logger.info('Reading molecules from database...')
-            mol_df = self.chem_data.fetch_mol_embedding(num_recs=n_molecules,
-                                                        batch_size=context.batch_size)
+            self.radius = radius
+            self.nBits = nBits
+            logger.info(f'Reading molecules from database and computing fingerprints (radius={self.radius}, nBits={self.nBits})...')
+            mol_df = self.chem_data.fetch_mol_embedding(
+                num_recs=n_molecules,
+                batch_size=context.batch_size,
+                radius=radius,
+                nBits=nBits
+            )
+            if cache_directory:
+                os.mkdir(cache_subdir)
+                mol_df.to_hdf(hdf_path, 'fingerprints')
 
+        logger.info(f'mol_df: {list(mol_df.columns)}')#\n{mol_df.head().compute()}')
         return mol_df
 
-    def fetch_molecular_embedding_by_id(self, molecule_id: List):
+    def fetch_molecular_embedding_by_id(self, molecule_id: List, radius=2, nBits=512):
         context = Context()
-        meta = self.chem_data._meta_df()
-        fp_df = self.chem_data._fetch_mol_embedding(molregnos=molecule_id,
-                                                    batch_size=context.batch_size) \
-            .astype(meta.dtypes)
+        meta = self.chem_data._meta_df(
+            f'fetch_molecular_embedding_by_id({molecule_id}): MISMATCH!!! radius: {radius} != {self.radius}, nBits: {nBits} != {self.nBits}')
+        if (self.radius != radius) or (self.nBits != nBits):
+            logger.info('Something broken?')
+        fp_df = self.chem_data._fetch_mol_embedding(
+            molregnos=molecule_id,
+            batch_size=context.batch_size,
+            radius=radius,
+            nBits=nBits
+        ).astype(meta.dtypes)
 
         fp_df = cudf.from_pandas(fp_df)
         fp_df = dask_cudf.from_cudf(fp_df, npartitions=1).reset_index()

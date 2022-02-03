@@ -163,6 +163,7 @@ To start dash:
             elif (args.cache_type == 'Embeddings'):
                 prepocess_type = Embeddings
 
+            # TODO: when loading precomputed fingerprints, the radius and size should be specified
             chem_data = ChEmblData(fp_type=prepocess_type)
             chem_data.save_fingerprints(
                 os.path.join(args.cache_directory, FINGER_PRINT_FILES), num_recs = args.n_mol,

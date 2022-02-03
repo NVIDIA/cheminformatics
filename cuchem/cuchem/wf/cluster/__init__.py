@@ -22,16 +22,14 @@ class BaseClusterWorkflow:
 
     def _remove_non_numerics(self, embedding):
         embedding = self._remove_ui_columns(embedding)
-
-        other_props = ['id'] + IMP_PROPS + ADDITIONAL_FEILD
-        # Tempraryly store columns not required during processesing
+        # Fingerprint columns have the names 0, 1, 2,...
+        non_numeric_col_names = [col for col in embedding.columns if type(col) != int]
+        # Temporarily store columns not required during processesing
         prop_series = {}
-        for col in other_props:
-            if col in embedding.columns:
-                prop_series[col] = embedding[col]
+        for col in non_numeric_col_names:
+            prop_series[col] = embedding[col]
         if len(prop_series) > 0:
-            embedding = embedding.drop(other_props, axis=1)
-
+            embedding = embedding.drop(non_numeric_col_names, axis=1)
         return embedding, prop_series
 
     def _random_sample_from_arrays(self, *input_array_list, n_samples=None, index=None):
@@ -97,7 +95,7 @@ class BaseClusterWorkflow:
 
     def add_molecules(self, chemblids: List):
         """
-        ChembleId's accepted as argument to the existing database. Duplicates
+        ChemblId's accepted as argument to the existing database. Duplicates
         must be ignored.
         """
         raise NotImplementedError

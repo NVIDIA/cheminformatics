@@ -9,12 +9,14 @@ from cddd.inference import InferenceModel
 from cuchem.utils.data_peddler import download_cddd_models
 from rdkit import Chem
 from rdkit.Chem import AllChem
+from math import ceil
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 logger = logging.getLogger(__name__)
+INTEGER_NBITS = 64 # Maximum number of bits in an integer column in a cudf Series
 
 
-def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles'):
+def calc_morgan_fingerprints(dataframe, smiles_column='canonical_smiles'):
     """Calculate Morgan fingerprints on SMILES strings
 
     Args:
@@ -24,7 +26,7 @@ def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles'):
         pd.DataFrame: new dataframe containing fingerprints
     """
     mf = MorganFingerprint()
-    fp = mf.transform(dataframe, col_name=smiles_col)
+    fp = mf.transform(dataframe, smiles_column=smiles_column)
     fp = pd.DataFrame(fp)
     fp.index = dataframe.index
     return fp
@@ -41,7 +43,7 @@ class BaseTransformation(ABC):
         self.kwargs = None
         self.func = None
 
-    def transform(self, data):
+    def transform(self, data, smiles_column = 'transformed_smiles'):
         return NotImplemented
 
     def transform_many(self, data):
@@ -59,14 +61,31 @@ class MorganFingerprint(BaseTransformation):
         self.kwargs.update(kwargs)
         self.func = AllChem.GetMorganFingerprintAsBitVect
 
-    def transform(self, data, col_name='transformed_smiles'):
-        data = data[col_name]
+    def transform(self, data, smiles_column='transformed_smiles', return_fp=False, raw=False):
+        data = data[smiles_column]
         fp_array = []
-        for mol in data:
-            m = Chem.MolFromSmiles(mol)
+        self.n_fp_integers = ceil(self.kwargs['nBits'] / INTEGER_NBITS)
+        if raw:
+            raw_fp_array = []
+        else:
+            raw_fp_array = [[] for i in range(0, self.kwargs['nBits'], INTEGER_NBITS)]
+        for mol_smiles in data:
+            m = Chem.MolFromSmiles(mol_smiles)
             fp = self.func(m, **self.kwargs)
-            fp_array.append(list(fp.ToBitString()))
+            fp_bs = fp.ToBitString()
+            fp_array.append(list(fp_bs))
+            if return_fp:
+                if raw:
+                    raw_fp_array.append(fp)
+                else:
+                    for i in range(0, self.kwargs['nBits'], INTEGER_NBITS):
+                        raw_fp_array[i // INTEGER_NBITS].append(int(fp_bs[i: i + INTEGER_NBITS], 2))
         fp_array = np.asarray(fp_array)
+        if return_fp:
+            if raw:
+                return fp_array, raw_fp_array
+            else:
+                return fp_array, np.asarray(raw_fp_array, dtype=np.uint64)
         return fp_array
 
     def __len__(self):

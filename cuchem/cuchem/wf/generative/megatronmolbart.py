@@ -71,7 +71,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                              dim=dim,
                              pad_mask=pad_mask)
 
-        return self.stub.EmbeddingToSmiles(spec)
+        return self.stub.EmbeddingToSmiles(spec) # Not yet implemented in the main branch but supported elsewhere
 
     def find_similars_smiles(self,
                              smiles: str,
@@ -80,6 +80,11 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                              force_unique=False,
                              sanitize=True,
                              compound_id=None):
+        if isinstance(compound_id, list):
+            # Sometimes calling routine may send a list of length one containing the compound ID
+            if len(compound_id) > 1:
+                logger.info(f'find_similars_smiles received {compound_id}, generating neighbors only for first compound!')
+            compound_id = compound_id[0]
         spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
                               smiles=smiles,
                               radius=scaled_radius,
@@ -106,8 +111,6 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                 for i in range(len(generatedSmiles) - 1)
             ],
         })
-        #generated_df['Generated'].iat[0] = False
-
         return generated_df
 
     def interpolate_smiles(
@@ -171,11 +174,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         radius = self._compute_radius(scaled_radius)
         # TO DO: User must be able to extrapolate directly from smiles in the table;
         # these may themselves be generated compounds without any chemblid.
-        logger.info(f'cluster_id={cluster_id}, compound_property={compound_property}, compounds_df: {len(compounds_df)}, {type(compounds_df)}')
-        logger.info(compounds_df.head())
-        logger.info(f'{list(compounds_df.columns)}, {list(compounds_df.dtypes)}')
         df_cluster = compounds_df[ compounds_df['cluster'] == int(cluster_id) ].dropna().reset_index(drop=True).compute()
-        logger.info(f'df_cluster: {len(df_cluster)}\n{df_cluster.head()}')
         if 'transformed_smiles' in df_cluster:
             smiles_col = 'transformed_smiles'
         elif 'SMILES' in df_cluster:
@@ -185,7 +184,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         else:
             logger.info(list(df_cluster.columns))
             logger.info(df_cluster.head())
-            raise Error('No smiles column')
+            raise RuntimeError('No smiles column')
             smiles_col = None
         smiles_list = df_cluster[smiles_col].to_array()
         return self.extrapolate_from_smiles(smiles_list,
@@ -212,14 +211,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         logger.info(f'_get_embedding_direction: emb:{embedding_list.shape}, {type(embedding_list)}, prop:{compound_property_vals.shape}, {type(compound_property_vals)}, prop: {min(compound_property_vals)} - {max(compound_property_vals)}')
         n_data = compound_property_vals.shape[0]
         n_dimensions = embedding_list[0].shape[0]
-        try:
-            reg = Lasso()#alpha=1.0/n_dimensions)#, tol=1.0/n_dimensions)
-            #reg = Ridge()#alpha=1.0/n_dimensions, solver='cd') # default is 'eig'
-            reg = reg.fit(embedding_list, compound_property_vals)        
-        except Exception as e:
-            logger.info(f'Ridge regression encountered {e}, trying Lasso regression')
-            reg = Lasso()#alpha=1.0/n_dimensions)
-            reg = reg.fit(embedding_list, compound_property_vals)
+        reg = reg.fit(embedding_list, compound_property_vals)
         n_zero_coefs = len([x for x in reg.coef_ if x == 0.0])
         zero_coef_indices = [i for i, x in enumerate(reg.coef_) if x != 0.0]
         logger.info(f'coef: {n_zero_coefs} / {len(reg.coef_)} coefficients are zero (in some positions between {min(zero_coef_indices)} and {max(zero_coef_indices)});'\
@@ -329,8 +321,6 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         logger.info(f'direction: {type(direction)}, shape={direction.shape}, {direction}\n, embeddings: {type(embeddings)}, shape: {embeddings.shape}, embeddings[0]={embeddings[0]}')
 
         for step_num in range(1, 1 + num_points):
-            #noise = cp.random.normal(loc=0.0, scale=emb_std, size=emb_std.shape)
-            #logger.info(f'noise: {type(noise)}, {noise.shape}; dir: {type(direction)}, {direction.shape}')
             direction_sampled = cp.random.normal(loc=direction, scale=emb_std, size=emb_std.shape) #direction + noise
             logger.info(f'step ({type(step_num)} * {type(diff_size)} * {type(step_size)} * {type(direction_sampled)}')
             step = float(step_num * diff_size * step_size) * direction_sampled
@@ -340,8 +330,6 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
             smiles_gen_list = []
             ids_interp_list = []
             for i in range(len(extrap_embeddings)):
-                #diff = extrap_embeddings[i] - embeddings[i]
-                #logger.info(f'{i}: diff: {diff.argmin()}: {min(diff)} to {diff.argmax()}: {max(diff)}')
                 extrap_embedding = list(extrap_embeddings[i,:])
                 logger.info(f'embedding: {type(extrap_embedding)}, {len(extrap_embeddings)};'\
                             f' dim: {type(emb_shape)}, {len(emb_shape)}; pad_mask={type(full_mask)}, {len(full_mask)}')
@@ -429,10 +417,8 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
             emb = result.embedding
             mask = result.pad_mask
             dim = result.dim
-            logger.info(f'{i}: smiles={smiles}, emd: {len(emb)}, {emb[:5]}; dim={dim}, mask: {len(mask)}')
-            emb_shape = result.dim #emb[:2]
-            #emb = emb[2:]
-
+            #logger.info(f'{i}: smiles={smiles}, emd: {len(emb)}, {emb[:5]}; dim={dim}, mask: {len(mask)}')
+            emb_shape = result.dim
             if debug:
                 spec = EmbeddingList(
                     embedding=emb,
@@ -440,7 +426,6 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                     pad_mask=mask
                 )
                 generated_mols = self.stub.EmbeddingToSmiles(spec).generatedSmiles                
-                #generated_mols = self.inverse_transform([emb.reshape(emb_shape)], k=1, mem_pad_mask=mask.bool().cuda())
                 if len(generated_mols) > 0:
                     m = MolFromSmiles(generated_mols[0])
                     if m is not None:
@@ -449,15 +434,10 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                         logger.info(f'{n_recovered}/ {i+1}: {smiles} ({len(smiles)} chars)--> emb:{emb_shape}, mask:{len(mask)} --> {generated_mols} (tani={tani:.2f})')
                         avg_tani += tani
             embeddings.append(torch.tensor(emb, device=self.device)) #emb.detach().reshape(-1)) #torch tensor
-            #if full_mask is None:
-            #    full_mask = mask
-            #    emb_shape = emb.shape
-            #else:
-            #    full_mask &= mask
+
         if debug:
             logger.info(f'{n_recovered} / {len(smiles_list)} compounds yielded something after embedding, with avg tani = {avg_tani / n_recovered if n_recovered > 0 else 0}')
         
-        #full_mask = full_mask.bool().cuda()
         embeddings = torch.nn.utils.rnn.pad_sequence(
             embeddings, batch_first=True, padding_value=PAD_TOKEN)
         embeddings_train = embeddings[:n_train,:]

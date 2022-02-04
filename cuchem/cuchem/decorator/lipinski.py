@@ -21,7 +21,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
 
     def decorate(self,
                  df: Union[cudf.DataFrame, pandas.DataFrame],
-                 smile_cols: int = 0):
+                 smiles_cols: int = 0):
 
         mol_wt = []
         mol_logp = []
@@ -33,7 +33,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
 
         for idx in range(df.shape[0]):
 
-            smiles = df.iat[idx, smile_cols]
+            smiles = df.iat[idx, smiles_cols]
             m = Chem.MolFromSmiles(smiles)
 
             if m is None:

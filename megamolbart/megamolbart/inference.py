@@ -342,6 +342,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
             result_df.append(interp_df)
 
         result_df = pd.concat(result_df)
-        smile_list = list(result_df['SMILES'])
+        smiles_list = list(result_df['SMILES'])
 
-        return result_df, smile_list
+        return result_df, smiles_list

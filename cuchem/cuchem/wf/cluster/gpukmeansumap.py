@@ -22,6 +22,8 @@ import cudf
 import cuml
 import dask
 import dask_cudf
+import sys
+from dask.distributed import wait
 from cuchemcommon.context import Context
 from cuchemcommon.data import ClusterWfDAO
 from cuchemcommon.data.cluster_wf import ChemblClusterWfDao
@@ -62,7 +64,6 @@ def _(embedding, n_pca, reuse_umap, reuse_pca, self):
 @_gpu_cluster_wrapper.register(dask_cudf.core.DataFrame)
 def _(embedding, n_pca, reuse_umap, reuse_pca, self):
     embedding = embedding.persist()
-    logger.info(f'_gpu_cluster_wrapper: self={self}, {type(embedding)}, {n_pca}, {reuse_umap}, {reuse_pca}')
     return self._cluster(embedding, n_pca, reuse_umap, reuse_pca)
 
 
@@ -182,26 +183,33 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         return embedding
 
-    def cluster(self, df_mol_embedding=None, reuse_umap=False, reuse_pca=True, fingerprint_radius=2, fingerprint_nBits=512):
+    def cluster(
+        self, 
+        df_mol_embedding=None, 
+        reuse_umap=False, 
+        reuse_pca=True, 
+        fingerprint_radius=2, 
+        fingerprint_nBits=512
+    ):
 
-        #logger.info("Executing GPU workflow...")
         logger.info(f"GpuKmeansUmap.cluster(radius={fingerprint_radius}, nBits={fingerprint_nBits}), df_mol_embedding={df_mol_embedding}")
-
+        sys.stdout.flush()
         if (df_mol_embedding is None) or (fingerprint_radius != self.fingerprint_radius) or (fingerprint_nBits != self.fingerprint_nBits):
             self.n_molecules = self.context.n_molecule
             self.dao = ChemblClusterWfDao(
                 MorganFingerprint, radius=fingerprint_radius, nBits=fingerprint_nBits)
             self.fingerprint_radius = fingerprint_radius
             self.fingerprint_nBits = fingerprint_nBits
-            logger.info(f'dao={self.dao}')
+            logger.info(f'dao={self.dao}, getting df_mol_embedding...')
             df_mol_embedding = self.dao.fetch_molecular_embedding(
                 self.n_molecules,
                 cache_directory=self.context.cache_directory,
                 radius=fingerprint_radius,
                 nBits=fingerprint_nBits
-                )
-
+            )
             df_mol_embedding = df_mol_embedding.persist()
+            wait(df_mol_embedding)
+
         self.df_embedding = _gpu_cluster_wrapper(
             df_mol_embedding,
             self.pca_comps,
@@ -277,8 +285,6 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
             # TODO: does caller expect cudf or dask_cudf?
             if hasattr(self.df_embedding, 'compute'):
                 self.df_embedding = self.df_embedding.compute()
-
-            logger.info(self.df_embedding.shape)
 
         return chem_mol_map, molregnos, self.df_embedding
 

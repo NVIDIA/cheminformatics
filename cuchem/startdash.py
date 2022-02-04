@@ -164,9 +164,18 @@ To start dash:
                 prepocess_type = Embeddings
 
             # TODO: when loading precomputed fingerprints, the radius and size should be specified
+            # For now, we are hard-coding this information:
+            nBits = 512
+            radius = 2
             chem_data = ChEmblData(fp_type=prepocess_type)
+            subdir = f'{args.cache_directory}/fp_r{radius}_n{nBits}'
+            if not os.path.isdir(subdir):
+                os.mkdir(subdir)
+
+            logging.info(f'client: saving fingerprints')
+            # This will trigger a reread if fingerprints are not found in the cache directory!
             chem_data.save_fingerprints(
-                os.path.join(args.cache_directory, FINGER_PRINT_FILES), num_recs = args.n_mol,
+                os.path.join(subdir, FINGER_PRINT_FILES), num_recs = args.n_mol,
                 batch_size=args.batch_size)
 
             logger.info('Fingerprint generated in (hh:mm:ss.ms) {}'.format(
@@ -341,8 +350,8 @@ To start dash:
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
 
+        # Cluster() will trigger a read if not found in the cache dir:
         mol_df = workflow.cluster()
-
         if args.benchmark:
             workflow.compute_qa_matric()
             if not args.cpu:

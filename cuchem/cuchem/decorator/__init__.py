@@ -8,7 +8,7 @@ class BaseMolPropertyDecorator(object):
 
     def decorate(self,
                  df: Union[cudf.DataFrame, pandas.DataFrame],
-                 smile_cols: int = 0):
+                 smiles_cols: int = 0):
         NotImplemented
 
 

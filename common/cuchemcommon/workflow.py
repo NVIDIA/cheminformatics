@@ -100,12 +100,12 @@ class BaseGenerativeWorkflow:
         embeddings = interp_df['embeddings']
         embeddings_dim = interp_df['embeddings_dim']
         for index, row in interp_df.iterrows():
-            smile_string = row['SMILES']
+            smiles_string = row['SMILES']
             try:
-                canonical_smile = CanonSmiles(smile_string)
+                canonical_smile = CanonSmiles(smiles_string)
             except:
                 # If a SMILES cannot be canonicalized, just use the original
-                canonical_smile = smile_string
+                canonical_smile = smiles_string
 
             row['SMILES'] = canonical_smile
 

@@ -26,9 +26,9 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
     # TODO how to handle length overrun for batch processing --> see also MegaMolBART.load_model in inference.py
     def SmilesToEmbedding(self, spec, context):
 
-        smile_str = ''.join(spec.smiles)
+        smiles_str = ''.join(spec.smiles)
 
-        embedding, pad_mask = self.megamolbart.smiles2embedding(smile_str,
+        embedding, pad_mask = self.megamolbart.smiles2embedding(smiles_str,
                                                                 pad_length=spec.padding)
         dim = embedding.shape
         embedding = embedding.flatten().tolist()
@@ -53,10 +53,10 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
 
     def FindSimilars(self, spec, context):
 
-        smile_str = ''.join(spec.smiles)
+        smiles_str = ''.join(spec.smiles)
 
         generated_df = self.megamolbart.find_similars_smiles(
-                smile_str,
+                smiles_str,
                 num_requested=spec.numRequested,
                 scaled_radius=spec.radius,
                 force_unique=False)

@@ -6,6 +6,7 @@ from typing import List
 import cudf
 import dask
 import dask_cudf
+import sys
 from cuchemcommon.context import Context
 from cuchemcommon.data.helper.chembldata import BATCH_SIZE, ChEmblData
 from cuchemcommon.utils.singleton import Singleton
@@ -43,6 +44,7 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
             hdf_path = os.path.join(cache_subdir, FINGER_PRINT_FILES)
         else:
             cache_subdir = None
+            hdf_path = None
         if cache_directory and os.path.isdir(cache_subdir): # and (self.radius == radius) and (self.nBits == nBits):
             logger.info('Reading %d rows from %s...', n_molecules, hdf_path)
             mol_df = dask.dataframe.read_hdf(hdf_path, 'fingerprints')
@@ -55,6 +57,7 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
             self.radius = radius
             self.nBits = nBits
             logger.info(f'Reading molecules from database and computing fingerprints (radius={self.radius}, nBits={self.nBits})...')
+            sys.stdout.flush()
             mol_df = self.chem_data.fetch_mol_embedding(
                 num_recs=n_molecules,
                 batch_size=context.batch_size,
@@ -63,9 +66,11 @@ class ChemblClusterWfDao(ClusterWfDAO, metaclass=Singleton):
             )
             if cache_directory:
                 os.mkdir(cache_subdir)
+                logger.info(f'Caching mol_df fingerprints to {hdf_path}')
                 mol_df.to_hdf(hdf_path, 'fingerprints')
-
-        logger.info(f'mol_df: {list(mol_df.columns)}')#\n{mol_df.head().compute()}')
+            else:
+                logging.info(f'cache_directory={cache_directory}, not caching!')
+        sys.stdout.flush()
         return mol_df
 
     def fetch_molecular_embedding_by_id(self, molecule_id: List, radius=2, nBits=512):

@@ -136,7 +136,7 @@ class ChemVisualization(metaclass=Singleton):
         self.cluster_wf_cls = 'cuchem.wf.cluster.gpukmeansumap.GpuKmeansUmapHybrid'
         self.generative_wf_cls = 'cuchem.wf.generative.MegatronMolBART'
 
-        self.fp_df = None # all fingerprints of all ChemBl compounds and their IDs as a pandas dataframe
+        self.fp_df = None # all fingerprints of all ChemBl compounds and their IDs as a pandas dataframe for use in compound similarity search on the CPU
         self.fingerprint_radius = fingerprint_radius
         self.fingerprint_nBits = fingerprint_nBits
 
@@ -319,7 +319,6 @@ class ChemVisualization(metaclass=Singleton):
 
     def handle_analoguing_candidate(self, bt_analoguing_candidate, analoguing_candidates):
         comp_id, event_type = self._fetch_event_data()
-        logger.info(f'handle_analoguing_candidate({bt_analoguing_candidate}, {analoguing_candidates}): cid={comp_id}, et={event_type},  dash.callback_context.triggered[0]["value"]={ dash.callback_context.triggered[0]["value"]}')
         if event_type != 'n_clicks' or dash.callback_context.triggered[0]['value'] == 0:
             raise dash.exceptions.PreventUpdate
 
@@ -333,7 +332,6 @@ class ChemVisualization(metaclass=Singleton):
 
         if selected_chembl_id not in selected_candidates:
             selected_candidates.append(selected_chembl_id)
-        logger.info(f'comp_detail={comp_detail}, selected_candidates={selected_candidates}')
         return ','.join(selected_candidates)
 
     def _fetch_event_data(self):
@@ -369,8 +367,6 @@ class ChemVisualization(metaclass=Singleton):
         self.generative_wf_cls = sl_generative_wf
         wf_class = locate(self.generative_wf_cls)
         generative_wf = wf_class()
-        logger.info(f'locate({self.generative_wf_cls}) = {wf_class}, rd_generation_type={rd_generation_type}')
-        sys.stdout.flush()
         n2generate = int(n2generate)
         scaled_radius = float(scaled_radius)
 
@@ -401,7 +397,6 @@ class ChemVisualization(metaclass=Singleton):
         if show_generated_mol is None:
             show_generated_mol = 0
         show_generated_mol += 1
-
         # Add other useful attributes to be added for rendering
         self.generated_df = MolecularStructureDecorator().decorate(self.generated_df)
         self.generated_df = LipinskiRuleOfFiveDecorator().decorate(self.generated_df)
@@ -419,7 +414,7 @@ class ChemVisualization(metaclass=Singleton):
         self.generated_df = pd.concat([self.generated_df, df_fp], axis=1)  
         df_fp=cudf.from_pandas(df_fp)
         df_fp['id'] = list(map(str, self.generated_df['id']))
-        df_fp['cluster'] = list(map(int, self.generated_df['Generated']))
+        df_fp['cluster'] = list(map(int, self.generated_df['Generated'])) # This controls the color
         n_generated =  self.generated_df['Generated'].sum()
         if n_generated < len(self.generated_df) / 2:
             # Highlight the generated compounds
@@ -436,65 +431,50 @@ class ChemVisualization(metaclass=Singleton):
         df_embedding, prop_series = self.cluster_wf._remove_non_numerics(df_embedding)
         prop_series['cluster'] = cluster_col
         n_molecules, n_obs = df_embedding.compute().shape # needed?
-        logger.info(
-            f'cluster_wf: {self.cluster_wf}, self.cluster_wf.pca={self.cluster_wf.pca}, isinstance(self.cluster_wf.pca, cuml.PCA)={isinstance(self.cluster_wf.pca, cuml.PCA)}'\
-            f'\ndf_embedding: {type(df_embedding)}, isinstance(df_embedding, dask_cudf.DataFrame)={isinstance(df_embedding, dask_cudf.DataFrame)}\n{df_embedding.head()}')
-        sys.stdout.flush()
         #if hasattr(df_embedding, 'compute'):
         #    df_embedding = df_embedding.compute()
-        #    logger.info(f'df_embedding after compute(): {type(df_embedding)}\n{df_embedding.head()}')
-        #    sys.stdout.flush()
 
         if isinstance(self.cluster_wf.pca, cuml.PCA) and isinstance(df_embedding, dask_cudf.DataFrame):
+            # Trying to accommodate the GpuKmeansUmapHybrid workflow
             df_embedding = df_embedding.compute()
         df_embedding = self.cluster_wf.pca.transform(df_embedding)
-        df_embedding = df_embedding.persist() # TODO: wait after this?
-        #X_train = df_embedding.compute() # needed?
+        if hasattr(df_embedding, 'persist'):
+            df_embedding = df_embedding.persist()
+            wait(df_embedding)
         Xt = self.cluster_wf.umap.transform(df_embedding)
         df_embedding['x'] = Xt[0]
         df_embedding['y'] = Xt[1]
 
         for col in prop_series.keys():
-            #logger.info(f'col={col}')
             sys.stdout.flush()
             df_embedding[col] = prop_series[col]#.compute()
 
         fig, northstar_cluster = self.create_graph(df_embedding, north_stars=north_stars)
- 
+
         # Create Table header
         table_headers = []
-        columns = [
+        all_columns = self.generated_df.columns.to_list()
+        columns_in_table = [
             col_name 
             for col_name in self.generated_df.columns.to_list()
-            if not isinstance(col_name, int)
+            if (not isinstance(col_name, int)) and (not col_name.startswith('fp')) and not ('embeddings' in col_name)
         ]
-        #columns = self.generated_df.columns.to_list()
-        ignore_columns = ['embeddings', 'embeddings_dim']
-        for column in columns:
-            if column in ignore_columns:
-                continue
+        # TODO: factor this into a separate function: build table from dataframe
+        for column in columns_in_table:
             table_headers.append(html.Th(column, style={'fontSize': '150%', 'text-align': 'center'}))
-
         prop_recs = [html.Tr(table_headers, style={'background': 'lightgray'})]
-        invalid_mol_cnt = 0
         for row_idx in range(self.generated_df.shape[0]):
             td = []
-
             try:
-                col_pos = columns.index('Chemical Structure')
+                col_pos = all_columns.index('Chemical Structure')
                 col_data = self.generated_df.iat[row_idx, col_pos]
-
-                if 'value' in col_data and col_data['value'] == MolecularStructureDecorator.ERROR_VALUE:
-                    invalid_mol_cnt += 1
+                if 'value' in col_data and col_data['value'] == 'Error interpreting SMILES using RDKit':
                     continue
             except ValueError:
                 pass
-
-            for col_id in range(len(columns)):
+            for col_name in columns_in_table:
+                col_id = all_columns.index(col_name)
                 col_data = self.generated_df.iat[row_idx, col_id]
-                #if columns[col_id] in ignore_columns:
-                #    continue
-
                 col_level = 'info'
                 if isinstance(col_data, dict):
                     col_value = col_data['value']
@@ -502,24 +482,12 @@ class ChemVisualization(metaclass=Singleton):
                         col_level = col_data['level']
                 else:
                     col_value = col_data
-
                 if isinstance(col_value, str) and col_value.startswith('data:image/png;base64,'):
                     td.append(html.Td(html.Img(src=col_value)))
                 else:
-                    td.append(html.Td(str(col_value),
-                                      style={'maxWidth': '300px',
-                                             'wordWrap': 'break-word',
-                                             'text-align': 'center',
-                                             'color': LEVEL_TO_STYLE[col_level]['color']
-                                             }
-                                      ))
-
-            #prop_recs.append(html.Tr(td, style={'fontSize': '125%'}))
+                    td.append(
+                        html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level].update({'maxWidth': '100px', 'wordWrap':'break-word'})))
             prop_recs.append(html.Tr(td))
-            
-        msg_generated_molecules = ''
-        if invalid_mol_cnt > 0:
-            msg_generated_molecules =  f'{invalid_mol_cnt} invalid molecules were created, which were eliminated from the result.'
 
         return {'display': 'inline'}, fig, html.Table(
             prop_recs, style={'width': '100%', 'margin': 12, 'border': '1px solid lightgray'}
@@ -533,11 +501,9 @@ class ChemVisualization(metaclass=Singleton):
         fit_nn_max_epochs, fit_nn_learning_rate, fit_nn_weight_decay, fit_nn_batch_size
     ):
         comp_id, event_type = self._fetch_event_data()
-        #logger.info(f'handle_fitting: comp_id={comp_id}, event_type={event_type}')
         sys.stdout.flush()
         if (comp_id != 'bt_fit') or (event_type != 'n_clicks'):
             return dash.no_update, dash.no_update
-        #logger.info(f'comp_id={comp_id}, event_type={event_type}')
         self.featurizing_wf_cls = sl_featurizing_wf
         wf_class = locate(self.featurizing_wf_cls)
         featurizing_wf = wf_class()
@@ -555,7 +521,6 @@ class ChemVisualization(metaclass=Singleton):
             weight_decay=float(fit_nn_weight_decay),
             batch_size=int(fit_nn_batch_size)
         )
-        #logger.info(df.head())
         sys.stdout.flush()
         fig = self.create_plot(df, fit_nn_compound_property)
         return {'display': 'inline'}, fig
@@ -566,7 +531,6 @@ class ChemVisualization(metaclass=Singleton):
 
     ):
         comp_id, event_type = self._fetch_event_data()
-        #logger.info(f'handle_analoguing: mol={analoguing_mol_id}, n={analoguing_n_analogues}, th={analoguing_threshold}, type={analoguing_type}')
         sys.stdout.flush()
         if (comp_id != 'bt_analoguing') or (event_type != 'n_clicks'):
             return dash.no_update, dash.no_update
@@ -576,18 +540,20 @@ class ChemVisualization(metaclass=Singleton):
             smiles_column = 'canonical_smiles'
         else:
             smiles_columns = 'SMILES'
-        logger.info(f'self.cluster_wf.df_embedding: {self.cluster_wf.df_embedding}\n{self.cluster_wf.df_embedding.head()}')
-        if self.fp_df is None: # CPU-based workflow, to be deprecated
-            logger.info(f'self.fp_df not set, computing on CPU')
+
+        if self.fp_df is None: 
+            # Note: CPU-based workflow is no longer needed, can be removed
+            logger.info(f'CPU-based similarity search: self.fp_df not set')
+            # First move the smiles to the CPU:
             if isinstance(self.cluster_wf.df_embedding, dask_cudf.DataFrame):
                 smiles_df = self.cluster_wf.df_embedding[[smiles_column, 'id']].map_partitions(cudf.DataFrame.to_pandas)
             elif isinstance(self.cluster_wf.df_embedding, cudf.DataFrame):
                 smiles_df = self.cluster_wf.df_embedding[[smiles_column, 'id']].to_pandas()
             else:
                 smiles_df = self.cluster_wf.df_embedding[[smiles_column, 'id']]
-
+            # Then compute fingerprints on the CPU using RDKit:
             if 'fp' not in self.cluster_wf.df_embedding.columns:           
-                logger.info(f'Computing fingerprints...')
+                logger.info(f'Computing fingerprints with radius={self.fingerprint_radius}, nBits={self.fingerprint_nBits}...')
                 _, v = MorganFingerprint(radius=self.fingerprint_radius, nBits=self.fingerprint_nBits).transform(
                     smiles_df, smiles_column=smiles_column, return_fp=True, raw=True)
             else:
@@ -596,7 +562,7 @@ class ChemVisualization(metaclass=Singleton):
                     v = list(self.cluster_wf.df_embedding['fp'].compute().to_pandas())
                 else:
                     v = list(self.cluster_wf.df_embedding['fp'])
-
+            # This pandas dataframe has the fingerprints in the fp column:
             self.fp_df = pd.DataFrame({
                 'fp': v, 
                 smiles_column: smiles_df[smiles_column], #list(self.cluster_wf.df_embedding[smiles_column].compute().to_pandas()), #smiles_df[smiles_column], 
@@ -608,14 +574,14 @@ class ChemVisualization(metaclass=Singleton):
             wait(self.cluster_wf.df_embedding)
 
         if 'pc' not in self.cluster_wf.df_embedding.columns:
-            # Pre-computing the popcounts for all compounds in the database:
+            # Pre-computing the popcounts for all compounds in the database for use in GPU-based similarity search:
             t0 = time.time()
             self.cluster_wf.df_embedding['op_col'] = 0
             self.cluster_wf.df_embedding['pc'] = 0
-
+            n_fp_cols = 0
             for col in self.cluster_wf.df_embedding.columns:
                 if (type(col) == str) and col.startswith('fp') and (len(col) > 2):
-                    logger.info(f'{col}: {self.cluster_wf.df_embedding[col]}')
+                    n_fp_cols += 1
                     self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.apply_rows(
                         popcll_wrapper, incols = {col: 'ip_col'}, outcols = {'op_col': int}, kwargs = {})
                     # More complex syntax was not necessary:
@@ -625,7 +591,7 @@ class ChemVisualization(metaclass=Singleton):
                 self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.persist()
                 wait(self.cluster_wf.df_embedding)
             t1 = time.time()
-            logger.info(f'Time to compute partial popcounts: {t1 - t0}')
+            logger.info(f'Time to compute partial popcounts ({n_fp_cols} fp columns): {t1 - t0}:\n{self.cluster_wf.df_embedding["pc"].head()}')
 
         # Prepare the query compound:
         logger.info(f'analoguing_mol_id={analoguing_mol_id}')
@@ -649,15 +615,11 @@ class ChemVisualization(metaclass=Singleton):
         #self.cluster_wf.df_embedding['op_col'] = 0
         self.cluster_wf.df_embedding['n_intersection'] = 0
         t4 = time.time()
-        logger.info(f'self.cluster_wf.df_embedding: {type(self.cluster_wf.df_embedding)}, {list(self.cluster_wf.df_embedding.columns)}\n{self.cluster_wf.df_embedding.head()}')
-        sys.stdout.flush()
         for i in range(0, self.fingerprint_nBits, INTEGER_NBITS):
             fp_num = i // INTEGER_NBITS
-            logger.info(f'i={i}, fp_num={fp_num}')
             self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.apply_rows(
                 intersection_wrapper, incols={f'fp{fp_num}': 'fp_int_col'}, 
                 outcols={'op_col': int}, kwargs={'query_fp_int': query_fp_ints[fp_num]})
-            #logging.info(f'{i}:\n{self.cluster_wf.df_embedding.head()}')
             #self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.persist()
             #wait(self.cluster_wf.df_embedding)
             self.cluster_wf.df_embedding['n_intersection'] += self.cluster_wf.df_embedding['op_col']
@@ -941,7 +903,7 @@ class ChemVisualization(metaclass=Singleton):
 
                 # Compute size of northstar and normal points
                 df_shape = df_size.copy()
-                df_size = (df_size * 2) + DOT_SIZE
+                df_size = (df_size * 18) + DOT_SIZE
                 df_shape = df_shape * 2
                 x_data = cdf['x']
                 y_data = cdf['y']
@@ -1145,6 +1107,8 @@ class ChemVisualization(metaclass=Singleton):
 
                 html.Div([
                     dcc.Markdown("""**Molecule(s) of Interest**"""),
+                    dcc.Markdown(children="""Click *Highlight* to populate this list""",
+                                style={'marginTop': 18}),
                     dcc.Markdown("Please enter ChEMBL ID(s) separated by commas."),
 
                     html.Div(className='row', children=[
@@ -1154,6 +1118,7 @@ class ChemVisualization(metaclass=Singleton):
                                    className='three columns'),
                     ], style={'marginLeft': 0, 'marginBottom': 18, }),
 
+                    dcc.Markdown("For fingerprint changes to take effect, first *Apply* the *GPU KMeans-UMAP* Workflow, then *Recluster*"),
                     html.Div(className='row', children=[
                         dcc.Markdown("Fingerprint Radius", style={'marginTop': 12,}),
                         dcc.Input(id='fingerprint_radius', value=2),
@@ -1278,6 +1243,8 @@ class ChemVisualization(metaclass=Singleton):
                             dcc.Markdown(children="""**Please Select Two**""",
                                          id="mk_selection_msg",
                                          style={'marginTop': 18}),
+                            dcc.Markdown(children="""Click *Add* to populate this list""",
+                                         style={'marginTop': 18}),
                             dcc.Checklist(
                                 id='ckl_candidate_mol_id',
                                 options=[],
@@ -1397,6 +1364,8 @@ class ChemVisualization(metaclass=Singleton):
                                          id="analoguing_msg",
                                          style={'marginTop': 18}
                             ),
+                            dcc.Markdown(children="""Click *Analogue* to populate this list""",
+                                         style={'marginTop': 18}),
                             dcc.Checklist(
                                 id='ckl_analoguing_mol_id',
                                 options=[],
@@ -1690,7 +1659,7 @@ class ChemVisualization(metaclass=Singleton):
                     north_star, radius=int(fingerprint_radius), nBits=int(fingerprint_nBits))
                 recluster_data = len(missing_mols) > 0
                 logger.info("%d missing molecules added...", len(missing_mols))
-                logger.debug("Missing molecules werew %s", missing_mols)
+                logger.debug("Missing molecules were %s", missing_mols)
 
                 moi_molregno = " ,".join(list(map(str, molregnos)))
                 if refresh_moi_prop_table is None:

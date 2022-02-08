@@ -46,7 +46,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
         embedding = torch.reshape(embedding, dim).cuda()
         pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
 
-        generated_mols = self.megamolbart.inverse_transform(embedding, pad_mask)
+        generated_mols = self.megamolbart.inverse_transform([embedding], pad_mask)
         return SmilesList(generatedSmiles=generated_mols)
 
     def FindSimilars(self, spec, context):

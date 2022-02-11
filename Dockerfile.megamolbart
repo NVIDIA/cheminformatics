@@ -1,38 +1,50 @@
-# Copyright 2021 NVIDIA Corporation
-FROM nvcr.io/nvidia/pytorch:20.11-py3
+# Copyright 2020 NVIDIA Corporation
+FROM nvcr.io/nvidia/nemo:1.2.0
+ARG GITHUB_ACCESS_TOKEN
+ARG GITHUB_BRANCH=main
+ARG NEMO_HOME=/opt/nemo
+ARG CHEMINFO_HOME=/opt/nvidia/cheminfomatics
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 docker.io\
     && rm -rf /var/lib/apt/lists/*
-
-ENV UCX_LOG_LEVEL error
-ENV PATH /opt/conda/bin:$PATH
-ENV CUDA_HOME /usr/local/cuda
-SHELL ["/bin/bash", "-c"]
-RUN echo "source activate base" > /etc/bash.bashrc
 
 ## Environment setup
 COPY megamolbart/conda/env.yml /tmp/.
 RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
 
+SHELL ["conda", "run", "-n", "base", "/bin/bash", "-c"]
+
 ## PySMILES -- requirements handled by conda environment
 RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
     && cd /opt/pysmilesutils; pip install .
 
-## MegaMolBART and Megatron code
-RUN git clone https://github.com/MolecularAI/MolBART.git --branch megatron-molbart-with-zinc /opt/MolBART \
-    && cd /opt/MolBART/megatron_molbart/Megatron-LM-v1.1.5-3D_parallelism && pip install . \
-    && cd /opt/MolBART; pip install .
-ENV PYTHONPATH /opt/MolBART/megatron_molbart:/opt/MolBART
+# NeMo_MegaMolBART
+RUN git clone https://${GITHUB_ACCESS_TOKEN}@github.com/clara-parabricks/NeMo_MegaMolBART.git \
+    --branch ${GITHUB_BRANCH} /opt/NeMo_MegaMolBART \
+    && cd /opt/NeMo_MegaMolBART \
+    && git checkout c218e4b9a22e6880fca9e7b130dea9b336af5afa \
+    && rm -rf ${NEMO_HOME} \
+    && mv /opt/NeMo_MegaMolBART ${NEMO_HOME} \
+    && ln -s ${NEMO_HOME}/nemo/collections/chem /opt/conda/lib/python3.8/site-packages/nemo/collections/chem
 
-# Copy and add generated code to PYTHONPATH
+RUN /opt/conda/bin/python -m pip install --upgrade pytorch_lightning
+
+## Copy and add generated code to PYTHONPATH
 COPY common/ /tmp/common
 RUN cd /tmp/common; pip install .
 
-RUN mkdir -p /opt/nvidia/cuchem/grpc
-COPY common/generated /opt/nvidia/cuchem/grpc
-ENV PYTHONPATH /opt/nvidia/cuchem/grpc:$PYTHONPATH
+RUN mkdir -p ${CHEMINFO_HOME}/cuchemcommon/grpc
+COPY common/cuchemcommon ${CHEMINFO_HOME}/cuchemcommon
+COPY common/generated ${CHEMINFO_HOME}/cuchemcommon/grpc
+COPY setup/env.sh ${CHEMINFO_HOME}/cuchemcommon/
+COPY setup/launch ${CHEMINFO_HOME}/cuchemcommon/
 
-COPY megamolbart/ /opt/nvidia/megamolbart/
-CMD cd /opt/nvidia/megamolbart && python3 launch.py
+# Comment this before production rollout
+COPY ./models/ /models
+
+ENV PYTHONPATH ${CHEMINFO_HOME}/cuchemcommon/grpc/:${CHEMINFO_HOME}/common:$PYTHONPATH
+ENV CHEMINFO_HOME ${CHEMINFO_HOME}
+COPY megamolbart/ ${CHEMINFO_HOME}/megamolbart/
+CMD cd ${CHEMINFO_HOME}/megamolbart && python3 -m megamolbart

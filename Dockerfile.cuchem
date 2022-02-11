@@ -4,6 +4,11 @@ FROM rapidsai/rapidsai:21.08-cuda11.2-runtime-ubuntu20.04-py3.7
 RUN apt-get update \
     && apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release \
     && rm -rf /var/lib/apt/lists/*
 
 SHELL ["conda", "run", "-n", "rapids", "/bin/bash", "-c"]

@@ -22,9 +22,10 @@ enum GenerativeModel {
 
 service GenerativeSampler {
   rpc SmilesToEmbedding(GenerativeSpec) returns (EmbeddingList) {};
+  rpc EmbeddingToSmiles(EmbeddingList) returns (SmilesList) {};
   rpc FindSimilars(GenerativeSpec) returns (SmilesList) {};
   rpc Interpolate(GenerativeSpec) returns (SmilesList) {};
-  rpc GetIteration(google.protobuf.Empty) returns (IterationVal) {};
+  rpc GetVersion(google.protobuf.Empty) returns (Version) {};
 }
 
 
@@ -44,10 +45,14 @@ message SmilesList {
   repeated EmbeddingList embeddings = 2;
 }
 
+
 message EmbeddingList{
   repeated float embedding = 1;
+  repeated int32 dim = 2;
+  repeated bool pad_mask = 3;
 }
 
-message IterationVal{
-  int32 iteration = 1;
+
+message Version{
+  string version = 1;
 }

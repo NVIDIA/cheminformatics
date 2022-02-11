@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\x17generativesampler.proto\x12\x1bnvidia.cheminformatics.grpc\x1a\x1bgoogle/protobuf/empty.proto\"\x99\x02\n\x0eGenerativeSpec\x12;\n\x05model\x18\x01 \x01(\x0e\x32,.nvidia.cheminformatics.grpc.GenerativeModel\x12\x0e\n\x06smiles\x18\x02 \x03(\t\x12\x13\n\x06radius\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x19\n\x0cnumRequested\x18\x04 \x01(\x05H\x01\x88\x01\x01\x12\x14\n\x07padding\x18\x05 \x01(\x05H\x02\x88\x01\x01\x12\x18\n\x0b\x66orceUnique\x18\x06 \x01(\x08H\x03\x88\x01\x01\x12\x15\n\x08sanitize\x18\x07 \x01(\x08H\x04\x88\x01\x01\x42\t\n\x07_radiusB\x0f\n\r_numRequestedB\n\n\x08_paddingB\x0e\n\x0c_forceUniqueB\x0b\n\t_sanitize\"e\n\nSmilesList\x12\x17\n\x0fgeneratedSmiles\x18\x01 \x03(\t\x12>\n\nembeddings\x18\x02 \x03(\x0b\x32*.nvidia.cheminformatics.grpc.EmbeddingList\"A\n\rEmbeddingList\x12\x11\n\tembedding\x18\x01 \x03(\x02\x12\x0b\n\x03\x64im\x18\x02 \x03(\x05\x12\x10\n\x08pad_mask\x18\x03 \x03(\x08\"!\n\x0cIterationVal\x12\x11\n\titeration\x18\x01 \x01(\x05*:\n\x0fGenerativeModel\x12\x08\n\x04\x43\x44\x44\x44\x10\x00\x12\x0f\n\x0bMegaMolBART\x10\x01\x12\x0c\n\x07MolBART\x10\x90N2\x93\x04\n\x11GenerativeSampler\x12n\n\x11SmilesToEmbedding\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a*.nvidia.cheminformatics.grpc.EmbeddingList\"\x00\x12j\n\x11\x45mbeddingToSmiles\x12*.nvidia.cheminformatics.grpc.EmbeddingList\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x66\n\x0c\x46indSimilars\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x65\n\x0bInterpolate\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12S\n\x0cGetIteration\x12\x16.google.protobuf.Empty\x1a).nvidia.cheminformatics.grpc.IterationVal\"\x00\x62\x06proto3'
+  serialized_pb=b'\n\x17generativesampler.proto\x12\x1bnvidia.cheminformatics.grpc\x1a\x1bgoogle/protobuf/empty.proto\"\x99\x02\n\x0eGenerativeSpec\x12;\n\x05model\x18\x01 \x01(\x0e\x32,.nvidia.cheminformatics.grpc.GenerativeModel\x12\x0e\n\x06smiles\x18\x02 \x03(\t\x12\x13\n\x06radius\x18\x03 \x01(\x02H\x00\x88\x01\x01\x12\x19\n\x0cnumRequested\x18\x04 \x01(\x05H\x01\x88\x01\x01\x12\x14\n\x07padding\x18\x05 \x01(\x05H\x02\x88\x01\x01\x12\x18\n\x0b\x66orceUnique\x18\x06 \x01(\x08H\x03\x88\x01\x01\x12\x15\n\x08sanitize\x18\x07 \x01(\x08H\x04\x88\x01\x01\x42\t\n\x07_radiusB\x0f\n\r_numRequestedB\n\n\x08_paddingB\x0e\n\x0c_forceUniqueB\x0b\n\t_sanitize\"e\n\nSmilesList\x12\x17\n\x0fgeneratedSmiles\x18\x01 \x03(\t\x12>\n\nembeddings\x18\x02 \x03(\x0b\x32*.nvidia.cheminformatics.grpc.EmbeddingList\"A\n\rEmbeddingList\x12\x11\n\tembedding\x18\x01 \x03(\x02\x12\x0b\n\x03\x64im\x18\x02 \x03(\x05\x12\x10\n\x08pad_mask\x18\x03 \x03(\x08\"\x1a\n\x07Version\x12\x0f\n\x07version\x18\x01 \x01(\t*:\n\x0fGenerativeModel\x12\x08\n\x04\x43\x44\x44\x44\x10\x00\x12\x0f\n\x0bMegaMolBART\x10\x01\x12\x0c\n\x07MolBART\x10\x90N2\x8c\x04\n\x11GenerativeSampler\x12n\n\x11SmilesToEmbedding\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a*.nvidia.cheminformatics.grpc.EmbeddingList\"\x00\x12j\n\x11\x45mbeddingToSmiles\x12*.nvidia.cheminformatics.grpc.EmbeddingList\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x66\n\x0c\x46indSimilars\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12\x65\n\x0bInterpolate\x12+.nvidia.cheminformatics.grpc.GenerativeSpec\x1a\'.nvidia.cheminformatics.grpc.SmilesList\"\x00\x12L\n\nGetVersion\x12\x16.google.protobuf.Empty\x1a$.nvidia.cheminformatics.grpc.Version\"\x00\x62\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_empty__pb2.DESCRIPTOR,])
 
@@ -38,27 +38,27 @@ _GENERATIVEMODEL = _descriptor.EnumDescriptor(
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='MolBART', index=1, number=1,
+      name='MegaMolBART', index=1, number=1,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
     _descriptor.EnumValueDescriptor(
-      name='MegaMolBART', index=2, number=2,
+      name='MolBART', index=2, number=10000,
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=574,
-  serialized_end=632,
+  serialized_start=567,
+  serialized_end=625,
 )
 _sym_db.RegisterEnumDescriptor(_GENERATIVEMODEL)
 
 GenerativeModel = enum_type_wrapper.EnumTypeWrapper(_GENERATIVEMODEL)
 CDDD = 0
-MolBART = 1
-MegaMolBART = 2
+MegaMolBART = 1
+MolBART = 10000
 
 
 
@@ -215,6 +215,20 @@ _EMBEDDINGLIST = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='dim', full_name='nvidia.cheminformatics.grpc.EmbeddingList.dim', index=1,
+      number=2, type=5, cpp_type=1, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
+    _descriptor.FieldDescriptor(
+      name='pad_mask', full_name='nvidia.cheminformatics.grpc.EmbeddingList.pad_mask', index=2,
+      number=3, type=8, cpp_type=7, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -232,18 +246,18 @@ _EMBEDDINGLIST = _descriptor.Descriptor(
 )
 
 
-_ITERATIONVAL = _descriptor.Descriptor(
-  name='IterationVal',
-  full_name='nvidia.cheminformatics.grpc.IterationVal',
+_VERSION = _descriptor.Descriptor(
+  name='Version',
+  full_name='nvidia.cheminformatics.grpc.Version',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   create_key=_descriptor._internal_create_key,
   fields=[
     _descriptor.FieldDescriptor(
-      name='iteration', full_name='nvidia.cheminformatics.grpc.IterationVal.iteration', index=0,
-      number=1, type=5, cpp_type=1, label=1,
-      has_default_value=False, default_value=0,
+      name='version', full_name='nvidia.cheminformatics.grpc.Version.version', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=b"".decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
@@ -260,7 +274,7 @@ _ITERATIONVAL = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=539,
-  serialized_end=572,
+  serialized_end=565,
 )
 
 _GENERATIVESPEC.fields_by_name['model'].enum_type = _GENERATIVEMODEL
@@ -283,7 +297,7 @@ _SMILESLIST.fields_by_name['embeddings'].message_type = _EMBEDDINGLIST
 DESCRIPTOR.message_types_by_name['GenerativeSpec'] = _GENERATIVESPEC
 DESCRIPTOR.message_types_by_name['SmilesList'] = _SMILESLIST
 DESCRIPTOR.message_types_by_name['EmbeddingList'] = _EMBEDDINGLIST
-DESCRIPTOR.message_types_by_name['IterationVal'] = _ITERATIONVAL
+DESCRIPTOR.message_types_by_name['Version'] = _VERSION
 DESCRIPTOR.enum_types_by_name['GenerativeModel'] = _GENERATIVEMODEL
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
@@ -308,12 +322,12 @@ EmbeddingList = _reflection.GeneratedProtocolMessageType('EmbeddingList', (_mess
   })
 _sym_db.RegisterMessage(EmbeddingList)
 
-IterationVal = _reflection.GeneratedProtocolMessageType('IterationVal', (_message.Message,), {
-  'DESCRIPTOR' : _ITERATIONVAL,
+Version = _reflection.GeneratedProtocolMessageType('Version', (_message.Message,), {
+  'DESCRIPTOR' : _VERSION,
   '__module__' : 'generativesampler_pb2'
-  # @@protoc_insertion_point(class_scope:nvidia.cheminformatics.grpc.IterationVal)
+  # @@protoc_insertion_point(class_scope:nvidia.cheminformatics.grpc.Version)
   })
-_sym_db.RegisterMessage(IterationVal)
+_sym_db.RegisterMessage(Version)
 
 
 
@@ -324,8 +338,8 @@ _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=635,
-  serialized_end=1166,
+  serialized_start=628,
+  serialized_end=1152,
   methods=[
   _descriptor.MethodDescriptor(
     name='SmilesToEmbedding',
@@ -338,9 +352,19 @@ _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
+    name='EmbeddingToSmiles',
+    full_name='nvidia.cheminformatics.grpc.GenerativeSampler.EmbeddingToSmiles',
+    index=1,
+    containing_service=None,
+    input_type=_EMBEDDINGLIST,
+    output_type=_SMILESLIST,
+    serialized_options=None,
+    create_key=_descriptor._internal_create_key,
+  ),
+  _descriptor.MethodDescriptor(
     name='FindSimilars',
     full_name='nvidia.cheminformatics.grpc.GenerativeSampler.FindSimilars',
-    index=1,
+    index=2,
     containing_service=None,
     input_type=_GENERATIVESPEC,
     output_type=_SMILESLIST,
@@ -350,7 +374,7 @@ _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
   _descriptor.MethodDescriptor(
     name='Interpolate',
     full_name='nvidia.cheminformatics.grpc.GenerativeSampler.Interpolate',
-    index=2,
+    index=3,
     containing_service=None,
     input_type=_GENERATIVESPEC,
     output_type=_SMILESLIST,
@@ -358,12 +382,12 @@ _GENERATIVESAMPLER = _descriptor.ServiceDescriptor(
     create_key=_descriptor._internal_create_key,
   ),
   _descriptor.MethodDescriptor(
-    name='GetIteration',
-    full_name='nvidia.cheminformatics.grpc.GenerativeSampler.GetIteration',
-    index=3,
+    name='GetVersion',
+    full_name='nvidia.cheminformatics.grpc.GenerativeSampler.GetVersion',
+    index=4,
     containing_service=None,
     input_type=google_dot_protobuf_dot_empty__pb2._EMPTY,
-    output_type=_ITERATIONVAL,
+    output_type=_VERSION,
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),

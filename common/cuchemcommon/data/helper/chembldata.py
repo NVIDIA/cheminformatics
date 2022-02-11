@@ -32,12 +32,10 @@ ADDITIONAL_FEILD_TYPE = [pandas.Series([], dtype='object'),
 
 SQL_MOLECULAR_PROP = """
 SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
-FROM compound_properties cp,
-        compound_structures cs,
-        molecule_dictionary md
-WHERE cp.molregno = md.molregno
-        AND md.molregno = cs.molregno
-        AND md.molregno in (%s)
+FROM molecule_dictionary as md
+    join compound_structures cs on md.molregno = cs.molregno
+    left join compound_properties cp on cs.molregno = cp.molregno
+WHERE  md.molregno in (%s)
 """
 
 
@@ -48,7 +46,7 @@ class ChEmblData(object, metaclass=Singleton):
 
         context = Context()
         db_file = context.get_config('data_mount_path', default='/data')
-        db_file = os.path.join(db_file, 'db/chembl_27.db')
+        db_file = os.path.join(db_file, 'db', 'chembl_27.db')
 
         if not os.path.exists(db_file):
             logger.error('%s not found', db_file)
@@ -79,12 +77,10 @@ class ChEmblData(object, metaclass=Singleton):
         """
         sql_stml = """
             SELECT md.molregno as molregno, md.chembl_id, cp.*, cs.*
-            FROM compound_properties cp,
-                    compound_structures cs,
-                    molecule_dictionary md
-            WHERE cp.molregno = md.molregno
-                    AND md.molregno = cs.molregno
-                    AND md.chembl_id in (%s)
+            FROM molecule_dictionary as md
+                join compound_properties cp on md.molregno = cp.molregno
+                left join compound_structures cs on cp.molregno = cs.molregno
+            WHERE  md.chembl_id in (%s)
             """
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
@@ -100,12 +96,10 @@ class ChEmblData(object, metaclass=Singleton):
                 closing(con.cursor()) as cur:
             select_stmt = '''
                 SELECT md.molregno as molregno
-                FROM compound_properties cp,
-                        compound_structures cs,
-                        molecule_dictionary md
-                WHERE cp.molregno = md.molregno
-                    AND md.molregno = cs.molregno
-                    AND md.chembl_id in (%s)
+                FROM molecule_dictionary as md
+                    join compound_properties cp on md.molregno = cp.molregno
+                    left join compound_structures cs on cp.molregno = cs.molregno
+                WHERE  md.chembl_id in (%s)
             ''' % "'%s'" % "','".join(chemblIds)
             cur.execute(select_stmt)
             return cur.fetchall()
@@ -116,12 +110,11 @@ class ChEmblData(object, metaclass=Singleton):
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
             select_stmt = '''
-                SELECT cs.molregno as molregno, md.chembl_id as chembl_id,
-                       cs.canonical_smiles as smiles
-                FROM compound_structures cs,
-                    molecule_dictionary md
-                WHERE md.molregno = cs.molregno
-                    AND md.chembl_id in (%s)
+                SELECT md.molregno as molregno, md.chembl_id as chembl_id,
+                    cs.canonical_smiles as smiles
+                FROM molecule_dictionary as md
+                    join compound_structures cs on md.molregno = cs.molregno
+                WHERE md.chembl_id in (%s)
             ''' % "'%s'" % "','".join([x.strip().upper() for x in new_molecules])
             cur.execute(select_stmt)
 
@@ -136,58 +129,6 @@ class ChEmblData(object, metaclass=Singleton):
                 FROM molecule_dictionary md
                 WHERE md.molregno in (%s)
             ''' % ", ".join(list(map(str, molregnos)))
-            cur.execute(select_stmt)
-            return cur.fetchall()
-
-    def fetch_approved_drugs(self):
-        """Fetch approved drugs with phase >=3 as dataframe
-
-        Args:
-            chembl_db_path (string): path to chembl sqlite database
-        Returns:
-            pd.DataFrame: dataframe containing SMILES strings and molecule index
-        """
-        logger.debug('Fetching ChEMBL approved drugs...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
-                closing(con.cursor()) as cur:
-            select_stmt = """SELECT
-                di.molregno,
-                cs.canonical_smiles,
-                di.max_phase_for_ind
-            FROM
-                drug_indication AS di
-            LEFT JOIN compound_structures AS cs ON di.molregno = cs.molregno
-            WHERE
-                di.max_phase_for_ind >= 3
-                AND cs.canonical_smiles IS NOT NULL;"""
-            cur.execute(select_stmt)
-            return cur.fetchall()
-
-    def fetch_random_samples(self, num_samples, max_len):
-        """Fetch random samples from ChEMBL as dataframe
-
-        Args:
-            num_samples (int): number of samples to select
-            chembl_db_path (string): path to chembl sqlite database
-        Returns:
-            pd.DataFrame: dataframe containing SMILES strings and molecule index
-        """
-        logger.debug('Fetching ChEMBL random samples...')
-        with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
-                closing(con.cursor()) as cur:
-            select_stmt = """SELECT
-                cs.molregno,
-                cs.canonical_smiles,
-                LENGTH(cs.canonical_smiles) as len
-            FROM
-                compound_structures AS cs
-            WHERE
-                cs.canonical_smiles IS NOT NULL
-            AND
-                len <= """ + f'{max_len}' + """
-            ORDER BY RANDOM()
-            LIMIT """ + f'{num_samples};'
-
             cur.execute(select_stmt)
             return cur.fetchall()
 
@@ -232,9 +173,7 @@ class ChEmblData(object, metaclass=Singleton):
         records in a dataframe.
         """
         # TODO: loading compounds from the database and computing fingerprints need to be separated
-        # We may need to recompute fingerprints but not reload compounds.
-        # TODO: user must be able to load compounds by specifying start and batch_size
-        logger.info('\n_fetch_mol_embedding: Fetching %d records starting %d...' % (batch_size, start))
+        logger.debug('Fetching %d records starting %d...' % (batch_size, start))
 
         imp_cols = ['cp.' + col for col in IMP_PROPS]
 
@@ -306,8 +245,8 @@ class ChEmblData(object, metaclass=Singleton):
         if num_recs is None or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
-        logger.info('num_recs %d', num_recs)
-        logger.info('batch_size %d', batch_size)
+        logger.debug(f'num_recs={num_recs}, batch_size={batch_size}')
+        meta_df = self._meta_df(**transformation_kwargs)
 
         dls = []
         for start in range(0, num_recs, batch_size):
@@ -332,3 +271,25 @@ class ChEmblData(object, metaclass=Singleton):
         logger.info(f'save_fingerprints writing {type(mol_df)} to {hdf_path}')
         mol_df.to_hdf(hdf_path, 'fingerprints')
 
+    def is_valid_chemble_smiles(self, smiles, con=None):
+
+        if con is None:
+            with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
+                    closing(con.cursor()) as cur:
+                select_stmt = '''
+                    SELECT count(*)
+                    FROM compound_structures cs
+                    WHERE canonical_smiles = ?
+                '''
+                cur.execute(select_stmt, (smiles))
+                return cur.fetchone()[0]
+        else:
+            cur = con.cursor()
+            select_stmt = '''
+                    SELECT count(*)
+                    FROM compound_structures cs
+                    WHERE canonical_smiles = ?
+                '''
+            cur.execute(select_stmt, (smiles,))
+
+            return cur.fetchone()[0]

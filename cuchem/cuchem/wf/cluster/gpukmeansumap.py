@@ -252,6 +252,9 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         chem_mol_map = {row[0]: row[1] for row in self.dao.fetch_id_from_chembl(chemblids)}
         molregnos = list(chem_mol_map.keys())
 
+        if len(molregnos) != len(chemblids):
+            raise Exception(f"One of the ChEMBL ID is either invalid or the DB does not contain structural properties.")
+
         self.df_embedding['id_exists'] = self.df_embedding['id'].isin(molregnos)
 
         ldf = self.df_embedding.query('id_exists == True')
@@ -282,9 +285,10 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
             self.df_embedding = self._remove_ui_columns(self.df_embedding)
             self.df_embedding = self.df_embedding.append(new_fingerprints)
 
-            # TODO: does caller expect cudf or dask_cudf?
             if hasattr(self.df_embedding, 'compute'):
                 self.df_embedding = self.df_embedding.compute()
+
+            logger.info(self.df_embedding.shape)
 
         return chem_mol_map, molregnos, self.df_embedding
 

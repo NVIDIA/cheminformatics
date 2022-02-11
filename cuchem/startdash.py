@@ -29,18 +29,20 @@ from dask.distributed import Client, LocalCluster
 from cuchemcommon.context import Context
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.data.cluster_wf import FINGER_PRINT_FILES
-from cuchemcommon.fingerprint import MorganFingerprint, Embeddings
-from cuchemcommon.utils.logger import initialize_logfile, log_results
+from cuchemcommon.utils.logger import initialize_logfile
 from cuchem.utils.dask import initialize_cluster
 
 warnings.filterwarnings('ignore', 'Expected ')
 warnings.simplefilter('ignore')
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, filename='/logs/cuchem.log')
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+console.setFormatter(logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s'))
+logging.getLogger("").addHandler(console)
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 logger = logging.getLogger('cuchem.cheminformatics')
-formatter = logging.Formatter(
-    '%(asctime)s %(name)s [%(levelname)s]: %(message)s')
 
 
 client = None
@@ -88,11 +90,12 @@ To start dash:
         args = parser.parse_args(sys.argv[1:2])
 
         if not hasattr(self, args.command):
-            print('Unrecognized command')
-            parser.print_help()
-            exit(1)
+            print('Unrecognized command. Please use --help option to list available actions.')
+            print('Falling back to default behavior')
+            getattr(self, args.command)()
+        else:
 
-        getattr(self, args.command)()
+            getattr(self, args.command)()
 
     def cache(self):
         """
@@ -159,8 +162,10 @@ To start dash:
                 os.makedirs(args.cache_directory)
 
             if (args.cache_type == 'MorganFingerprint'):
+                from cuchemcommon.fingerprint import MorganFingerprint
                 prepocess_type = MorganFingerprint
             elif (args.cache_type == 'Embeddings'):
+                from cuchemcommon.fingerprint import Embeddings
                 prepocess_type = Embeddings
 
             # TODO: when loading precomputed fingerprints, the radius and size should be specified
@@ -250,12 +255,6 @@ To start dash:
                             default=False,
                             help='Use CPU')
 
-        parser.add_argument('-b', '--benchmark',
-                            dest='benchmark',
-                            action='store_true',
-                            default=False,
-                            help='Execute for benchmark')
-
         parser.add_argument('-p', '--pca_comps',
                             dest='pca_comps',
                             type=int,
@@ -286,12 +285,6 @@ To start dash:
                             default=100000,
                             help='Chunksize.')
 
-        parser.add_argument('-o', '--output_dir',
-                            dest='output_dir',
-                            default=".",
-                            type=str,
-                            help='Output directory for benchmark results')
-
         parser.add_argument('--n_gpu',
                             dest='n_gpu',
                             type=int,
@@ -315,8 +308,8 @@ To start dash:
         if args.debug:
             logger.setLevel(logging.DEBUG)
 
-        benchmark_file = initialize_logfile()
-
+        # TODO: Move the clustering benchmark testing into benchmank module
+        # initialize_logfile()
         client = initialize_cluster(not args.cpu,
                                     n_cpu=args.n_cpu,
                                     n_gpu=args.n_gpu)
@@ -324,8 +317,6 @@ To start dash:
         # Set the context
         context = Context()
         context.dask_client = client
-        context.is_benchmark = args.benchmark
-        context.benchmark_file = benchmark_file
         context.cache_directory = args.cache_directory
         context.n_molecule = args.n_mol
         context.batch_size = args.batch_size
@@ -333,10 +324,7 @@ To start dash:
         if args.cpu:
             context.compute_type = 'cpu'
         else:
-            logger.info('Number of workers %d.', len(client.scheduler_info()['workers'].keys()))
-
-        start_time = datetime.now()
-        task_start_time = datetime.now()
+            logger.debug('Number of workers %d.', len(client.scheduler_info()['workers'].keys()))
 
         n_molecules = args.n_mol
         if not args.cpu:
@@ -350,38 +338,15 @@ To start dash:
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
 
-        # Cluster() will trigger a read if not found in the cache dir:
-        mol_df = workflow.cluster()
-        if args.benchmark:
-            workflow.compute_qa_matric()
-            if not args.cpu:
-                mol_df = mol_df.compute()
-                n_workers = args.n_gpu
-            else:
-                n_workers = args.n_cpu
+        logger.info("Starting interactive visualization...")
 
-            n_molecules = workflow.n_molecules
+        workflow.cluster()
+        from cuchem.interactive.chemvisualize import ChemVisualization
+        v = ChemVisualization(workflow)
+        port = context.get_config('plotly_port', 5000)
 
-            runtime = datetime.now() - task_start_time
-            logger.info('Runtime workflow (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, context.compute_type, 'workflow',
-                        runtime, n_molecules, n_workers, metric_name='',
-                        metric_value='', benchmark_file=benchmark_file)
-
-            runtime = datetime.now() - start_time
-            logger.info('Runtime Total (hh:mm:ss.ms) {}'.format(runtime))
-            log_results(task_start_time, context.compute_type, 'total',
-                        runtime, n_molecules, n_workers, metric_name='',
-                        metric_value='', benchmark_file=benchmark_file)
-        else:
-            port = context.get_config('plotly_port', 5000)
-
-            logger.info("Starting interactive visualization...")
-            from cuchem.interactive.chemvisualize import ChemVisualization
-            v = ChemVisualization(workflow)
-
-            logger.info('navigate to https://localhost: %s' % port)
-            v.start('0.0.0.0', port=port)
+        logger.info('navigate to https://localhost: %s' % port)
+        v.start('0.0.0.0', port=port)
 
 
 def main():

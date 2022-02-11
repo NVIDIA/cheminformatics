@@ -1,6 +1,7 @@
 import logging
+import torch
 
-from generativesampler_pb2 import EmbeddingList, SmilesList, IterationVal
+from generativesampler_pb2 import EmbeddingList, SmilesList, Version
 import generativesampler_pb2_grpc
 from megamolbart.inference import MegaMolBART
 
@@ -12,15 +13,12 @@ logger = logging.getLogger(__name__)
 class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=Singleton):
 
     def __init__(self, *args, **kwargs):
-        decoder_max_seq_len = kwargs['decoder_max_seq_len'] if 'decoder_max_seq_len' in kwargs else None
-        self.megamolbart = MegaMolBART(decoder_max_seq_len=decoder_max_seq_len)
+        torch.set_grad_enabled(False)
 
-        try:
-            iteration = int(self.megamolbart.iteration)
-        except:
-            iteration = 0
-        self.iteration = iteration
-        logger.info(f'Loaded iteration {self.iteration}')
+        model_dir = kwargs['model_dir'] if 'model_dir' in kwargs else None
+        self.megamolbart = MegaMolBART(model_dir=model_dir + '/megamolbart_checkpoint.nemo')
+
+        logger.info(f'Loaded Version {self.megamolbart.version}')
 
     # TODO update to accept batched input if similes2embedding does
     # TODO how to handle length overrun for batch processing --> see also MegaMolBART.load_model in inference.py
@@ -48,7 +46,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
         embedding = torch.reshape(embedding, dim).cuda()
         pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
 
-        generated_mols = self.megamolbart.inverse_transform(embedding, pad_mask)
+        generated_mols = self.megamolbart.inverse_transform([embedding], pad_mask)
         return SmilesList(generatedSmiles=generated_mols)
 
     def FindSimilars(self, spec, context):
@@ -59,6 +57,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
                 smiles_str,
                 num_requested=spec.numRequested,
                 scaled_radius=spec.radius,
+                sanitize=spec.sanitize,
                 force_unique=False)
 
         embeddings = []
@@ -76,8 +75,9 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
             spec.smiles,
             num_points=spec.numRequested,
             scaled_radius=spec.radius,
+            sanitize=spec.sanitize,
             force_unique=False)
         return SmilesList(generatedSmiles=generated_smiles)
 
-    def GetIteration(self, spec, context):
-        return IterationVal(iteration=self.iteration)
+    def GetVersion(self, spec, context):
+        return Version(version='0.1.0_' + self.megamolbart.version)

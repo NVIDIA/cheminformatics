@@ -1,10 +1,10 @@
 import logging
-# import torch
 from functools import singledispatch
 from typing import List
 
 import numpy as np
 from cuchemcommon.data import GenerativeWfDao
+from cuchemcommon.fingerprint import BaseTransformation
 from rdkit.Chem import PandasTools, CanonSmiles
 
 logger = logging.getLogger(__name__)
@@ -27,14 +27,14 @@ def _(embedding, radius, cnt, shape):
     return distorteds
 
 
-class BaseGenerativeWorkflow:
+class BaseGenerativeWorkflow(BaseTransformation):
 
     def __init__(self, dao: GenerativeWfDao = None) -> None:
         self.dao = dao
         self.min_jitter_radius = None
 
-    def get_iteration(self):
-        NotImplemented
+    def is_ready(self, timeout: int = 10):
+        return True
 
     def smiles_to_embedding(self,
                             smiles: str,
@@ -51,21 +51,24 @@ class BaseGenerativeWorkflow:
                            smiles: List,
                            num_points: int = 10,
                            scaled_radius=None,
-                           force_unique=False):
+                           force_unique=False,
+                           sanitize=True):
         NotImplemented
 
     def find_similars_smiles_list(self,
                                   smiles: str,
                                   num_requested: int = 10,
                                   scaled_radius=None,
-                                  force_unique=False):
+                                  force_unique=False,
+                                  sanitize=True):
         NotImplemented
 
     def find_similars_smiles(self,
                              smiles: str,
                              num_requested: int = 10,
                              scaled_radius=None,
-                             force_unique=False):
+                             force_unique=False,
+                             sanitize=True):
         NotImplemented
 
     def _compute_radius(self, scaled_radius):
@@ -79,7 +82,7 @@ class BaseGenerativeWorkflow:
                   radius=None,
                   cnt=1,
                   shape=None):
-        radius = radius if radius else self.radius_scale
+        radius = radius if radius else self.min_jitter_radius
         return add_jitter(embedding, radius, cnt, shape)
 
     def compute_unique_smiles(self,
@@ -159,7 +162,8 @@ class BaseGenerativeWorkflow:
                           id_type: str = 'chemblid',
                           num_points=10,
                           force_unique=False,
-                          scaled_radius: int = 1):
+                          scaled_radius: int = 1,
+                          sanitize=True):
         smiles = None
 
         if not self.min_jitter_radius:
@@ -177,7 +181,8 @@ class BaseGenerativeWorkflow:
             compound_ids=ids,
             num_points=num_points,
             scaled_radius=scaled_radius,
-            force_unique=force_unique
+            force_unique=force_unique,
+            sanitize=sanitize
         )
 
     def extrapolate_from_cluster(self,
@@ -217,7 +222,8 @@ class BaseGenerativeWorkflow:
                                    id_type: str = 'chemblid',
                                    num_requested=10,
                                    force_unique=False,
-                                   scaled_radius: int = 1):
+                                   scaled_radius: int = 1,
+                                   sanitize=True):
         smiles = None
 
         if not self.min_jitter_radius:
@@ -235,5 +241,6 @@ class BaseGenerativeWorkflow:
             num_requested=num_requested,
             scaled_radius=scaled_radius,
             force_unique=force_unique,
-            compound_id=str(chembl_id)
+            compound_id=str(chembl_id),
+            sanitize=sanitize
         )

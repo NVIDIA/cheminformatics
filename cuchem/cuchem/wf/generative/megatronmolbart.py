@@ -6,7 +6,7 @@ import pandas as pd
 from typing import List
 
 from generativesampler_pb2_grpc import GenerativeSamplerStub
-from generativesampler_pb2 import GenerativeSpec, EmbeddingList, GenerativeModel, google_dot_protobuf_dot_empty__pb2
+from generativesampler_pb2 import GenerativeSpec, EmbeddingList, GenerativeModel
 
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.data.generative_wf import ChemblGenerativeWfDao
@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 PAD_TOKEN = 0 # TODO: use tokenizer.pad_token instead
 
 
-class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
+class MegatronMolBART(BaseGenerativeWorkflow):
+    __metaclass__ = Singleton
 
     def __init__(self, dao: GenerativeWfDao = ChemblGenerativeWfDao(None)) -> None:
         super().__init__(dao)
@@ -43,22 +44,29 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
         else:
             self.device = 'cpu' 
         self.min_jitter_radius = 1
-        channel = grpc.insecure_channel(os.getenv('Megamolbart', 'megamolbart:50051'))
-        self.stub = GenerativeSamplerStub(channel)
+        self.channel = grpc.insecure_channel('megamolbart:50051')
+        self.stub = GenerativeSamplerStub(self.channel)
 
-    def get_iteration(self):
-        result = self.stub.GetIteration(google_dot_protobuf_dot_empty__pb2.Empty())
-        return result.iteration
+    def is_ready(self, timeout: int = 10) -> bool:
+        try:
+            grpc.channel_ready_future(self.channel).result(timeout=timeout)
+            logger.info('Megatron MolBART is ready')
+            return True
+        except grpc.FutureTimeoutError:
+            logger.warning('Megatron MolBART is not reachable.')
+            return False
 
     def smiles_to_embedding(self,
                             smiles: str,
                             padding: int,
                             scaled_radius=None,
-                            num_requested: int = 10):
+                            num_requested: int = 10,
+                            sanitize=True):
         spec = GenerativeSpec(smiles=[smiles],
                               padding=padding,
                               radius=scaled_radius,
-                              numRequested=num_requested)
+                              numRequested=num_requested,
+                              sanitize=sanitize)
 
         result = self.stub.SmilesToEmbedding(spec)
         return result
@@ -71,7 +79,7 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                              dim=dim,
                              pad_mask=pad_mask)
 
-        return self.stub.EmbeddingToSmiles(spec) # Not yet implemented in the main branch but supported elsewhere
+        return self.stub.EmbeddingToSmiles(spec)
 
     def find_similars_smiles(self,
                              smiles: str,
@@ -91,7 +99,6 @@ class MegatronMolBART(BaseGenerativeWorkflow, metaclass=Singleton):
                               numRequested=num_requested,
                               forceUnique=force_unique,
                               sanitize=sanitize)
-
         result = self.stub.FindSimilars(spec)
         generatedSmiles = result.generatedSmiles
         embeddings = []

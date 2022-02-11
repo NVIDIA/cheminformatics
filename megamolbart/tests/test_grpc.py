@@ -1,6 +1,7 @@
 import sys
 import grpc
 import logging
+import pathlib
 
 from concurrent import futures
 from contextlib import contextmanager
@@ -17,11 +18,8 @@ logger = logging.getLogger(__name__)
 def similarity(add_server_method, service_cls, stub_cls):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
 
-    add_server_method(service_cls(num_layers=DEFAULT_NUM_LAYERS,
-                                  hidden_size=DEFAULT_D_MODEL,
-                                  num_attention_heads=DEFAULT_NUM_HEADS,
-                                  checkpoints_dir=CHECKPOINTS_DIR,
-                                  vocab_path='/models/megamolbart/bart_vocab.txt',),
+    model_dir = sorted(pathlib.Path('/models/').glob('**/megamolbart_checkpoint.nemo'))[-1].absolute().parent.as_posix()
+    add_server_method(service_cls(model_dir=model_dir),
                       server)
     port = server.add_insecure_port('[::]:0')
     server.start()
@@ -49,10 +47,11 @@ def test_dataframe_similar():
         spec = generativesampler_pb2.GenerativeSpec(
             model=generativesampler_pb2.GenerativeModel.MegaMolBART,
             smiles=['CC(=O)Nc1ccc(O)cc1'],
-            radius=5.0,
+            radius=2.0,
             numRequested=10)
 
         result = stub.FindSimilars(spec)
+
 
 def test_dataframe_interpolate():
     sys.argv = [sys.argv[0]]
@@ -67,3 +66,18 @@ def test_dataframe_interpolate():
             numRequested=10)
 
         result = stub.Interpolate(spec)
+
+
+def test_transform():
+    sys.argv = [sys.argv[0]]
+    with similarity(generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server,
+                    GenerativeSampler,
+                    generativesampler_pb2_grpc.GenerativeSamplerStub) as stub:
+
+        spec = generativesampler_pb2.GenerativeSpec(
+            model=generativesampler_pb2.GenerativeModel.MegaMolBART,
+            smiles=['CC(=O)Nc1ccc(O)'])
+
+        result = stub.SmilesToEmbedding(spec)
+        result = stub.EmbeddingToSmiles(result)
+        logger.info(result)

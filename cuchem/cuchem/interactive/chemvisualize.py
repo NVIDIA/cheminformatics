@@ -248,7 +248,8 @@ class ChemVisualization(metaclass=Singleton):
              Output('gen_figure', 'figure'),
              Output('table_generated_molecules', 'children'),
              Output('show_generated_mol', 'children'),
-             Output('interpolation_error', 'children'), ],
+             Output('msg_generated_molecules', 'children'),
+             Output('interpolation_error', 'children')],
             [Input("bt_generate", "n_clicks"), ],
             [State('sl_generative_wf', 'value'),
              State('ckl_candidate_mol_id', 'value'),
@@ -376,7 +377,8 @@ class ChemVisualization(metaclass=Singleton):
             self.generated_df = generative_wf.find_similars_smiles_by_id(chembl_ids,
                                                                          num_requested=n2generate,
                                                                          scaled_radius=scaled_radius,
-                                                                         force_unique=True)
+                                                                         force_unique=True,
+                                                                         sanitize=True)
         elif rd_generation_type == 'EXTRAPOLATE':
             self.generated_df = generative_wf.extrapolate_from_cluster(self.cluster_wf.df_embedding,
                                                                        compound_property=extrap_compound_property,
@@ -392,7 +394,8 @@ class ChemVisualization(metaclass=Singleton):
             self.generated_df = generative_wf.interpolate_by_id(chembl_ids,
                                                                 num_points=n2generate,
                                                                 scaled_radius=scaled_radius,
-                                                                force_unique=True)
+                                                                force_unique=True,
+                                                                sanitize=True)
 
         if show_generated_mol is None:
             show_generated_mol = 0
@@ -715,7 +718,15 @@ class ChemVisualization(metaclass=Singleton):
 
             prop_recs.append(html.Tr(td))
 
+
+        # venkat: 
         return {'display': 'inline'}, html.Table(prop_recs, style={'width': '100%', 'margin': 12, 'border': '1px solid lightgray'})
+        # dev:
+        #return html.Table(prop_recs, style={'width': '100%',
+        #                                    'border': '1px solid lightgray'}), \
+        #       show_generated_mol, \
+        #       msg_generated_molecules, \
+        #       dash.no_update
 
     def handle_ckl_selection(self, ckl_candidate_mol_id, rd_generation_type):
         selection_msg = '**Please Select Two Molecules**'

@@ -29,7 +29,6 @@ MEGAMOLBART_CONT=nvcr.io/nvstaging/clara/megamolbart:latest
 MEGAMOLBART_MODEL=nvstaging/clara/megamolbart:0.1
 PROJECT_PATH=/home/user_home/code/cheminformatics
 CONTENT_PATH=/home/user_home/data
-DATA_MOUNT_PATH=/data
 PLOTLY_PORT=5000
 DASK_PORT=9001
 SUBNET=192.177.100.0/16
@@ -102,7 +101,7 @@ Users can generate Morgan Fingerprints and store it in HDF5 files for later use.
 ./launch.sh cache -c /data/fp
 ```
 
-It is best to create the cache at `DATA_MOUNT_PATH` property defined in `~/.env`. Default value of this property is `/data/`. This is a mounted volumne from host and available for reuse beyond the container's lifetime.
+It is best to create the cache at `/data/`. This is a mounted volumne from host and available for reuse beyond the container's lifetime.
 
 Once generated, the cached fingerprints can be used for analysis using `-c` option.
 ```
@@ -115,17 +114,17 @@ Conda environment support is available for user wanting to use the tool outside 
 
 ### Acceleration
 
-The latest benchmarks reside in the [benchmark](benchmark) directory.
+The latest benchmarks reside in the [benchmark](benchmark/clustering/results) directory.
 
 Benchmark tests run on A100:
-  - [markdown](benchmark/A100/benchmark.md)
-  - [Excel](benchmark/A100/benchmark.xlsx)
-  - [plot](benchmark/A100/benchmark.png)
+  - [markdown](benchmark/clustering/results/A100/benchmark.md)
+  - [Excel](benchmark/clustering/results/A100/benchmark.xlsx)
+  - [plot](benchmark/clustering/results/A100/benchmark.png)
 
 Benchmark tests run on V100:
-  - [markdown](benchmark/V100/benchmark.md)
-  - [Excel](benchmark/V100/benchmark.xlsx)
-  - [plot](benchmark/V100/benchmark.png)
+  - [markdown](benchmark/clustering/results/V100/benchmark.md)
+  - [Excel](benchmark/clustering/results/V100/benchmark.xlsx)
+  - [plot](benchmark/clustering/results/V100/benchmark.png)
 
 ### Features
 

@@ -57,8 +57,12 @@ variables:
     REGISTRY_ACCESS_TOKEN
         container registry access token. e.g.,
         Ckj53jGK...
-    REGISTRY_USER
-        container registry username. e.g.,
+    REGISTRY_USER        export UID=$(id -u)
+        export GID=$(id -g)
+
+        container registry username. e.g.,        export UID=$(id -u)
+        export GID=$(id -g)
+
         astern
     REGISTRY
         container registry URL. e.g.,
@@ -68,11 +72,11 @@ EOF
     exit
 }
 
-
 source env.sh
 
 
 start() {
+    validate_docker
     # run a container and start dash inside container.
     echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
     export ADDITIONAL_PARAM="$@"
@@ -80,10 +84,17 @@ start() {
     download_model
     dbSetup ${DATA_PATH}
 
-    export ADDITIONAL_PARAM="$@"
-    export CUCHEM_PATH=/opt/nvidia/cheminfomatics
-    export MEGAMOLBART_PATH=/opt/nvidia/megamolbart
-    ./docker-compose --env-file .env  \
+    export CUCHEM_UI_START_CMD="./launch.sh start $@"
+    export MEGAMOLBART_CMD="python3 -m megamolbart"
+    export UID=$(id -u)
+    export GID=$(id -g)
+
+    # Working directory for the individual containers.
+    export WORKING_DIR_CUCHEMUI=/opt/nvidia/cheminfomatics
+    export WORKING_DIR_MEGAMOLBART=/opt/nvidia/megamolbart
+    export NGINX_CONFIG=nginx.conf
+
+    docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \
         up
@@ -119,6 +130,9 @@ case $1 in
         ;;
     stop)
         ;&
+    download_model)
+        $@
+        ;;
     cache)
         $@
         ;;

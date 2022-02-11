@@ -7,8 +7,6 @@ from cuchemcommon.utils.singleton import Singleton
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = '.env'
-
 
 class Context(metaclass=Singleton):
 
@@ -23,11 +21,15 @@ class Context(metaclass=Singleton):
         self.batch_size = 10000
 
         self.config = {}
-        if os.path.exists(CONFIG_FILE):
-            logger.info('Reading properties from %s...', CONFIG_FILE)
-            self.config = self._load_properties_file(CONFIG_FILE)
+        config_file = '.env'
+        if not os.path.exists('.env'):
+            config_file = '/workspace/.env'
+
+        if os.path.exists(config_file):
+            logger.info('Reading properties from %s...', config_file)
+            self.config = self._load_properties_file(config_file)
         else:
-            logger.warn('Could not locate %s', CONFIG_FILE)
+            logger.warning('Could not locate .env file')
 
     def _load_properties_file(self, properties_file):
         """
@@ -49,5 +51,5 @@ class Context(metaclass=Singleton):
         try:
             return self.config[config_name]
         except KeyError:
-            logger.warn('%s not found, returing default.', config_name)
+            logger.warning('%s not found, returing default.', config_name)
             return default

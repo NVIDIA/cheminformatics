@@ -5,7 +5,8 @@ import math
 import numpy as np
 from datetime import datetime
 import matplotlib.dates as mdates
-from .data import PHYSCHEM_UNIT_RENAMER, load_aggregated_metric_results, make_aggregated_embedding_df
+import seaborn as sns
+from .data import PHYSCHEM_UNIT_RENAMER, MEGAMOLBART_SAMPLE_RADIUS, load_aggregated_metric_results, make_aggregated_embedding_df
 
 __ALL__ = ['create_aggregated_plots']
 
@@ -28,6 +29,8 @@ def _label_bars(ax, max_value=None):
 def make_sampling_plots(metric_df, output_dir):
     """Make aggregate plots for validity, uniqueness, novelty --
        will be bar chart for single date or timeseries for multiple"""
+
+    sns.set_palette('dark')
 
     # Select data
     generative_mask = metric_df['name'].isin(['validity', 'unique', 'novelty'])
@@ -64,19 +67,24 @@ def make_sampling_plots(metric_df, output_dir):
 
         _label_bars(ax)
         ax.set_ylim(0, 1.1)
-        ax.set(title=metric.title(), xlabel='Model (Latest Benchmark)', ylabel='Percentage')
+        ax.set(title=metric.title(), xlabel='Model (Latest Benchmark)', ylabel='Ratio')
 
         # Second row is timeseries of megamolbart benchmark data
         row = 1
         ax = axes[row, col]
+
+        # Filter out only MegaMolBART models with best radius
         line_dat = dat[dat['inferrer'].str.contains('MegaMolBART')]
-        (line_dat.pivot(columns=['inferrer', 'radius'], 
+        model_size_mask = line_dat.apply(lambda x: MEGAMOLBART_SAMPLE_RADIUS[x['model_size']] == x['radius'], axis=1)
+        line_dat = line_dat.loc[model_size_mask]
+
+        (line_dat.pivot(columns='inferrer', 
                              values='value', 
                              index='timestamp')
             .plot(kind='line', marker='o', ax=ax, legend=show_legend))
         ax.set_ylim(0, 1.1)
         ax.set_xlim(*timestamp_lim)
-        ax.set(xlabel='Benchmark Date (Development Models)', ylabel='Percentage')
+        ax.set(xlabel='Benchmark Date (Development Models)', ylabel='Ratio')
 
         plt.tight_layout()
         fig.savefig(os.path.join(output_dir, 'Sampling_Metrics_Aggregated_Benchmark.png'))
@@ -85,10 +93,12 @@ def make_sampling_plots(metric_df, output_dir):
 def make_nearest_neighbor_plot(embedding_df, output_dir):
     """Aggregate plot for nearest neighbor correlation ---
        bar chart for single time point, time series for multiple"""
+    sns.set_palette('dark')
 
     dat = embedding_df[embedding_df.name == 'nearest neighbor correlation']
     dat = dat[['timestamp', 'inferrer', 'top_k', 'value']].drop_duplicates()
     dat['top_k'] = dat['top_k'].astype(int)
+    timestamp_lim = (dat['timestamp'].min() - 1, dat['timestamp'].max() + 1)
     
     fig, axes = plt.subplots(ncols=2, nrows=1, figsize=(4*2, 4))
     
@@ -109,6 +119,7 @@ def make_nearest_neighbor_plot(embedding_df, output_dir):
     line_dat = line_dat.pivot(columns=['inferrer', 'top_k'], values='value', index='timestamp')
     line_dat.plot(kind='line', marker='o', ax=ax)
     ax.set_ylim(*ylim)
+    ax.set_xlim(*timestamp_lim)
     ax.set(title='Nearest Neighbor Metric', ylabel="Speaman's Rho", xlabel='Benchmark Date (Development Models)')
 
     plt.tight_layout()
@@ -118,6 +129,8 @@ def make_nearest_neighbor_plot(embedding_df, output_dir):
 
 def make_physchem_plots(embedding_df, output_dir, max_plot_ratio=10):
     """Plots of phychem property results"""
+    sns.set_palette('dark')
+
     dat = embedding_df[embedding_df.name == 'physchem']
     dat['property'] = dat['property'].map(lambda x: PHYSCHEM_UNIT_RENAMER[x])
     dat = dat[['timestamp', 'inferrer', 'property', 'model', 'value']]
@@ -163,6 +176,8 @@ def make_physchem_plots(embedding_df, output_dir, max_plot_ratio=10):
 
 
 def make_bioactivity_plots(embedding_df, output_dir, max_plot_ratio=6):
+    sns.set_palette('dark')
+    
     dat = embedding_df[embedding_df.name == 'bioactivity']
     dat = dat[['timestamp', 'inferrer', 'gene', 'model', 'value']]
     dat.sort_values('gene', inplace=True)

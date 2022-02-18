@@ -10,11 +10,14 @@ from cuchembm.datasets.physchem import (MoleculeNetESOL,
 from cuchembm.datasets.bioactivity import ExCAPEDataset
 
 MODEL_RENAME_REGEX = re.compile(r"""(?:cuchembm.inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""")
+MODEL_SIZE_REGEX = re.compile(r"""(?P<model_size>x?small)""")
 
+MEGAMOLBART_SAMPLE_RADIUS = {'xsmall': 1.0,
+                     'small': 0.75}
 
 PHYSCHEM_UNIT_RENAMER = {'logD': 'Lipophilicity (log[D])', 
-                         'log_solubility_(mol_per_L)': 'ESOL (log[solubility], mol/L)', 
-                         'hydration_free_energy': 'FreeSolv (hydration energy, deltaH)'}
+                         'log_solubility_(mol_per_L)': 'ESOL (log[solubility])', 
+                         'hydration_free_energy': 'FreeSolv (hydration free energy)'}
                          
 
 def load_aggregated_metric_results(output_dir):
@@ -25,6 +28,11 @@ def load_aggregated_metric_results(output_dir):
 
     for file in file_list:
         df = pd.read_csv(file, parse_dates=['timestamp'], date_parser=custom_date_parser)
+        try:
+            model_size = re.search(MODEL_SIZE_REGEX, file).group('model_size')
+        except:
+            model_size = ""
+        df['model_size'] = model_size
         metric_df.append(df)
 
     metric_df = pd.concat(metric_df, axis=0).reset_index(drop=True)

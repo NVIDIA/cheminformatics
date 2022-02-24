@@ -94,15 +94,9 @@ build() {
         IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
         echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
         docker build --network host \
-<<<<<<< HEAD
-            -t ${MEGAMOLBART_CONT_BASENAME}:latest \
-            -t ${MEGAMOLBART_CONT} \
-            --build-arg SOURCE_CONTAINER=${MEGAMOLBART_TRAINING_CONT} \
-=======
             --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
             -t ${MEGAMOLBART_CONT_BASENAME}:latest \
             -t ${MEGAMOLBART_CONT} \
->>>>>>> dev
             -f Dockerfile.megamolbart .
     fi
 
@@ -166,14 +160,9 @@ dev() {
     else
         DOCKER_CMD="${DOCKER_CMD} --privileged"
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
-<<<<<<< HEAD
-        DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${DEV_PYTHONPATH}:"
-=======
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"
->>>>>>> dev
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     fi
 
@@ -192,11 +181,7 @@ start() {
     validate_docker
 
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-<<<<<<< HEAD
-        PYTHONPATH=/opt/nvidia/cheminfomatics/common/generated:/opt/nvidia/cheminfomatics/common:/opt/nvidia/cheminfomatics/cuchem:/opt/nvidia/cheminfomatics/chemportal
-=======
         PYTHONPATH=${PYTHONPATH_CUCHEM}
->>>>>>> dev
         dbSetup "${DATA_MOUNT_PATH}"
         cd ${CHEMINFO_DIR}/cuchem/; python3 startdash.py analyze $@
     else
@@ -215,13 +200,6 @@ start() {
         export PYTHONPATH_MEGAMOLBART="${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
         export NGINX_CONFIG=${PROJECT_PATH}/setup/config/nginx.conf
 
-<<<<<<< HEAD
-        export ADDITIONAL_PARAM="$@"
-        export CUCHEM_PATH=/workspace
-        export MEGAMOLBART_PATH=/workspace/megamolbart
-        export WORKSPACE_DIR='.'
-=======
->>>>>>> dev
         docker-compose --env-file .env  \
                 -f setup/docker_compose.yml \
                 --project-directory . \

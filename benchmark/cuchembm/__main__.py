@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 from copy import deepcopy
 from cuchembm.data import MoleculeGenerator
-from cuchembm.plot import (create_aggregated_plots, make_model_plots)
+from cuchembm.plot import (create_latest_aggregated_plots, create_timeseries_aggregated_plots, make_model_plots)
 
 # Dataset classess
 from cuchembm.datasets.physchem import (ChEMBLApprovedDrugs,
@@ -316,7 +316,8 @@ def main(cfg):
         metric.cleanup()
 
     # Plotting
-    create_aggregated_plots(output_dir) # TODO: improve test handling if specific metric data is absent
+    create_latest_aggregated_plots(output_dir) # TODO: improve test handling if specific metric data is absent
+    create_timeseries_aggregated_plots(output_dir)
     make_model_plots(max_seq_len, 'physchem', output_dir)
     make_model_plots(max_seq_len, 'bioactivity', output_dir)
 

@@ -8,6 +8,7 @@ from rdkit import Chem
 from rdkit.Chem import AllChem
 from math import ceil
 
+INTEGER_NBITS = 64 # Maximum number of bits in an integer column in a cudf Series
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ class MorganFingerprint(BaseTransformation):
         fp = cupy.asarray(fp)
         return fp
 
-    def transform(self, data, col_name='transformed_smiles', return_fp=False, raw=False):
+    def transform_new(self, data, col_name='transformed_smiles', return_fp=False, raw=False):
         """Single threaded processing of list"""
         data = data[col_name]
         fp_array = []
@@ -82,6 +83,45 @@ class MorganFingerprint(BaseTransformation):
                 return fp_array, raw_fp_array
             else:
                 return fp_array, np.asarray(raw_fp_array, dtype=np.uint64)        
+        return fp_array
+
+    def transform(
+        self, 
+        data, 
+        smiles_column = 'transformed_smiles', 
+        return_fp = False, # When set to True, an additional value is returned determined by the raw parameter
+        raw = False # The RDKit fingerprint object is returned when raw = True, and the int64 fingerprint columns are returned when raw = False
+    ):
+        data = data[smiles_column]
+        fp_array = []
+        self.n_fp_integers = ceil(self.kwargs['nBits'] / INTEGER_NBITS)
+        if raw:
+            raw_fp_array = []
+        else:
+            raw_fp_array = [[] for i in range(0, self.kwargs['nBits'], INTEGER_NBITS)]
+        for mol_smiles in data:
+            m = Chem.MolFromSmiles(mol_smiles)
+            if not m:
+                fp = None
+                fp_bs = '0' * self.kwargs['nBits']
+            else:
+                fp = self.func(m, **self.kwargs)
+                fp_bs = fp.ToBitString()
+            fp_array.append(cupy.asarray(np.frombuffer(fp_bs.encode(), 'u1') - ord('0')))
+            if return_fp:
+                if raw:
+                    raw_fp_array.append(fp)
+                else:
+                    for i in range(0, self.kwargs['nBits'], INTEGER_NBITS):
+                        raw_fp_array[i // INTEGER_NBITS].append(int(fp_bs[i: i + INTEGER_NBITS], 2))
+        #fp_array = np.asarray(fp_array)
+        fp_array = cupy.stack(fp_array)
+
+        if return_fp:
+            if raw:
+                return fp_array, raw_fp_array
+            else:
+                return fp_array, np.asarray(raw_fp_array, dtype=np.uint64)
         return fp_array
 
     def __len__(self):

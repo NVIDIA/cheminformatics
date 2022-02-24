@@ -19,8 +19,8 @@ def grouper(list_, num_rows):
 
 
 def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
-
     assert plot_type in ['physchem', 'bioactivity'], AssertionError(f"Error: plot type must be one of 'physchem' or 'bioactivity'.")
+    sns.set_palette('dark')
 
     if plot_type == 'physchem':
         input_data_func = load_physchem_input_data

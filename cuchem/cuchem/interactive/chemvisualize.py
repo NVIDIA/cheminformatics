@@ -249,7 +249,8 @@ class ChemVisualization(metaclass=Singleton):
              Output('table_generated_molecules', 'children'),
              Output('show_generated_mol', 'children'),
              Output('msg_generated_molecules', 'children'),
-             Output('interpolation_error', 'children')],
+             #Output('interpolation_error', 'children')
+             ],
             [Input("bt_generate", "n_clicks"), ],
             [State('sl_generative_wf', 'value'),
              State('ckl_candidate_mol_id', 'value'),
@@ -351,19 +352,20 @@ class ChemVisualization(metaclass=Singleton):
             return {'display': 'block', 'width': '100%'}, {'display': 'none'}
         return dash.no_update, dash.no_update
 
-    @report_ui_error(4)
+    @report_ui_error(3)
     def handle_generation(
         self, bt_generate, sl_generative_wf, ckl_candidate_mol_id, n2generate, 
         extrap_compound_property, extrap_cluster_number, extrap_n_compounds, extrap_step_size, 
         scaled_radius, rd_generation_type, show_generated_mol
     ):    
+        print('***handle_generation***')
         comp_id, event_type = self._fetch_event_data()
-
+        logger.info(f'handle_generation: comp_id={comp_id}, event_type={event_type}, rd_generation_type={rd_generation_type}')
         chembl_ids = []
         if comp_id == 'bt_generate' and event_type == 'n_clicks':
             chembl_ids = ckl_candidate_mol_id
         else:
-            return dash.no_update, dash.no_update
+            return dash.no_update, dash.no_update, dash.no_update, dash.no_update, dash.no_update
 
         self.generative_wf_cls = sl_generative_wf
         wf_class = locate(self.generative_wf_cls)
@@ -1205,9 +1207,9 @@ class ChemVisualization(metaclass=Singleton):
                             dcc.RadioItems(
                                 id='rd_generation_type',
                                 options=[
-                                    {'label': 'Interpolate between two molecules', 'value': 'INTERPOLATE'},
-                                    {'label': 'Fit cluster to property and extrapolate', 'value': 'EXTRAPOLATE'},
                                     {'label': 'Sample around one molecule', 'value': 'SAMPLE'},
+                                    {'label': 'Fit cluster to property and extrapolate', 'value': 'EXTRAPOLATE'},
+                                    {'label': 'Interpolate between two molecules', 'value': 'INTERPOLATE'},
                                 ],
                                 value='INTERPOLATE',
                                 style={'marginTop': 18},
@@ -1264,7 +1266,7 @@ class ChemVisualization(metaclass=Singleton):
                                 labelStyle={'display': 'block', 'marginLeft': 6, 'marginRight': 6}
                             ),
                             html.Div(className='row', children=[
-                                dbc.Button('Generate', id='bt_generate', n_clicks=0, style={'marginRight': 12}),
+                                dbc.Button('GENERATE', id='bt_generate', n_clicks=0, style={'marginRight': 12}),
                                 dbc.Button('Reset', id='bt_reset_candidates', n_clicks=0),
                             ], style={'marginLeft': 0}),
                         ]),

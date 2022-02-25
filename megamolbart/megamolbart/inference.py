@@ -207,11 +207,13 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   num_requested: int = 10,
                                   scaled_radius=None,
                                   force_unique=False,
-                                  sanitize=True):
+                                  sanitize=True,
+                                  pad_length=None):
         distance = self._compute_radius(scaled_radius)
         logger.info(f'Sampling {num_requested} around {smiles} with distance {distance}...')
 
-        embedding, pad_mask = self.smiles2embedding(smiles)
+        embedding, pad_mask = self.smiles2embedding(smiles,
+                                                    pad_length=pad_length)
 
         neighboring_embeddings = self.addjitter(embedding, distance, cnt=num_requested)
 
@@ -230,13 +232,15 @@ class MegaMolBART(BaseGenerativeWorkflow):
                              num_requested: int = 10,
                              scaled_radius=None,
                              force_unique=False,
-                             sanitize=True):
+                             sanitize=True,
+                             pad_length=None):
         generated_mols, neighboring_embeddings, pad_mask = \
             self.find_similars_smiles_list(smiles,
                                            num_requested=num_requested,
                                            scaled_radius=scaled_radius,
                                            force_unique=force_unique,
-                                           sanitize=sanitize)
+                                           sanitize=sanitize,
+                                           pad_length=pad_length)
 
         # Rest of the applications and libraries use RAPIDS and cuPY libraries.
         # For interoperability, we need to convert the embeddings to cupy.

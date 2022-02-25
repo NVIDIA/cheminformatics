@@ -244,26 +244,6 @@ class ChemVisualization(metaclass=Singleton):
             [Input('ckl_analoguing_mol_id', 'value')])(self.handle_analoguing_ckl_selection)
 
         self.app.callback(
-            [Output('section_generated_molecules_clustered', 'style'),
-             Output('gen_figure', 'figure'),
-             Output('table_generated_molecules', 'children'),
-             Output('show_generated_mol', 'children'),
-             Output('msg_generated_molecules', 'children'),
-             #Output('interpolation_error', 'children')
-             ],
-            [Input("bt_generate", "n_clicks"), ],
-            [State('sl_generative_wf', 'value'),
-             State('ckl_candidate_mol_id', 'value'),
-             State('n2generate', 'value'),
-             State('extrap_compound_property', 'value'),
-             State('extrap_cluster_number', 'value'),
-             State('extrap_n_compounds', 'value'),
-             State('extrap_step_size', 'value'),
-             State('scaled_radius', 'value'),
-             State('rd_generation_type', 'value'),
-             State('show_generated_mol', 'children')])(self.handle_generation)
-
-        self.app.callback(
             [Output('section_fitting', 'style'),
              Output('fitting_figure', 'figure')],
             [Input("bt_fit", "n_clicks"),],
@@ -293,6 +273,37 @@ class ChemVisualization(metaclass=Singleton):
              Output('section_selected_molecules', 'style'), ],
             [Input('show_generated_mol', 'children'),
              Input('show_selected_mol', 'children')])(self.handle_property_tables)
+
+        #self.app.callback(
+        #    Output("n_test", "value"),
+        #    [Input("bt_test", "n_clicks")],
+        #    [State("n_test", "value")])(self.handle_test)
+
+        self.app.callback(
+            [Output('section_generated_molecules_clustered', 'style'),
+             Output('gen_figure', 'figure'),
+             Output('table_generated_molecules', 'children'),
+             Output('show_generated_mol', 'children'),
+             Output('msg_generated_molecules', 'children'),
+             Output('interpolation_error', 'children')],
+            [Input("bt_generate", "n_clicks")],
+            [State('sl_generative_wf', 'value'),
+             State('ckl_candidate_mol_id', 'value'),
+             State('n2generate', 'value'),
+             State('extrap_compound_property', 'value'),
+             State('extrap_cluster_number', 'value'),
+             State('extrap_n_compounds', 'value'),
+             State('extrap_step_size', 'value'),
+             State('scaled_radius', 'value'),
+             State('rd_generation_type', 'value'),
+             State('show_generated_mol', 'children')])(self.handle_generation)
+
+    def handle_test(self, bt_test, n_test):
+        comp_id, event_type = self._fetch_event_data()
+        if comp_id == 'bt_test' and event_type == 'n_clicks':
+            return n_test + 1
+        raise dash.exceptions.PreventUpdate
+
 
     def handle_add_candidate(self, bt_add_candidate,
                              bt_reset_candidates,
@@ -357,7 +368,26 @@ class ChemVisualization(metaclass=Singleton):
         self, bt_generate, sl_generative_wf, ckl_candidate_mol_id, n2generate, 
         extrap_compound_property, extrap_cluster_number, extrap_n_compounds, extrap_step_size, 
         scaled_radius, rd_generation_type, show_generated_mol
-    ):    
+    ):
+        """
+            [Output('section_generated_molecules_clustered', 'style'),
+             Output('gen_figure', 'figure'),
+             Output('table_generated_molecules', 'children'),
+             Output('show_generated_mol', 'children'),
+             Output('msg_generated_molecules', 'children'),
+             Output('interpolation_error', 'children')],
+            [Input("bt_generate", "n_clicks")],
+            [State('sl_generative_wf', 'value'),
+             State('ckl_candidate_mol_id', 'value'),
+             State('n2generate', 'value'),
+             State('extrap_compound_property', 'value'),
+             State('extrap_cluster_number', 'value'),
+             State('extrap_n_compounds', 'value'),
+             State('extrap_step_size', 'value'),
+             State('scaled_radius', 'value'),
+             State('rd_generation_type', 'value'),
+             State('show_generated_mol', 'children')])(self.handle_generation)
+        """
         print('***handle_generation***')
         comp_id, event_type = self._fetch_event_data()
         logger.info(f'handle_generation: comp_id={comp_id}, event_type={event_type}, rd_generation_type={rd_generation_type}')
@@ -468,12 +498,14 @@ class ChemVisualization(metaclass=Singleton):
         for column in columns_in_table:
             table_headers.append(html.Th(column, style={'fontSize': '150%', 'text-align': 'center'}))
         prop_recs = [html.Tr(table_headers, style={'background': 'lightgray'})]
+        invalid_mol_cnt = 0
         for row_idx in range(self.generated_df.shape[0]):
             td = []
             try:
                 col_pos = all_columns.index('Chemical Structure')
                 col_data = self.generated_df.iat[row_idx, col_pos]
                 if 'value' in col_data and col_data['value'] == 'Error interpreting SMILES using RDKit':
+                    invalid_mol_cnt += 1
                     continue
             except ValueError:
                 pass
@@ -490,13 +522,29 @@ class ChemVisualization(metaclass=Singleton):
                 if isinstance(col_value, str) and col_value.startswith('data:image/png;base64,'):
                     td.append(html.Td(html.Img(src=col_value)))
                 else:
-                    td.append(
-                        html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level].update({'maxWidth': '100px', 'wordWrap':'break-word'})))
-            prop_recs.append(html.Tr(td))
+                    #td.append(
+                    #    html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level].update({'maxWidth': '100px', 'wordWrap':'break-word'})))
+                    td.append(html.Td(str(col_value),
+                                      style={'maxWidth': '300px',
+                                             'wordWrap': 'break-word',
+                                             'text-align': 'center',
+                                             'color': LEVEL_TO_STYLE[col_level]['color']
+                                             }
+                                      ))                        
+            prop_recs.append(html.Tr(td, style={'fontSize': '125%'}))
+
+        #[Output('section_generated_molecules_clustered', 'style'),
+        #     Output('gen_figure', 'figure'),
+        #     Output('table_generated_molecules', 'children'),
+        #     Output('show_generated_mol', 'children'),
+        #     Output('msg_generated_molecules', 'children')],
+        msg_generated_molecules = ''
+        if invalid_mol_cnt > 0:
+            msg_generated_molecules =  f'{invalid_mol_cnt} invalid molecules were created, which were eliminated from the result.'
 
         return {'display': 'inline'}, fig, html.Table(
             prop_recs, style={'width': '100%', 'margin': 12, 'border': '1px solid lightgray'}
-            ), show_generated_mol, dash.no_update
+            ), show_generated_mol, msg_generated_molecules, dash.no_update
 
 
     @report_ui_error(3)
@@ -505,6 +553,23 @@ class ChemVisualization(metaclass=Singleton):
         fit_nn_compound_property, fit_nn_train_cluster_number, fit_nn_test_cluster_number, fit_nn_hidden_layer_sizes, fit_nn_activation_fn, fit_nn_final_activation_fn, 
         fit_nn_max_epochs, fit_nn_learning_rate, fit_nn_weight_decay, fit_nn_batch_size
     ):
+        """
+        self.app.callback(
+        [Output('section_fitting', 'style'),
+            Output('fitting_figure', 'figure')],
+        [Input("bt_fit", "n_clicks"),],
+        [State('sl_featurizing_wf', 'value'),
+            State('fit_nn_compound_property', 'value'),
+            State('fit_nn_train_cluster_number', 'value'),
+            State('fit_nn_test_cluster_number', 'value'),
+            State('fit_nn_hidden_layer_sizes', 'value'),
+            State('fit_nn_activation_fn', 'value'),
+            State('fit_nn_final_activation_fn', 'value'),
+            State('fit_nn_max_epochs', 'value'),
+            State('fit_nn_learning_rate', 'value'),
+            State('fit_nn_weight_decay', 'value'),
+            State('fit_nn_batch_size', 'value')])(self.handle_fitting)
+        """
         comp_id, event_type = self._fetch_event_data()
         sys.stdout.flush()
         if (comp_id != 'bt_fit') or (event_type != 'n_clicks'):
@@ -1144,6 +1209,13 @@ class ChemVisualization(metaclass=Singleton):
                         ], style={'marginLeft': 0, 'marginTop': '6px'}
                     ),
 
+
+                    html.Div(className='row', children=[
+                        dcc.Markdown("n_test", style={'marginTop': 12,}),
+                        dcc.Input(id='n_test', value=0),
+                        ]#, style={'marginLeft': 0, 'marginTop': '6px'}
+                    ),                    
+
                     dcc.Tabs([
                         dcc.Tab(label='Cluster Molecules', children=[
                             dcc.Markdown("""**Select Workflow**""", style={'marginTop': 18, }),
@@ -1256,8 +1328,8 @@ class ChemVisualization(metaclass=Singleton):
                             dcc.Markdown(children="""**Please Select Two**""",
                                          id="mk_selection_msg",
                                          style={'marginTop': 18}),
-                            dcc.Markdown(children="""Click *Add* to populate this list""",
-                                         style={'marginTop': 18}),
+                            #dcc.Markdown(children="""Click *Add* to populate this list""",
+                            #             style={'marginTop': 18}),
                             dcc.Checklist(
                                 id='ckl_candidate_mol_id',
                                 options=[],
@@ -1269,11 +1341,15 @@ class ChemVisualization(metaclass=Singleton):
                                 dbc.Button('GENERATE', id='bt_generate', n_clicks=0, style={'marginRight': 12}),
                                 dbc.Button('Reset', id='bt_reset_candidates', n_clicks=0),
                             ], style={'marginLeft': 0}),
-                        ]),
 
+                            #html.Div(className='row', children=[
+                            #    dbc.Button('TEST', id='bt_test', n_clicks=0), #, style={'marginRight': 12}),
+                            #]), #style={'marginLeft': 0}),                            
+                        ]),
+                        
                         dcc.Tab(label='Predict Properties', children=[
 
-                            dcc.Markdown("""**Select Featurizing Model**""", style={'marginTop': 18,}),
+                            dcc.Markdown("**Select Featurizing Model**", style={'marginTop': 18,}),
                             html.Div(children=[
                                 dcc.Dropdown(id='sl_featurizing_wf', multi=False,
                                              options=[{'label': 'CDDD Model',
@@ -1304,7 +1380,7 @@ class ChemVisualization(metaclass=Singleton):
                                 dcc.Input(id='fit_nn_test_cluster_number', value=1),
                                 ], style={'marginLeft': 0, 'marginTop': '6px'}
                             ),
-                            dcc.Markdown(children="""**Neural Network Parameters**""",
+                            dcc.Markdown(children="**Neural Network Parameters**",
                                          id="nn_params_msg",
                                          style={'marginTop': 18}
                             ),
@@ -1373,11 +1449,11 @@ class ChemVisualization(metaclass=Singleton):
                                              value='similar',
                                              clearable=False),
                             ]),
-                            dcc.Markdown(children="""Choose a compound""",
+                            dcc.Markdown(children="Choose a compound",
                                          id="analoguing_msg",
                                          style={'marginTop': 18}
                             ),
-                            dcc.Markdown(children="""Click *Analogue* to populate this list""",
+                            dcc.Markdown(children="Click *Analogue* to populate this list",
                                          style={'marginTop': 18}),
                             dcc.Checklist(
                                 id='ckl_analoguing_mol_id',
@@ -1403,21 +1479,23 @@ class ChemVisualization(metaclass=Singleton):
                 ], className='three columns', style={'marginLeft': 18, 'marginTop': 90, 'verticalAlign': 'text-top', }),
             ]),
 
-            html.Div(id='section_generated_molecules', 
-                children=[
-                    html.A(
-                        'Export to SDF',
-                        id='download-link',
-                        download="rawdata.sdf",
-                        href="/cheminfo/downloadSDF",
-                        target="_blank",
-                        n_clicks=0,
-                        style={'marginLeft': 10, 'fontSize': '150%'}
+            #html.Div(className='row', children=[
+            html.Div(id='section_generated_molecules', children=[
+                    html.Div(className='row', children=[
+                        html.A('Export to SDF',
+                            id='download-link',
+                            download="rawdata.sdf",
+                            href="/cheminfo/downloadSDF",
+                            target="_blank",
+                            n_clicks=0,
+                            style={'fontSize': '150%'}
                     ),
-                    html.Div(id='table_generated_molecules', children=[]),
-                ], 
-                style={'display': 'none'}
-            ),
+                    html.Div(id='msg_generated_molecules', children=[],
+                            style={'color': 'red', 'fontWeight': 'bold', 'marginLeft': 12, 'fontSize': '150%'}),
+                ], style={'marginLeft': 0, 'marginBottom': 18, }),
+                html.Div(id='table_generated_molecules', children=[], style={'width': '100%'})
+            ], style={'display': 'none', 'width': '100%'}),
+
 
             html.Div(id='section_generated_molecules_clustered', children=[
                 dcc.Graph(id='gen_figure', figure=fig,
@@ -1473,6 +1551,9 @@ class ChemVisualization(metaclass=Singleton):
                              ),
                 ])
             ], style={'display': 'none'}),
+
+            #], style={'margin': 12}),
+
 
             html.Div(id='refresh_main_fig', style={'display': 'none'}),
             html.Div(id='northstar_cluster', style={'display': 'none'}),

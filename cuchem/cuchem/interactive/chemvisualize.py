@@ -429,6 +429,7 @@ class ChemVisualization(metaclass=Singleton):
                                                                 force_unique=True,
                                                                 sanitize=True)
 
+        logging.info(f'RAW self.generated_df: {self.generated_df.columns}, {len(self.generated_df)}\n{self.generated_df.head()}\n{self.generated_df.tail()}')
         if show_generated_mol is None:
             show_generated_mol = 0
         show_generated_mol += 1
@@ -442,6 +443,9 @@ class ChemVisualization(metaclass=Singleton):
 
         # Note: we are not allowing fingerprint specification to change here because we want to see the results on the same PCA / UMAP as the original figure
         # TODO: make this clear in the UI
+
+        # The number of generated molecules is not expected to be large, so regular cudf dataframes should suffice
+        logging.info(f'VALID self.generated_df: {self.generated_df.columns}, {len(self.generated_df)}\n{self.generated_df.head()}\n{self.generated_df.tail()}')
         fps = MorganFingerprint(
             radius=self.fingerprint_radius, nBits=self.fingerprint_nBits
         ).transform(self.generated_df, smiles_column='SMILES')
@@ -459,30 +463,39 @@ class ChemVisualization(metaclass=Singleton):
             north_stars = ','.join(list(df_fp[ ~self.generated_df['Generated'] ]['id'].values_host))     
 
         # TODO: check if all these lines are necessary!
-        chunksize=max(10, int(df_fp.shape[0] * 0.1))
-        df_embedding = dask_cudf.from_cudf(df_fp, chunksize=chunksize)
-        df_embedding = df_embedding.reset_index()
+        #chunksize=max(10, int(df_fp.shape[0] * 0.1))
+        df_embedding = df_fp #dask_cudf.from_cudf(df_fp, chunksize=chunksize)
+        #df_embedding = df_embedding.reset_index()
         cluster_col = df_embedding['cluster']
         df_embedding, prop_series = self.cluster_wf._remove_non_numerics(df_embedding)
         prop_series['cluster'] = cluster_col
-        n_molecules, n_obs = df_embedding.compute().shape # needed?
+        #n_molecules, n_obs = df_embedding.compute().shape # needed?
         #if hasattr(df_embedding, 'compute'):
         #    df_embedding = df_embedding.compute()
 
-        if isinstance(self.cluster_wf.pca, cuml.PCA) and isinstance(df_embedding, dask_cudf.DataFrame):
-            # Trying to accommodate the GpuKmeansUmapHybrid workflow
-            df_embedding = df_embedding.compute()
+        #if isinstance(self.cluster_wf.pca, cuml.PCA) and isinstance(df_embedding, dask_cudf.DataFrame):
+        #    # Trying to accommodate the GpuKmeansUmapHybrid workflow
+        #    df_embedding = df_embedding.compute()
         df_embedding = self.cluster_wf.pca.transform(df_embedding)
-        if hasattr(df_embedding, 'persist'):
-            df_embedding = df_embedding.persist()
-            wait(df_embedding)
+        logging.info(f'df_embedding: {type(df_embedding)}, {len(df_embedding)}')
+        #if hasattr(df_embedding, 'persist'):
+        #    df_embedding = df_embedding.persist()
+        #    wait(df_embedding)
         Xt = self.cluster_wf.umap.transform(df_embedding)
+        logging.info(f'Xt: {type(Xt)}, {len(Xt)}')
         df_embedding['x'] = Xt[0]
         df_embedding['y'] = Xt[1]
-
+        logging.info(f'df_embedding: {type(df_embedding)}, {df_embedding.columns}, {len(df_embedding)}, {df_embedding.index}')
         for col in prop_series.keys():
             sys.stdout.flush()
-            df_embedding[col] = prop_series[col]#.compute()
+            # TypeError: Implicit conversion to a host NumPy array via __array__ is not allowed, 
+            # To explicitly construct a GPU array, consider using cupy.asarray(...)
+            # To explicitly construct a host array, consider using .to_array()
+            logging.info(f'before prop_series[{col}]: {type(prop_series[col])}')
+            #if hasattr(prop_series[col], 'compute'):
+            #    prop_series[col] = prop_series[col].compute()
+            #logging.info(f'prop_series[{col}]: {type(prop_series[col])}, {prop_series[col].index}')
+            df_embedding[col] = prop_series[col]#.to_pandas() #cupy.asarray(prop_series[col]) #.to_array()#.compute() # Cannot align indices with non-unique values
 
         fig, northstar_cluster = self.create_graph(df_embedding, north_stars=north_stars)
 

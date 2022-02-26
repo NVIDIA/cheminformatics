@@ -2,6 +2,7 @@ import logging
 from functools import singledispatch
 from typing import List
 
+import pandas as pd
 import numpy as np
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.fingerprint import BaseTransformation
@@ -218,29 +219,35 @@ class BaseGenerativeWorkflow(BaseTransformation):
 
 
     def find_similars_smiles_by_id(self,
-                                   chembl_id: str,
+                                   chembl_ids: List[str], # actually a list of strings
                                    id_type: str = 'chemblid',
                                    num_requested=10,
                                    force_unique=False,
                                    scaled_radius: int = 1,
                                    sanitize=True):
-        smiles = None
-
+        smiles_list = []
+        
         if not self.min_jitter_radius:
             raise Exception('Property `radius_scale` must be defined in model class.')
 
         if id_type.lower() == 'chemblid':
-            smiles = [row[2] for row in self.dao.fetch_id_from_chembl(chembl_id)]
-            if len(smiles) != len(chembl_id):
-                raise Exception('One of the ids is invalid %s' + chembl_id)
+            smiles_list = [row[2] for row in self.dao.fetch_id_from_chembl(chembl_ids)]
+            if len(smiles_list) != len(chembl_ids):
+                raise Exception('One of the ids is invalid %s' + chembl_ids)
         else:
             raise Exception('id type %s not supported' % id_type)
 
-        return self.find_similars_smiles(
-            smiles[0],
-            num_requested=num_requested,
-            scaled_radius=scaled_radius,
-            force_unique=force_unique,
-            compound_id=str(chembl_id),
-            sanitize=sanitize
-        )
+        ret_vals = [
+            self.find_similars_smiles(
+                smiles,
+                num_requested=num_requested,
+                scaled_radius=scaled_radius,
+                force_unique=force_unique,
+                compound_id=str(chembl_id),
+                sanitize=sanitize
+            )
+            for smiles, chembl_id in zip(smiles_list, chembl_ids)
+        ]
+        if len(ret_vals) == 1:
+            return ret_vals[0]
+        return pd.concat(ret_vals, ignore_index=True, copy=False)

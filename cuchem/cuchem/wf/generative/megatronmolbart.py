@@ -88,11 +88,13 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                              force_unique=False,
                              sanitize=True,
                              compound_id=None):
+        logger.info(f'find_similars_smiles: compound_id={compound_id}')
         if isinstance(compound_id, list):
             # Sometimes calling routine may send a list of length one containing the compound ID
             if len(compound_id) > 1:
                 logger.info(f'find_similars_smiles received {compound_id}, generating neighbors only for first compound!')
             compound_id = compound_id[0]
+            logger.info(f'comp_id: {compound_id}')
         spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
                               smiles=smiles,
                               radius=scaled_radius,
@@ -118,6 +120,7 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                 for i in range(len(generatedSmiles) - 1)
             ],
         })
+        logging.info(f'find_similars_smiles returning: {type(generated_df)}, {len(generated_df)}\n{generated_df.head()}')
         return generated_df
 
     def interpolate_smiles(

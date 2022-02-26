@@ -126,7 +126,8 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         num_points: int = 10,
         scaled_radius=None,
         force_unique=False,
-        compound_ids=[]
+        compound_ids=[],
+        sanitize=True
     ):
         if len(compound_ids) == 0:
             compound_ids = [f'source{i}' for i in range(len(smiles))]
@@ -135,7 +136,8 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                               smiles=smiles,
                               radius=scaled_radius,
                               numRequested=num_points,
-                              forceUnique=force_unique)
+                              forceUnique=force_unique,
+                              sanitize=sanitize)
 
         result = self.stub.Interpolate(spec)
         result = result.generatedSmiles

@@ -186,7 +186,9 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         radius = self._compute_radius(scaled_radius)
         # TO DO: User must be able to extrapolate directly from smiles in the table;
         # these may themselves be generated compounds without any chemblid.
-        df_cluster = compounds_df[ compounds_df['cluster'] == int(cluster_id) ].dropna().reset_index(drop=True).compute()
+        df_cluster = compounds_df[ compounds_df['cluster'] == int(cluster_id) ].dropna().reset_index(drop=True)
+        if hasattr(df_cluster, 'compute'):
+            df_cluster = df_cluster.compute()
         if 'transformed_smiles' in df_cluster:
             smiles_col = 'transformed_smiles'
         elif 'SMILES' in df_cluster:
@@ -223,6 +225,7 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         logger.info(f'_get_embedding_direction: emb:{embedding_list.shape}, {type(embedding_list)}, prop:{compound_property_vals.shape}, {type(compound_property_vals)}, prop: {min(compound_property_vals)} - {max(compound_property_vals)}')
         n_data = compound_property_vals.shape[0]
         n_dimensions = embedding_list[0].shape[0]
+        reg = Lasso()
         reg = reg.fit(embedding_list, compound_property_vals)
         n_zero_coefs = len([x for x in reg.coef_ if x == 0.0])
         zero_coef_indices = [i for i, x in enumerate(reg.coef_) if x != 0.0]

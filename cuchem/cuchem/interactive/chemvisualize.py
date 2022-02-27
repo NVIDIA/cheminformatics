@@ -429,7 +429,7 @@ class ChemVisualization(metaclass=Singleton):
                                                                 force_unique=True,
                                                                 sanitize=True)
 
-        logging.info(f'RAW self.generated_df: {self.generated_df.columns}, {len(self.generated_df)}\n{self.generated_df.head()}\n{self.generated_df.tail()}')
+        logging.info(f'RAW self.generated_df: {type(self.generated_df)}, {self.generated_df.columns}, {len(self.generated_df)}\n{self.generated_df.head()}\n{self.generated_df.tail()}')
         if show_generated_mol is None:
             show_generated_mol = 0
         show_generated_mol += 1
@@ -462,8 +462,7 @@ class ChemVisualization(metaclass=Singleton):
             # Highlight the source compound(s)
             north_stars = ','.join(list(df_fp[ ~self.generated_df['Generated'] ]['id'].values_host))     
 
-        # TODO: check if all these lines are necessary!
-        #chunksize=max(10, int(df_fp.shape[0] * 0.1))
+        # TODO: dask_cudf needs to be handled carefully as each chunk has its own index
         df_embedding = df_fp #dask_cudf.from_cudf(df_fp, chunksize=chunksize)
         #df_embedding = df_embedding.reset_index()
         cluster_col = df_embedding['cluster']
@@ -476,13 +475,24 @@ class ChemVisualization(metaclass=Singleton):
         #if isinstance(self.cluster_wf.pca, cuml.PCA) and isinstance(df_embedding, dask_cudf.DataFrame):
         #    # Trying to accommodate the GpuKmeansUmapHybrid workflow
         #    df_embedding = df_embedding.compute()
+
+        # TODO: cuml.dask.decomposition.PCA needs a dask dataframe!!!
+        if isinstance(self.cluster_wf.pca, cuml.dask.decomposition.PCA) and not isinstance(df_embedding, dask_cudf.DataFrame):
+            #chunksize=max(10, int(df_fp.shape[0] * 0.1))
+            df_embedding = dask_cudf.from_cudf(df_embedding, npartitions=1) #chunksize=chunksize)
         df_embedding = self.cluster_wf.pca.transform(df_embedding)
-        logging.info(f'df_embedding: {type(df_embedding)}, {len(df_embedding)}')
-        #if hasattr(df_embedding, 'persist'):
-        #    df_embedding = df_embedding.persist()
-        #    wait(df_embedding)
         Xt = self.cluster_wf.umap.transform(df_embedding)
-        logging.info(f'Xt: {type(Xt)}, {len(Xt)}')
+        if hasattr(Xt, 'persist'):
+            logging.info(f'BEFORE Xt: {type(Xt)}, {Xt.columns}, {len(Xt)}, {Xt.index}')
+            Xt = Xt.compute()
+            #wait(Xt)
+        logging.info(f'Xt: {type(Xt)}, {Xt.columns}, {len(Xt)}, {Xt.index}')
+
+        if hasattr(df_embedding, 'persist'):
+            logging.info(f'BEFORE df_embedding: {type(df_embedding)}, {df_embedding.columns}, {len(df_embedding)}, {df_embedding.index}')
+            # Note: When converting a dask_cudf to cudf, the indices within each chunk are retained
+            df_embedding = df_embedding.compute().reset_index(drop=True)
+            #wait(df_embedding)
         df_embedding['x'] = Xt[0]
         df_embedding['y'] = Xt[1]
         logging.info(f'df_embedding: {type(df_embedding)}, {df_embedding.columns}, {len(df_embedding)}, {df_embedding.index}')

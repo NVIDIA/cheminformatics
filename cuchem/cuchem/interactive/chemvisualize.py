@@ -274,11 +274,6 @@ class ChemVisualization(metaclass=Singleton):
             [Input('show_generated_mol', 'children'),
              Input('show_selected_mol', 'children')])(self.handle_property_tables)
 
-        #self.app.callback(
-        #    Output("n_test", "value"),
-        #    [Input("bt_test", "n_clicks")],
-        #    [State("n_test", "value")])(self.handle_test)
-
         self.app.callback(
             [Output('section_generated_molecules_clustered', 'style'),
              Output('gen_figure', 'figure'),
@@ -297,13 +292,6 @@ class ChemVisualization(metaclass=Singleton):
              State('scaled_radius', 'value'),
              State('rd_generation_type', 'value'),
              State('show_generated_mol', 'children')])(self.handle_generation)
-
-    def handle_test(self, bt_test, n_test):
-        comp_id, event_type = self._fetch_event_data()
-        if comp_id == 'bt_test' and event_type == 'n_clicks':
-            return n_test + 1
-        raise dash.exceptions.PreventUpdate
-
 
     def handle_add_candidate(self, bt_add_candidate,
                              bt_reset_candidates,
@@ -1173,14 +1161,7 @@ class ChemVisualization(metaclass=Singleton):
                         dcc.Markdown("Fingerprint Size", style={'marginTop': 12,}),
                         dcc.Input(id='fingerprint_nBits', value=512),
                         ], style={'marginLeft': 0, 'marginTop': '6px'}
-                    ),
-
-
-                    html.Div(className='row', children=[
-                        dcc.Markdown("n_test", style={'marginTop': 12,}),
-                        dcc.Input(id='n_test', value=0),
-                        ]#, style={'marginLeft': 0, 'marginTop': '6px'}
-                    ),                    
+                    ),      
 
                     dcc.Tabs([
                         dcc.Tab(label='Cluster Molecules', children=[
@@ -1307,10 +1288,7 @@ class ChemVisualization(metaclass=Singleton):
                                 dbc.Button('GENERATE', id='bt_generate', n_clicks=0, style={'marginRight': 12}),
                                 dbc.Button('Reset', id='bt_reset_candidates', n_clicks=0),
                             ], style={'marginLeft': 0}),
-
-                            #html.Div(className='row', children=[
-                            #    dbc.Button('TEST', id='bt_test', n_clicks=0), #, style={'marginRight': 12}),
-                            #]), #style={'marginLeft': 0}),                            
+                       
                         ]),
                         
                         dcc.Tab(label='Predict Properties', children=[

@@ -1275,8 +1275,8 @@ class ChemVisualization(metaclass=Singleton):
                             dcc.Markdown(children="""**Please Select Two**""",
                                          id="mk_selection_msg",
                                          style={'marginTop': 18}),
-                            #dcc.Markdown(children="""Click *Add* to populate this list""",
-                            #             style={'marginTop': 18}),
+                            dcc.Markdown(children="""Click *Add* to populate this list""",
+                                         style={'marginTop': 18}),
                             dcc.Checklist(
                                 id='ckl_candidate_mol_id',
                                 options=[],
@@ -1285,7 +1285,7 @@ class ChemVisualization(metaclass=Singleton):
                                 labelStyle={'display': 'block', 'marginLeft': 6, 'marginRight': 6}
                             ),
                             html.Div(className='row', children=[
-                                dbc.Button('GENERATE', id='bt_generate', n_clicks=0, style={'marginRight': 12}),
+                                dbc.Button('Generate', id='bt_generate', n_clicks=0, style={'marginRight': 12}),
                                 dbc.Button('Reset', id='bt_reset_candidates', n_clicks=0),
                             ], style={'marginLeft': 0}),
                        

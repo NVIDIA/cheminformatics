@@ -1,4 +1,3 @@
-import logging
 from functools import singledispatch
 from typing import List
 
@@ -7,9 +6,6 @@ import numpy as np
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.fingerprint import BaseTransformation
 from rdkit.Chem import PandasTools, CanonSmiles
-
-logger = logging.getLogger(__name__)
-
 
 @singledispatch
 def add_jitter(embedding, radius, cnt, shape):

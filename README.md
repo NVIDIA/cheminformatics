@@ -50,11 +50,6 @@ Build your container:
 ./launch.sh build
 ```
 
-Download the ChEMBL database (version 27):
-```
-./launch.sh dbSetup
-```
-
 Launch the interactive ChEMBL exploration tool:
 ```
 ./launch.sh start

@@ -127,7 +127,6 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         with MetricsLogger('kmeans', self.n_molecules) as ml:
             if self.n_molecules < self.n_clusters: # < MIN_RECLUSTER_SIZE:
                 raise Exception('Reclustering {self.n_molecules} molecules into {self.n_clusters} clusters not supported.')# % MIN_RECLUSTER_SIZE)
-                #raise Exception('Reclustering less than %d molecules is not supported.' % MIN_RECLUSTER_SIZE)
 
             kmeans_cuml = cuDaskKMeans(client=dask_client,
                                        n_clusters=self.n_clusters)
@@ -287,8 +286,6 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
             if hasattr(self.df_embedding, 'compute'):
                 self.df_embedding = self.df_embedding.compute()
-
-            logger.info(self.df_embedding.shape)
 
         return chem_mol_map, molregnos, self.df_embedding
 

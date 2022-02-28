@@ -388,9 +388,7 @@ class ChemVisualization(metaclass=Singleton):
              State('rd_generation_type', 'value'),
              State('show_generated_mol', 'children')])(self.handle_generation)
         """
-        print('***handle_generation***')
         comp_id, event_type = self._fetch_event_data()
-        logger.info(f'handle_generation: comp_id={comp_id}, event_type={event_type}, rd_generation_type={rd_generation_type}')
         chembl_ids = []
         if comp_id == 'bt_generate' and event_type == 'n_clicks':
             chembl_ids = ckl_candidate_mol_id
@@ -429,7 +427,6 @@ class ChemVisualization(metaclass=Singleton):
                                                                 force_unique=True,
                                                                 sanitize=True)
 
-        logging.info(f'RAW self.generated_df: {type(self.generated_df)}, {self.generated_df.columns}, {len(self.generated_df)}\n{self.generated_df.head()}\n{self.generated_df.tail()}')
         if show_generated_mol is None:
             show_generated_mol = 0
         show_generated_mol += 1
@@ -438,14 +435,14 @@ class ChemVisualization(metaclass=Singleton):
         self.generated_df = LipinskiRuleOfFiveDecorator().decorate(self.generated_df)
         self.generated_df = self.generated_df[ ~self.generated_df['invalid'] ].reset_index(drop=True).drop(columns=['invalid'])
         if len(self.generated_df) == 0:
-            logger.info("None of the generated smiles yielded valid molecules!!!")
+            logger.info("None of the generated smiles yielded valid molecules!")
             return dash.no_update, dash.no_update
 
         # Note: we are not allowing fingerprint specification to change here because we want to see the results on the same PCA / UMAP as the original figure
         # TODO: make this clear in the UI
 
-        # The number of generated molecules is not expected to be large, so regular cudf dataframes should suffice
-        logging.info(f'VALID self.generated_df: {self.generated_df.columns}, {len(self.generated_df)}\n{self.generated_df.head()}\n{self.generated_df.tail()}')
+        # The number of generated molecules is not expected to be large, so regular cudf dataframes should suffice. 
+        # However, we have to handle both cudf and dask_cudf, perhaps more elegantly.
         fps = MorganFingerprint(
             radius=self.fingerprint_radius, nBits=self.fingerprint_nBits
         ).transform(self.generated_df, smiles_column='SMILES')
@@ -461,54 +458,27 @@ class ChemVisualization(metaclass=Singleton):
         else:
             # Highlight the source compound(s)
             north_stars = ','.join(list(df_fp[ ~self.generated_df['Generated'] ]['id'].values_host))     
-
-        # TODO: dask_cudf needs to be handled carefully as each chunk has its own index
-        df_embedding = df_fp #dask_cudf.from_cudf(df_fp, chunksize=chunksize)
-        #df_embedding = df_embedding.reset_index()
+        df_embedding = df_fp
         cluster_col = df_embedding['cluster']
         df_embedding, prop_series = self.cluster_wf._remove_non_numerics(df_embedding)
         prop_series['cluster'] = cluster_col
-        #n_molecules, n_obs = df_embedding.compute().shape # needed?
-        #if hasattr(df_embedding, 'compute'):
-        #    df_embedding = df_embedding.compute()
-
-        #if isinstance(self.cluster_wf.pca, cuml.PCA) and isinstance(df_embedding, dask_cudf.DataFrame):
-        #    # Trying to accommodate the GpuKmeansUmapHybrid workflow
-        #    df_embedding = df_embedding.compute()
-
-        # TODO: cuml.dask.decomposition.PCA needs a dask dataframe!!!
         if isinstance(self.cluster_wf.pca, cuml.dask.decomposition.PCA) and not isinstance(df_embedding, dask_cudf.DataFrame):
-            #chunksize=max(10, int(df_fp.shape[0] * 0.1))
-            df_embedding = dask_cudf.from_cudf(df_embedding, npartitions=1) #chunksize=chunksize)
+            df_embedding = dask_cudf.from_cudf(df_embedding, npartitions=1)
         df_embedding = self.cluster_wf.pca.transform(df_embedding)
         Xt = self.cluster_wf.umap.transform(df_embedding)
         if hasattr(Xt, 'persist'):
-            logging.info(f'BEFORE Xt: {type(Xt)}, {Xt.columns}, {len(Xt)}, {Xt.index}')
             Xt = Xt.compute()
-            #wait(Xt)
-        logging.info(f'Xt: {type(Xt)}, {Xt.columns}, {len(Xt)}, {Xt.index}')
-
         if hasattr(df_embedding, 'persist'):
             logging.info(f'BEFORE df_embedding: {type(df_embedding)}, {df_embedding.columns}, {len(df_embedding)}, {df_embedding.index}')
-            # Note: When converting a dask_cudf to cudf, the indices within each chunk are retained
+            # Note: When converting a dask_cudf to cudf, the indices within each chunk are retained, so we need to reset_index.
             df_embedding = df_embedding.compute().reset_index(drop=True)
-            #wait(df_embedding)
         df_embedding['x'] = Xt[0]
         df_embedding['y'] = Xt[1]
         logging.info(f'df_embedding: {type(df_embedding)}, {df_embedding.columns}, {len(df_embedding)}, {df_embedding.index}')
         for col in prop_series.keys():
-            sys.stdout.flush()
-            # TypeError: Implicit conversion to a host NumPy array via __array__ is not allowed, 
-            # To explicitly construct a GPU array, consider using cupy.asarray(...)
-            # To explicitly construct a host array, consider using .to_array()
-            logging.info(f'before prop_series[{col}]: {type(prop_series[col])}')
-            #if hasattr(prop_series[col], 'compute'):
-            #    prop_series[col] = prop_series[col].compute()
-            #logging.info(f'prop_series[{col}]: {type(prop_series[col])}, {prop_series[col].index}')
-            df_embedding[col] = prop_series[col]#.to_pandas() #cupy.asarray(prop_series[col]) #.to_array()#.compute() # Cannot align indices with non-unique values
+            df_embedding[col] = prop_series[col]
 
         fig, northstar_cluster = self.create_graph(df_embedding, north_stars=north_stars)
-
         # Create Table header
         table_headers = []
         all_columns = self.generated_df.columns.to_list()
@@ -545,8 +515,6 @@ class ChemVisualization(metaclass=Singleton):
                 if isinstance(col_value, str) and col_value.startswith('data:image/png;base64,'):
                     td.append(html.Td(html.Img(src=col_value)))
                 else:
-                    #td.append(
-                    #    html.Td(str(col_value), style=LEVEL_TO_STYLE[col_level].update({'maxWidth': '100px', 'wordWrap':'break-word'})))
                     td.append(html.Td(str(col_value),
                                       style={'maxWidth': '300px',
                                              'wordWrap': 'break-word',
@@ -556,11 +524,6 @@ class ChemVisualization(metaclass=Singleton):
                                       ))                        
             prop_recs.append(html.Tr(td, style={'fontSize': '125%'}))
 
-        #[Output('section_generated_molecules_clustered', 'style'),
-        #     Output('gen_figure', 'figure'),
-        #     Output('table_generated_molecules', 'children'),
-        #     Output('show_generated_mol', 'children'),
-        #     Output('msg_generated_molecules', 'children')],
         msg_generated_molecules = ''
         if invalid_mol_cnt > 0:
             msg_generated_molecules =  f'{invalid_mol_cnt} invalid molecules were created, which were eliminated from the result.'
@@ -576,23 +539,6 @@ class ChemVisualization(metaclass=Singleton):
         fit_nn_compound_property, fit_nn_train_cluster_number, fit_nn_test_cluster_number, fit_nn_hidden_layer_sizes, fit_nn_activation_fn, fit_nn_final_activation_fn, 
         fit_nn_max_epochs, fit_nn_learning_rate, fit_nn_weight_decay, fit_nn_batch_size
     ):
-        """
-        self.app.callback(
-        [Output('section_fitting', 'style'),
-            Output('fitting_figure', 'figure')],
-        [Input("bt_fit", "n_clicks"),],
-        [State('sl_featurizing_wf', 'value'),
-            State('fit_nn_compound_property', 'value'),
-            State('fit_nn_train_cluster_number', 'value'),
-            State('fit_nn_test_cluster_number', 'value'),
-            State('fit_nn_hidden_layer_sizes', 'value'),
-            State('fit_nn_activation_fn', 'value'),
-            State('fit_nn_final_activation_fn', 'value'),
-            State('fit_nn_max_epochs', 'value'),
-            State('fit_nn_learning_rate', 'value'),
-            State('fit_nn_weight_decay', 'value'),
-            State('fit_nn_batch_size', 'value')])(self.handle_fitting)
-        """
         comp_id, event_type = self._fetch_event_data()
         sys.stdout.flush()
         if (comp_id != 'bt_fit') or (event_type != 'n_clicks'):
@@ -635,7 +581,7 @@ class ChemVisualization(metaclass=Singleton):
             smiles_columns = 'SMILES'
 
         if self.fp_df is None: 
-            # Note: CPU-based workflow is no longer needed, can be removed
+            # Note: CPU-based workflow for fingerprint similarity is no longer needed, can be removed
             logger.info(f'CPU-based similarity search: self.fp_df not set')
             # First move the smiles to the CPU:
             if isinstance(self.cluster_wf.df_embedding, dask_cudf.DataFrame):
@@ -650,7 +596,6 @@ class ChemVisualization(metaclass=Singleton):
                 _, v = MorganFingerprint(radius=self.fingerprint_radius, nBits=self.fingerprint_nBits).transform(
                     smiles_df, smiles_column=smiles_column, return_fp=True, raw=True)
             else:
-                logger.info(f'Fingerprints already available')
                 if hasattr(self.cluster_wf.df_embedding, 'compute'):
                     v = list(self.cluster_wf.df_embedding['fp'].compute().to_pandas())
                 else:
@@ -677,14 +622,12 @@ class ChemVisualization(metaclass=Singleton):
                     n_fp_cols += 1
                     self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.apply_rows(
                         popcll_wrapper, incols = {col: 'ip_col'}, outcols = {'op_col': int}, kwargs = {})
-                    # More complex syntax was not necessary:
-                    #self.cluster_wf.df_embedding['op_col'] = self.cluster_wf.df_embedding.map_partitions(popcll_wrapper_dask, col, 'op_col') #lambda df: df = df.apply_rows(popcll_wrapper, incols = {col: 'ip_col'}, outcols = {'op_col': int}, kwargs = {}))
                     self.cluster_wf.df_embedding['pc'] += self.cluster_wf.df_embedding['op_col']
             if hasattr(self.cluster_wf.df_embedding, 'persist'):
                 self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.persist()
                 wait(self.cluster_wf.df_embedding)
             t1 = time.time()
-            logger.info(f'Time to compute partial popcounts ({n_fp_cols} fp columns): {t1 - t0}:\n{self.cluster_wf.df_embedding["pc"].head()}')
+            #logger.info(f'Time to compute partial popcounts ({n_fp_cols} fp columns): {t1 - t0}:\n{self.cluster_wf.df_embedding["pc"].head()}')
 
         # Prepare the query compound:
         logger.info(f'analoguing_mol_id={analoguing_mol_id}')
@@ -737,7 +680,7 @@ class ChemVisualization(metaclass=Singleton):
         ).reset_index(drop=True)
 
         t1 = time.time()
-        logger.info(f'Fingerprint length={self.fingerprint_nBits}: GPU-Method: {t5 - t4}, CPU-Method: {t1 - t0}')
+        #logger.info(f'Fingerprint length={self.fingerprint_nBits}: GPU-Method: {t5 - t4}, CPU-Method: {t1 - t0}')
 
         #self.analoguing_df = self.fp_df[ self.fp_df['similarity_cpu'] >= float(analoguing_threshold) ]
         self.analoguing_df = self.cluster_wf.df_embedding[ self.cluster_wf.df_embedding['similarity'] >= float(analoguing_threshold) ]

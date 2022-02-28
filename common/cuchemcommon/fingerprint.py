@@ -114,9 +114,8 @@ class MorganFingerprint(BaseTransformation):
                 else:
                     for i in range(0, self.kwargs['nBits'], INTEGER_NBITS):
                         raw_fp_array[i // INTEGER_NBITS].append(int(fp_bs[i: i + INTEGER_NBITS], 2))
-        #fp_array = np.asarray(fp_array)
         fp_array = cupy.stack(fp_array)
-
+        # TODO: return value parameter names should be self-explanatory 
         if return_fp:
             if raw:
                 return fp_array, raw_fp_array

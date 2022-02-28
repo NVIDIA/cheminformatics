@@ -88,13 +88,11 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                              force_unique=False,
                              sanitize=True,
                              compound_id=None):
-        logger.info(f'find_similars_smiles: compound_id={compound_id}')
         if isinstance(compound_id, list):
             # Sometimes calling routine may send a list of length one containing the compound ID
             if len(compound_id) > 1:
                 logger.info(f'find_similars_smiles received {compound_id}, generating neighbors only for first compound!')
             compound_id = compound_id[0]
-            logger.info(f'comp_id: {compound_id}')
         spec = GenerativeSpec(model=GenerativeModel.MegaMolBART,
                               smiles=smiles,
                               radius=scaled_radius,
@@ -120,7 +118,6 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                 for i in range(len(generatedSmiles) - 1)
             ],
         })
-        logging.info(f'find_similars_smiles returning: {type(generated_df)}, {len(generated_df)}\n{generated_df.head()}')
         return generated_df
 
     def interpolate_smiles(
@@ -196,9 +193,7 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         elif 'smiles' in df_cluster:
             smiles_col = 'smiles'
         else:
-            logger.info(list(df_cluster.columns))
-            logger.info(df_cluster.head())
-            raise RuntimeError('No smiles column')
+            raise RuntimeError(f'No smiles column in df_cluster: {list(df_cluster.columns)}\n{df_cluster.head()}')
             smiles_col = None
         smiles_list = df_cluster[smiles_col].to_array()
         return self.extrapolate_from_smiles(smiles_list,
@@ -222,7 +217,8 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         compute the step size along the direction that is expected to increase the compound_property value by step_percentage.
         """
 
-        logger.info(f'_get_embedding_direction: emb:{embedding_list.shape}, {type(embedding_list)}, prop:{compound_property_vals.shape}, {type(compound_property_vals)}, prop: {min(compound_property_vals)} - {max(compound_property_vals)}')
+        logger.info(f'_get_embedding_direction: emb:{embedding_list.shape}, {type(embedding_list)}, prop:{compound_property_vals.shape}, {type(compound_property_vals)},'\
+            f' prop range: {max(compound_property_vals)} - {min(compound_property_vals)}.\nFitting Lasso regression...')
         n_data = compound_property_vals.shape[0]
         n_dimensions = embedding_list[0].shape[0]
         reg = Lasso()
@@ -235,15 +231,13 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         y_pred = reg.predict(embedding_list)
         rmse = sqrt(mean_squared_error(compound_property_vals, y_pred.astype('float64')))
         pearson_rho = cp.corrcoef(compound_property_vals, y_pred)
-        logger.info(f'_get_embedding_direction: n={len(compound_property_vals)}, rho={pearson_rho}, rmse={rmse}') #:.2f}')
         emb_std = np.std(embedding_list, axis=0)
-        logger.info(f'embedding_list.std: {emb_std}')
+        logger.info(f'_get_embedding_direction: n={len(compound_property_vals)}, rho={pearson_rho}, rmse={rmse}, embedding_list.std: {emb_std}')
      
         emb_max = embedding_list[ np.argmax(compound_property_vals) ]
         emb_min = embedding_list[ np.argmin(compound_property_vals) ]
         diff_size = np.linalg.norm(emb_max - emb_min) / sqrt(n_dimensions)
-        # TODO: project on to embedding direction!!!
-        logger.info(f'compound_property_vals: [{np.argmin(compound_property_vals)}]={np.amin(compound_property_vals)}, [{np.argmax(compound_property_vals)}]={np.amax(compound_property_vals)}, diff_size={diff_size}')
+        #logger.info(f'compound_property_vals: [{np.argmin(compound_property_vals)}]={np.amin(compound_property_vals)}, [{np.argmax(compound_property_vals)}]={np.amax(compound_property_vals)}, diff_size={diff_size}')
         return reg.coef_, emb_std, diff_size
 
 
@@ -271,9 +265,6 @@ class MegatronMolBART(BaseGenerativeWorkflow):
             id_list = list(map(str, range(len(smiles_list))))
         logger.info(f'molbart: extrapolate_from_smiles: {len(smiles_list)} smiles ({type(smiles_list)}), {num_points} extrapolations each with step_size {step_size}')
         data = pd.DataFrame({'transformed_smiles': smiles_list})
-        logger.info(data.head())
-        #pad_length = max(map(len, smiles_list)) + 2 # add 2 for start / stop
-        # TODO: check reversibility / recovery
         full_mask = None
         emb_shape = None
         n_recovered = 0
@@ -316,8 +307,6 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         emb_shape = [n_embedding_tokens, emb_shape[1], emb_shape[2]]
         embeddings = cp.asarray(embeddings)
         full_mask = [False] * n_embedding_tokens
-        logger.info(f'emb type: {type(embeddings)} of {type(embeddings[0])}')
-        logger.info(f'embeddings.shape:{embeddings.shape}, emb_shape={emb_shape}, embeddings[0]={embeddings[0]}')
 
         # Use the entire cluster to infer the direction:
         direction, emb_std, diff_size = self._get_embedding_direction(embeddings, compound_property_vals)
@@ -333,21 +322,16 @@ class MegatronMolBART(BaseGenerativeWorkflow):
             id_list = [id_list[i] for i in indices]
 
         result_df_list = [ pd.DataFrame({'SMILES': smiles_list,  'Generated': False, 'id': id_list}) ]
-        logger.info(f'direction: {type(direction)}, shape={direction.shape}, {direction}\n, embeddings: {type(embeddings)}, shape: {embeddings.shape}, embeddings[0]={embeddings[0]}')
 
         for step_num in range(1, 1 + num_points):
             direction_sampled = cp.random.normal(loc=direction, scale=emb_std, size=emb_std.shape) #direction + noise
-            logger.info(f'step ({type(step_num)} * {type(diff_size)} * {type(step_size)} * {type(direction_sampled)}')
             step = float(step_num * diff_size * step_size) * direction_sampled
-            logger.info(step)
             extrap_embeddings = embeddings + step # TODO: print and check output
-            logger.info(f'step ({step_num} * {diff_size} * {step_size} * direction_sampled): {type(step)}, {step.shape}, {step}\n:extrap_embeddings: {type(extrap_embeddings)}, {extrap_embeddings.shape}, extrap_embeddings[0]={extrap_embeddings[0]}')
+            #logger.info(f'step ({step_num} * {diff_size} * {step_size} * direction_sampled): {type(step)}, {step.shape}, {step}\n:extrap_embeddings: {type(extrap_embeddings)}, {extrap_embeddings.shape}, extrap_embeddings[0]={extrap_embeddings[0]}')
             smiles_gen_list = []
             ids_interp_list = []
             for i in range(len(extrap_embeddings)):
                 extrap_embedding = list(extrap_embeddings[i,:])
-                logger.info(f'embedding: {type(extrap_embedding)}, {len(extrap_embeddings)};'\
-                            f' dim: {type(emb_shape)}, {len(emb_shape)}; pad_mask={type(full_mask)}, {len(full_mask)}')
                 spec = EmbeddingList(
                     embedding=extrap_embedding,
                     dim=emb_shape,
@@ -362,7 +346,6 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                 'Generated': True,
                 'id': ids_interp_list
             })
-            logger.info(extrap_df.head())
             if force_unique:
                 inv_transform_funct = partial(self.inverse_transform,
                                             mem_pad_mask=full_mask)
@@ -370,7 +353,7 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                                                    smiles_gen,
                                                    inv_transform_funct,
                                                    radius=radius)
-            logger.info(f'step_num={step_num} yielded {len(extrap_df)} compounds:\n{extrap_df.head()}')
+            logger.info(f'step_num={step_num} yielded {len(extrap_df)} compounds')
             result_df_list.append(extrap_df)
         results_df = pd.concat(result_df_list, ignore_index=True)
         results_df['id'] = results_df['id'].apply(str)
@@ -391,7 +374,7 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         batch_size=32,
         learning_rate=0.001,
         weight_decay=0.0001,
-        debug=False, #82 / 88 compounds yielded something after embedding, with avg tani = 0.8287583649661866
+        debug=False,
         #scaled_radius=None
         ):
         """
@@ -409,18 +392,13 @@ class MegatronMolBART(BaseGenerativeWorkflow):
         n_train = len(df_train)
         n_test = len(df_test)
 
-        logger.info(f'df_train: {len(df_train)}\n{df_train.head()}')
-        logger.info(f"type(df_train['transformed_smiles'])={type(df_train['transformed_smiles'])}")
-
         smiles_list = np.concatenate((df_train['transformed_smiles'].to_array(), df_test['transformed_smiles'].to_array()), axis=0)
         logger.info(f'smiles_list: {smiles_list.shape}')
         pad_length = max(map(len, smiles_list)) + 2 # add 2 for start / stop
         embeddings = []
-        #full_mask = None
         emb_shape = None
         n_recovered = 0
         avg_tani = 0
-        #radius = self._compute_radius(scaled_radius)
 
         for i, smiles in enumerate(smiles_list):
             spec = GenerativeSpec(
@@ -432,7 +410,6 @@ class MegatronMolBART(BaseGenerativeWorkflow):
             emb = result.embedding
             mask = result.pad_mask
             dim = result.dim
-            #logger.info(f'{i}: smiles={smiles}, emd: {len(emb)}, {emb[:5]}; dim={dim}, mask: {len(mask)}')
             emb_shape = result.dim
             if debug:
                 spec = EmbeddingList(
@@ -457,10 +434,8 @@ class MegatronMolBART(BaseGenerativeWorkflow):
             embeddings, batch_first=True, padding_value=PAD_TOKEN)
         embeddings_train = embeddings[:n_train,:]
         embeddings_test = embeddings[n_train:,:]
-        logger.info(f'emb train: {type(embeddings_train)} of {type(embeddings_train[0])}, {embeddings_train.shape}')
-        compound_property_vals_train = torch.tensor(df_train[compound_property], device=self.device, dtype=torch.float32)#.to_gpu_array() # need to move to GPU array??
-        compound_property_vals_test = torch.tensor(df_test[compound_property], device=self.device, dtype=torch.float32)#.to_gpu_array() # need to move to GPU array??
-        logger.info(f'type(df_train[{compound_property}])={type(df_train[compound_property])}, type(compound_property_vals_train)={type(compound_property_vals_train)}')
+        compound_property_vals_train = torch.tensor(df_train[compound_property], device=self.device, dtype=torch.float32)
+        compound_property_vals_test = torch.tensor(df_test[compound_property], device=self.device, dtype=torch.float32)
         train_pred, test_pred = self._build_and_train_nn(
             embeddings_train,
             compound_property_vals_train,

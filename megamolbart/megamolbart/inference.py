@@ -1,47 +1,53 @@
 #!/usr/bin/env python3
 
 import logging
+import concurrent.futures
 from functools import partial
 from typing import List
-import concurrent.futures
+
 from rdkit import Chem
+from rdkit.Chem import PandasTools, CanonSmiles
 
 import torch
 import pandas as pd
-from cuchemcommon.workflow import BaseGenerativeWorkflow, add_jitter
 
 from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMolBARTModel
 
 logger = logging.getLogger(__name__)
 
 
-@add_jitter.register(torch.Tensor)
-def _(embedding, radius, cnt, shape):
-    if shape is not None:
-        embedding = torch.reshape(embedding, (1, shape[0], shape[1])).to(embedding.device)
-    permuted_emb = embedding.permute(1, 0, 2)
-
-    distorteds = []
-    for i in range(cnt):
-        noise = torch.normal(0, radius, permuted_emb.shape).to(embedding.device)
-        distorted = (noise + permuted_emb).permute(1, 0, 2)
-        distorteds.append(distorted)
-
-    return distorteds
-
-
-class MegaMolBART(BaseGenerativeWorkflow):
+class MegaMolBART():
 
     def __init__(self, model_dir) -> None:
         super().__init__()
 
-        torch.set_grad_enabled(False)  # Testing this instead of `with torch.no_grad():` context since it doesn't exit
-
-        self.device = 'cuda'  # Megatron arg loading seems to only work with GPU
+        torch.set_grad_enabled(False)
+        self.device = 'cuda'
         self.min_jitter_radius = 1.0
         self.model, self.version = self.load_model(model_dir)
         self.max_model_position_embeddings = self.model.max_seq_len
         self.tokenizer = self.model.tokenizer
+
+    def _compute_radius(self, scaled_radius):
+        if scaled_radius:
+            return float(scaled_radius * self.min_jitter_radius)
+        else:
+            return self.min_jitter_radius
+
+    def add_jitter(self, embedding, radius, cnt, shape=None):
+        if shape is not None:
+            embedding = torch.reshape(embedding, (1, shape[0], shape[1]))\
+                             .to(embedding.device)
+
+        permuted_emb = embedding.permute(1, 0, 2)
+        distorteds = []
+        for _ in range(cnt):
+            noise = torch.normal(0, radius, permuted_emb.shape)\
+                         .to(embedding.device)
+            distorted = (noise + permuted_emb).permute(1, 0, 2)
+            distorteds.append(distorted)
+
+        return distorteds
 
     def load_model(self, checkpoint_path):
         """Load saved model checkpoint
@@ -123,8 +129,9 @@ class MegaMolBART(BaseGenerativeWorkflow):
         batch_size = 1
         with torch.no_grad():
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                futures = {executor.submit(self._inverse_transform, memory, mem_pad_mask, batch_size, sanitize, k): \
-                    memory for memory in embeddings}
+                futures = {executor.submit(self._inverse_transform,\
+                    memory, mem_pad_mask, batch_size, sanitize, k):\
+                        memory for memory in embeddings}
 
                 for future in concurrent.futures.as_completed(futures):
                     smiles = futures[future]
@@ -134,28 +141,6 @@ class MegaMolBART(BaseGenerativeWorkflow):
                         smiles_interp_list.append(g_smiles)
                     except Exception as exc:
                         logger.warning(f'{smiles.smiles} generated an exception: {exc}')
-
-                # for memory in embeddings:
-                #     if isinstance(memory, list):
-                #         memory = torch.FloatTensor(memory).cuda()
-                #     decode_fn = partial(self.model.model._decode_fn,
-                #                         mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
-                #                         memory=memory)
-                #     mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
-                #                                                 batch_size=batch_size,
-                #                                                 device='cuda',
-                #                                                 k=k)
-                #     mol_strs = sum(mol_strs, [])  # flatten list
-
-                #     for smiles in mol_strs:
-                #         if sanitize:
-                #             mol = Chem.MolFromSmiles(smiles, sanitize=sanitize)
-                #             if mol:
-                #                 sanitized_smiles = Chem.MolToSmiles(mol)
-                #                 smiles_interp_list.append(sanitized_smiles)
-                #                 logger.debug(f'Sanitized SMILES {sanitized_smiles} added...')
-                #                 break
-                #         smiles_interp_list.append(smiles)
 
         return smiles_interp_list
 
@@ -172,19 +157,20 @@ class MegaMolBART(BaseGenerativeWorkflow):
         Returns
             list of interpolated smiles molecules
         """
-
-        pad_length = max(len(smiles1), len(smiles2)) + 2  # add 2 for start / stop
+        # add 2 for start / stop
+        pad_length = max(len(smiles1), len(smiles2)) + 2
         embedding1, pad_mask1 = self.smiles2embedding(smiles1,
                                                       pad_length=pad_length)
 
         embedding2, pad_mask2 = self.smiles2embedding(smiles2,
                                                       pad_length=pad_length)
 
-        scale = torch.linspace(0.0, 1.0, num_interp + 2)[
-                1:-1]  # skip first and last because they're the selected molecules
+        # skip first and last because they're the selected molecules
+        scale = torch.linspace(0.0, 1.0, num_interp + 2)[1:-1]
         scale = scale.unsqueeze(0).unsqueeze(-1).cuda()
 
-        interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()  # dims: batch, tokens, embedding
+        # dims: batch, tokens, embedding
+        interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()
         combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
 
         embeddings = []
@@ -207,13 +193,15 @@ class MegaMolBART(BaseGenerativeWorkflow):
                                   num_requested: int = 10,
                                   scaled_radius=None,
                                   force_unique=False,
-                                  sanitize=True):
+                                  sanitize=True,
+                                  pad_length=None):
         distance = self._compute_radius(scaled_radius)
         logger.info(f'Sampling {num_requested} around {smiles} with distance {distance}...')
 
-        embedding, pad_mask = self.smiles2embedding(smiles)
+        embedding, pad_mask = self.smiles2embedding(smiles,
+                                                    pad_length=pad_length)
 
-        neighboring_embeddings = self.addjitter(embedding, distance, cnt=num_requested)
+        neighboring_embeddings = self.add_jitter(embedding, distance, num_requested)
 
         generated_mols = self.inverse_transform(neighboring_embeddings,
                                                 pad_mask.bool().cuda(),
@@ -309,3 +297,75 @@ class MegaMolBART(BaseGenerativeWorkflow):
         smile_list = list(result_df['SMILES'])
 
         return result_df, smile_list
+
+    def compute_unique_smiles(self,
+                              interp_df,
+                              embedding_funct,
+                              scaled_radius=None):
+        """
+        Identify duplicate SMILES and distorts the embedding. The input df
+        must have columns 'SMILES' and 'Generated' at 0th and 1st position.
+        'Generated' colunm must contain boolean to classify SMILES into input
+        SMILES(False) and generated SMILES(True).
+
+        This function does not make any assumptions about order of embeddings.
+        Instead it simply orders the df by SMILES to identify the duplicates.
+        """
+
+        distance = self._compute_radius(scaled_radius)
+        embeddings = interp_df['embeddings']
+        embeddings_dim = interp_df['embeddings_dim']
+        for _, row in interp_df.iterrows():
+            smile_string = row['SMILES']
+            try:
+                canonical_smile = CanonSmiles(smile_string)
+            except:
+                # If a SMILES cannot be canonicalized, just use the original
+                canonical_smile = smile_string
+
+            row['SMILES'] = canonical_smile
+
+        for i in range(5):
+            smiles = interp_df['SMILES'].sort_values()
+            duplicates = set()
+            for idx in range(0, smiles.shape[0] - 1):
+                if smiles.iat[idx] == smiles.iat[idx + 1]:
+                    duplicates.add(smiles.index[idx])
+                    duplicates.add(smiles.index[idx + 1])
+
+            if len(duplicates) > 0:
+                for dup_idx in duplicates:
+                    if interp_df.iat[dup_idx, 3]:
+                        # add jitter to generated molecules only
+                        distored = self.add_jitter(embeddings[dup_idx],
+                                                  distance,
+                                                  1,
+                                                  shape=embeddings_dim[dup_idx])
+                        embeddings[dup_idx] = distored[0]
+                interp_df['SMILES'] = embedding_funct(embeddings.to_list())
+                interp_df['embeddings'] = embeddings
+            else:
+                break
+
+        # Ensure all generated molecules are valid.
+        for i in range(5):
+            PandasTools.AddMoleculeColumnToFrame(interp_df, 'SMILES')
+            invalid_mol_df = interp_df[interp_df['ROMol'].isnull()]
+
+            if not invalid_mol_df.empty:
+                invalid_index = invalid_mol_df.index.to_list()
+                for idx in invalid_index:
+                    embeddings[idx] = self.add_jitter(embeddings[idx],
+                                                     distance,
+                                                     1,
+                                                     shape=embeddings_dim[idx])[0]
+                interp_df['SMILES'] = embedding_funct(embeddings.to_list())
+                interp_df['embeddings'] = embeddings
+            else:
+                break
+
+        # Cleanup
+        if 'ROMol' in interp_df.columns:
+            interp_df = interp_df.drop('ROMol', axis=1)
+
+        return interp_df

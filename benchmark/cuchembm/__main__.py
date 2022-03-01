@@ -137,9 +137,7 @@ def main(cfg):
     output_dir = cfg.output.path
     os.makedirs(output_dir, exist_ok=True)
 
-    max_seq_len = int(cfg.sampling.max_seq_len)  # TODO: pull from inferrer
-
-    # Inferrer (DL model)
+    max_seq_len = int(cfg.sampling.max_seq_python -m cdddinf
     if cfg.model.name == 'MegaMolBART':
         from cuchembm.inference.megamolbart import MegaMolBARTWrapper
         inferrer = MegaMolBARTWrapper()

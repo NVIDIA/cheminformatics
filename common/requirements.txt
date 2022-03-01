@@ -1,3 +1,4 @@
-dask[complete]==2021.8.1
+dask[complete]
 sqlalchemy==1.4.23
 seaborn
+numpy

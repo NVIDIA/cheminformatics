@@ -86,7 +86,6 @@ start() {
     dbSetup ${DATA_PATH}
 
     export CUCHEM_UI_START_CMD="./launch.sh start $@"
-    export MEGAMOLBART_CMD="python3 -m megamolbart"
     export UID=$(id -u)
     export GID=$(id -g)
 

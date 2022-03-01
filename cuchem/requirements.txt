@@ -7,7 +7,7 @@ progressbar2==3.53.1
 tables==3.6.1
 sqlalchemy==1.4.23
 openpyxl==3.0.6
-tabulate==0.8.7
+tabulate
 autopep8==1.5.4
 protobuf==3.14.0
 chembl_webresource_client==0.10.2
@@ -16,13 +16,12 @@ waitress==1.4.3
 flask-restplus==0.13.0
 locust==1.4.3
 hydra-core==1.1.1
-dask_ml==1.8.0
 locust==1.4.3
-dask==2021.10.0
+dask
+dask_ml
 distributed==2021.10.0
 plotly==4.9.0
 pytest==6.2.2
 umap-learn==0.5.1
 grpcio
-pickle5
 git+https://github.com/jrwnter/cddd.git@1.0

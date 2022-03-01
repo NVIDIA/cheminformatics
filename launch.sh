@@ -81,6 +81,7 @@ build() {
     set -e
     DATE=$(date +%y%m%d)
 
+    local built=false
     if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "1" ]]; then
         IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
         echo "Building ${CUCHEM_CONT_BASENAME}..."
@@ -88,6 +89,7 @@ build() {
             -t ${CUCHEM_CONT_BASENAME}:latest \
             -t ${CUCHEM_CONT} \
             -f Dockerfile.cuchem .
+        built=true
     fi
 
     if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "2" ]]; then
@@ -98,21 +100,32 @@ build() {
             -t ${MEGAMOLBART_CONT_BASENAME}:latest \
             -t ${MEGAMOLBART_CONT} \
             -f Dockerfile.megamolbart .
+        built=true
+    fi
+
+    if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "3" ]]; then
+        IFS=':' read -ra CDDD_CONT_BASENAME <<< ${CDDD_CONT}
+        echo "Building ${CDDD_CONT_BASENAME}..."
+        docker build --network host \
+            -t ${CDDD_CONT_BASENAME}:latest \
+            -t ${CDDD_CONT} \
+            -f Dockerfile.cddd .
+        built=true
+    fi
+
+    if [[ ${built} == false ]]; then
+        echo "${RED}${BOLD}Invalid build option: ${IMG_OPTION}${RESET}"
+        exit 1
     fi
 
     set +e
 }
 
 
-push() {
-    local VERSION=$1
-    set -x
-    IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
-    IFS=':' read -ra MEGAMOLBART_BASENAME <<< ${MEGAMOLBART_CONT}
-
+check_docker_registry() {
     if [ -z ${REGISTRY_ACCESS_TOKEN} ]; then
         echo "${RED}Please ensure 'REGISTRY_ACCESS_TOKEN' in $LOCAL_ENV is correct and rerun this script. Please set NGC API key to REGISTRY_ACCESS_TOKEN.${RESET}"
-        exit
+        exit 1
     else
         echo "${YELLOW}Attempting docker login to ${REGISTRY}.${RESET}"
     fi
@@ -123,16 +136,43 @@ push() {
         echo "Please also check network settings and ensure 'REGISTRY_ACCESS_TOKEN' is $LOCAL_ENV is correct.${RESET}"
         exit 1
     fi
+}
 
-    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
 
-    docker push ${CUCHEM_CONT_BASENAME}:latest
-    docker tag ${CUCHEM_CONT_BASENAME}:latest ${CUCHEM_CONT_BASENAME}:${VERSION}
-    docker push ${CUCHEM_CONT_BASENAME}:${VERSION}
+push_container() {
+    local container_name=($(echo $1 | tr ":" "\n"))
+    docker push ${container_name[0]}:latest
+    docker tag ${container_name[0]}:latest ${container_name[0]}:${container_name[1]}
+    docker push ${container_name[0]}:${container_name[1]}
+}
 
-    docker push ${MEGAMOLBART_BASENAME}:latest
-    docker tag ${MEGAMOLBART_BASENAME}:latest ${MEGAMOLBART_BASENAME}:${VERSION}
-    docker push ${MEGAMOLBART_BASENAME}:${VERSION}
+
+push() {
+    local PUSH_OPTION=$1
+    local pushed=false
+
+    if [[ -z "${PUSH_OPTION}" || "${PUSH_OPTION}" == "1" ]]; then
+        docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+        push_container ${CUCHEM_CONT}
+        pushed=true
+    fi
+
+    if [[ -z "${PUSH_OPTION}" || "${PUSH_OPTION}" == "2" ]]; then
+        docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+        push_container ${MEGAMOLBART_CONT}
+        pushed=true
+    fi
+
+    if [[ -z "${PUSH_OPTION}" || "${PUSH_OPTION}" == "3" ]]; then
+        push_container ${CDDD_CONT}
+        pushed=true
+    fi
+
+    if [[ ${pushed} == false ]]; then
+        echo "${RED}${BOLD}Invalid push option: ${IMG_OPTION}${RESET}"
+        exit 1
+    fi
+
     exit
 }
 
@@ -145,7 +185,15 @@ setup() {
 dev() {
     local CONTAINER_OPTION=$1
     local CONT=${CUCHEM_CONT}
-    if [[ ${CONTAINER_OPTION} -eq 2 ]]; then
+
+    if [[ ${CONTAINER_OPTION} -eq 1 ]]; then
+        DOCKER_CMD="${DOCKER_CMD} --privileged"
+        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
+        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
+        DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
+    elif [[ ${CONTAINER_OPTION} -eq 2 ]]; then
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
@@ -153,17 +201,13 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/megamolbart:/workspace/benchmark"
         CONT=${MEGAMOLBART_CONT}
     elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
-        CONT="gpuci/miniconda-cuda:11.5-devel-ubuntu20.04"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/cddd"
+        CONT=${CDDD_CONT}
     else
-        DOCKER_CMD="${DOCKER_CMD} --privileged"
-        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
-        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
-        DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
+        echo "${RED}${BOLD}Invalid container option${RESET}"
+        exit 1
     fi
 
     if [ ! -z "$2" ]; then
@@ -173,6 +217,7 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} --rm"
         CMD='bash'
     fi
+    set -x
     ${DOCKER_CMD} -it ${CONT} ${CMD}
 }
 
@@ -189,7 +234,6 @@ start() {
         setup
         set -x
         export CUCHEM_UI_START_CMD="./launch.sh start $@"
-        export MEGAMOLBART_CMD="python3 -m megamolbart"
         export UID=$(id -u)
         export GID=$(id -g)
 
@@ -197,6 +241,7 @@ start() {
         echo "Starting containers ${MEGAMOLBART_CONT} and ${CUCHEM_CONT}..."
         export WORKING_DIR_CUCHEMUI=/workspace
         export WORKING_DIR_MEGAMOLBART=/workspace/megamolbart
+        export WORKING_DIR_CDDD=/workspace
         export PYTHONPATH_MEGAMOLBART="${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
         export NGINX_CONFIG=${PROJECT_PATH}/setup/config/nginx.conf
 

@@ -1,6 +1,6 @@
 ./data
 ./cache
-./cddd
+./models
 
 .bash_history
 .cache

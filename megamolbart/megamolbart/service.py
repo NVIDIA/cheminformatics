@@ -58,6 +58,7 @@ class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=
                 num_requested=spec.numRequested,
                 scaled_radius=spec.radius,
                 sanitize=spec.sanitize,
+                pad_length=spec.padding,
                 force_unique=False)
 
         embeddings = []

@@ -56,7 +56,32 @@ services:
       - /etc/shadow:/etc/shadow:ro
       - /var/run/docker.sock:/var/run/docker.sock
     working_dir: ${WORKING_DIR_MEGAMOLBART}
-    command: ${MEGAMOLBART_CMD}
+    command: python3 -m megamolbart
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            capabilities: [gpu]
+
+  cddd:
+    image: ${CDDD_CONT}
+    user: $UID:$GID
+    networks:
+      - cuchemNet
+    ports:
+      - "50051"
+    volumes:
+      - './:/workspace'
+      - "${CONTENT_PATH}/data:/data"
+      - "${CONTENT_PATH}/models:/models"
+      - "${CONTENT_PATH}/logs:/logs"
+      - /etc/passwd:/etc/passwd:ro
+      - /etc/group:/etc/group:ro
+      - /etc/shadow:/etc/shadow:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: ${WORKING_DIR_CDDD}
+    command: '/opt/conda/envs/rapids/bin/python -m cdddinf'
     deploy:
       resources:
         reservations:

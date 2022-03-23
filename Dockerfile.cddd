@@ -1,0 +1,25 @@
+# Copyright 2020 NVIDIA Corporation
+FROM rapidsai/rapidsai:21.08-cuda11.2-runtime-ubuntu20.04-py3.7
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg \
+        wget \
+        lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+SHELL ["conda", "run", "-n", "rapids", "/bin/bash", "-c"]
+COPY ./ /opt/nvidia/cheminfomatics
+
+RUN python3 --version
+RUN cd /opt/nvidia/cheminfomatics/cddd; \
+    pip install -r requirements.txt\
+    pip install grpcio
+
+ENV UCX_LOG_LEVEL error
+ENV PYTHONPATH $PYTHONPATH:./cuchem:./common:./common/generated/:./cddd
+SHELL ["conda", "run", "-n", "rapids", "/bin/bash", "-c"]
+CMD cd /opt/nvidia/cheminfomatics; python -m cdddinf

@@ -345,7 +345,7 @@ To start dash:
         v = ChemVisualization(workflow)
         port = context.get_config('plotly_port', 5000)
 
-        logger.info('navigate to https://localhost: %s' % port)
+        logger.info('navigate to https://localhost:%s' % port)
         v.start('0.0.0.0', port=port)
 
 

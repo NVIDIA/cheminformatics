@@ -1,5 +1,5 @@
 # Copyright 2020 NVIDIA Corporation
-FROM rapidsai/rapidsai:21.08-cuda11.2-runtime-ubuntu20.04-py3.7
+FROM rapidsai/rapidsai:22.02-cuda11.4-base-ubuntu20.04-py3.8
 
 RUN apt-get update \
     && apt-get upgrade -y \

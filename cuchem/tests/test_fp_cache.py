@@ -2,10 +2,11 @@ import os
 import logging
 import tempfile
 import dask
+import pytest
 
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.data.cluster_wf import FINGER_PRINT_FILES
-from cuchemcommon.fingerprint import MorganFingerprint, Embeddings
+from cuchemcommon.fingerprint import MorganFingerprint
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +39,7 @@ def test_cache_morganfingerprint():
         ('Expected %d rec found %d.' % (num_recs, mol_df.shape[0]))
 
 
+@pytest.
 def test_cache_cddd_embeddings():
     """
     Verify fetching data from chemblDB.

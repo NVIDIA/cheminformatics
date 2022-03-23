@@ -60,7 +60,7 @@ metric:
 
   modelability:
     physchem:
-      enabled: True
+      enabled: False
       input_size: -1
       n_splits: 20
       normalize_inputs: True

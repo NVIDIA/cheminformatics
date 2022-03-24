@@ -650,8 +650,9 @@ class ChemVisualization(metaclass=Singleton):
 
         self.cluster_wf.df_embedding['n_union'] = self.cluster_wf.df_embedding['pc'] - self.cluster_wf.df_embedding['n_intersection'] + query_pc
         self.cluster_wf.df_embedding['similarity'] = self.cluster_wf.df_embedding['n_intersection'] / self.cluster_wf.df_embedding['n_union']
-        self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.persist()
-        wait(self.cluster_wf.df_embedding)
+        if hasattr(self.cluster_wf.df_embedding, 'persist'):
+            self.cluster_wf.df_embedding = self.cluster_wf.df_embedding.persist()
+            wait(self.cluster_wf.df_embedding)
         t5 = time.time()
         t0 = time.time()
         self.fp_df['similarity_cpu'] = self.fp_df['fp'].apply(lambda x: DataStructs.FingerprintSimilarity(query_fp, x))

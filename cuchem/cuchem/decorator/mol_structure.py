@@ -17,12 +17,12 @@ class MolecularStructureDecorator(BaseMolPropertyDecorator):
 
     def decorate(self,
                  df: Union[cudf.DataFrame, pandas.DataFrame],
-                 smile_cols: int = 0):
+                 smiles_col: int = 0):
 
         mol_struct = []
         for idx in range(df.shape[0]):
 
-            smiles = df.iat[idx, smile_cols]
+            smiles = df.iat[idx, smiles_col]
             try:
                 m = Chem.MolFromSmiles(smiles)
                 drawer = Draw.rdMolDraw2D.MolDraw2DCairo(500, 125)

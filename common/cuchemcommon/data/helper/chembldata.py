@@ -3,10 +3,9 @@ import warnings
 import pandas
 import sqlite3
 import logging
-
+import sys
 from typing import List
-from dask import delayed, dataframe
-
+import dask
 from contextlib import closing
 from cuchemcommon.utils.singleton import Singleton
 from cuchemcommon.context import Context
@@ -70,7 +69,7 @@ class ChEmblData(object, metaclass=Singleton):
             cols = list(map(lambda x: x[0], cur.description))
             return cols, cur.fetchall()
 
-    def fetch_props_by_chemble(self, chemble_ids):
+    def fetch_props_by_chembl(self, chembl_ids):
         """
         Returns compound properties and structure filtered by ChEMBL IDs along
         with a list of columns.
@@ -84,7 +83,7 @@ class ChEmblData(object, metaclass=Singleton):
             """
         with closing(sqlite3.connect(self.chembl_db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
-            select_stmt = sql_stml % "'%s'" % "','".join([x.strip().upper() for x in chemble_ids])
+            select_stmt = sql_stml % "'%s'" % "','".join([x.strip().upper() for x in chembl_ids])
             cur.execute(select_stmt)
 
             cols = list(map(lambda x: x[0], cur.description))
@@ -148,13 +147,18 @@ class ChEmblData(object, metaclass=Singleton):
 
             return cur.fetchone()[0]
 
-    def _meta_df(self, **transformation_kwargs):
+    def _meta_df(self, columns=[], **transformation_kwargs):
         transformation = self.fp_type(**transformation_kwargs)
 
         prop_meta = {'id': pandas.Series([], dtype='int64')}
         prop_meta.update(dict(zip(IMP_PROPS + ADDITIONAL_FEILD,
                                   IMP_PROPS_TYPE + ADDITIONAL_FEILD_TYPE)))
-        prop_meta.update({i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
+        prop_meta.update(
+            {i: pandas.Series([], dtype='float32') for i in range(len(transformation))})
+        # New columns containing the fingerprint as uint64s:
+        for column in columns:
+            if isinstance(column, str) and column.startswith('fp'):
+                prop_meta.update({column: pandas.Series([], dtype='uint64')})
 
         return pandas.DataFrame(prop_meta)
 
@@ -167,7 +171,7 @@ class ChEmblData(object, metaclass=Singleton):
         Returns compound properties and structure for the first N number of
         records in a dataframe.
         """
-
+        # TODO: loading compounds from the database and computing fingerprints need to be separated
         logger.debug('Fetching %d records starting %d...' % (batch_size, start))
 
         imp_cols = ['cp.' + col for col in IMP_PROPS]
@@ -194,32 +198,38 @@ class ChEmblData(object, metaclass=Singleton):
                 LIMIT %d, %d
             ''' % (', '.join(imp_cols), " ,".join(list(map(str, molregnos))), start, batch_size)
 
-        df = pandas.read_sql(select_stmt,
-                             sqlite3.connect(self.chembl_db, uri=True))
+        df = pandas.read_sql(
+            select_stmt,
+            sqlite3.connect(self.chembl_db, uri=True))
 
         # Smiles -> Smiles transformation and filtering
         # TODO: Discuss internally to find use or refactor this code to remove
         # model specific filtering
         df['transformed_smiles'] = df['canonical_smiles']
-        # if smiles_transforms is not None:
-        #     if len(smiles_transforms) > 0:
-        #         for xf in smiles_transforms:
-        #             df['transformed_smiles'] = df['transformed_smiles'].map(xf.transform)
-        #             df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
 
         # Conversion to fingerprints or embeddings
-        # transformed_smiles = df['transformed_smiles']
         transformation = self.fp_type(**transformation_kwargs)
-        cache_data = transformation.transform(df)
-        return_df = pandas.DataFrame(cache_data)
 
+        # This is where the int64 fingerprint columns are computed:
+        cache_data, raw_fp_list = transformation.transform(
+            df, 
+            return_fp=True
+        )
+        return_df = pandas.DataFrame(cache_data)
         return_df = pandas.DataFrame(
             return_df,
             columns=pandas.RangeIndex(start=0,
                                       stop=len(transformation))).astype('float32')
 
         return_df = df.merge(return_df, left_index=True, right_index=True)
+        # TODO: expect to run into the issue that the fingerprint cannot be a cudf column
+        # TODO: compute here so that chemvisualize does not have to
+        # The computed fingerprint columns are inserted into the df with the 'fp' prefix (to
+        # distinguish from PCA columns that are also numeric)
+        for i, fp_col in enumerate(raw_fp_list):
+            return_df[f'fp{i}'] = fp_col
         return_df.rename(columns={'molregno': 'id'}, inplace=True)
+
         return return_df
 
     def fetch_mol_embedding(self,
@@ -231,8 +241,6 @@ class ChEmblData(object, metaclass=Singleton):
         Returns compound properties and structure for the first N number of
         records in a dataframe.
         """
-        logger.debug('Fetching properties for all molecules...')
-
         if num_recs is None or num_recs < 0:
             num_recs = self.fetch_molecule_cnt()
 
@@ -242,23 +250,25 @@ class ChEmblData(object, metaclass=Singleton):
         dls = []
         for start in range(0, num_recs, batch_size):
             bsize = min(num_recs - start, batch_size)
-            dl_data = delayed(self._fetch_mol_embedding)(start=start,
-                                                         batch_size=bsize,
-                                                         molregnos=molregnos,
-                                                         **transformation_kwargs)
+            dl_data = dask.delayed(self._fetch_mol_embedding)(
+                start=start,
+                batch_size=bsize,
+                molregnos=molregnos,
+                **transformation_kwargs
+            )
             dls.append(dl_data)
+        meta_df = self._meta_df(
+            columns=dls[0].columns.compute(), **transformation_kwargs)
 
-        return dataframe.from_delayed(dls, meta=meta_df)
+        return dask.dataframe.from_delayed(dls, meta=meta_df)
 
     def save_fingerprints(self, hdf_path='data/filter_*.h5', num_recs=None, batch_size=5000):
         """
         Generates fingerprints for all ChEMBL ID's in the database
         """
-        logger.debug('Fetching molecules from database for fingerprints...')
-
         mol_df = self.fetch_mol_embedding(num_recs=num_recs, batch_size=batch_size)
+        logger.info(f'save_fingerprints writing {type(mol_df)} to {hdf_path}')
         mol_df.to_hdf(hdf_path, 'fingerprints')
-
 
     def is_valid_chemble_smiles(self, smiles, con=None):
 

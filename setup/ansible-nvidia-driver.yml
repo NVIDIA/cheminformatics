@@ -5,12 +5,12 @@
   tasks:
     - name: Add CUDA apt-key
       apt_key:
-        url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/7fa2af80.pub
+        url: https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
         state: present
 
     - name: Add CUDA apt repository
       apt_repository:
-        repo: 'deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/ /'
+        repo: 'deb http://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /'
         state: present
         filename: nvidia
         update_cache: yes
@@ -27,9 +27,9 @@
         state: present
         update_cache: yes
       with_items:
-        - 'deb https://nvidia.github.io/libnvidia-container/stable/ubuntu18.04/amd64/ /'
-        - 'deb https://nvidia.github.io/nvidia-container-runtime/stable/ubuntu18.04/amd64/ /'
-        - 'deb https://nvidia.github.io/nvidia-docker/ubuntu18.04/amd64/ /'
+        - 'deb https://nvidia.github.io/libnvidia-container/stable/ubuntu20.04/amd64/ /'
+        - 'deb https://nvidia.github.io/nvidia-container-runtime/stable/ubuntu20.04/amd64/ /'
+        - 'deb https://nvidia.github.io/nvidia-docker/ubuntu20.04/amd64/ /'
       register: nvidia_container_runtime_apt_repo
 
     - name: Install Nvidia Driver

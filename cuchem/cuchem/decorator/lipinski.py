@@ -21,7 +21,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
 
     def decorate(self,
                  df: Union[cudf.DataFrame, pandas.DataFrame],
-                 smile_cols: int = 0):
+                 smiles_cols: int = 0):
 
         mol_wt = []
         mol_logp = []
@@ -29,13 +29,16 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
         hacceptors = []
         rotatable_bonds = []
         qeds = []
+        invalid = []
 
         for idx in range(df.shape[0]):
 
-            smiles = df.iat[idx, smile_cols]
+            smiles = df.iat[idx, smiles_cols]
             m = Chem.MolFromSmiles(smiles)
 
             if m is None:
+                logger.info(f'{idx}: Could not make a Mol from {smiles}')
+                invalid.append(True)
                 mol_logp.append({'value': '-', 'level': 'info'})
                 mol_wt.append({'value': '-', 'level': 'info'})
                 hdonors.append({'value': '-', 'level': 'info'})
@@ -43,7 +46,8 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
                 rotatable_bonds.append({'value': '-', 'level': 'info'})
                 qeds.append({'value': '-', 'level': 'info'})
                 continue
-
+            else: 
+                invalid.append(False)
             try:
                 logp = Descriptors.MolLogP(m)
                 mol_logp.append({'value': round(logp, 2),
@@ -100,5 +104,7 @@ class LipinskiRuleOfFiveDecorator(BaseMolPropertyDecorator):
         df['H-Bond Acceptors'] = hacceptors
         df['Rotatable Bonds'] = rotatable_bonds
         df['QED'] = qeds
+        # TODO: this may be redundant as chemvisualize seems to be handling such invalid molecules
+        df['invalid'] = invalid
 
         return df

@@ -236,6 +236,14 @@ class MegaMolBART():
             dims.append(tuple(neighboring_embedding.shape))
             embeddings.append(neighboring_embedding.flatten().tolist())
 
+        # Rest of the applications and libraries use RAPIDS and cuPY libraries.
+        # For interoperability, we need to convert the embeddings to cupy.
+        embeddings = []
+        dims = []
+        for neighboring_embedding in neighboring_embeddings:
+            dims.append(neighboring_embedding.shape)
+            embeddings.append(neighboring_embedding.flatten().tolist())
+
         generated_df = pd.DataFrame({'SMILES': generated_mols,
                                      'embeddings': embeddings,
                                      'embeddings_dim': dims,
@@ -296,9 +304,9 @@ class MegaMolBART():
             result_df.append(interp_df)
 
         result_df = pd.concat(result_df)
-        smile_list = list(result_df['SMILES'])
+        smiles_list = list(result_df['SMILES'])
 
-        return result_df, smile_list
+        return result_df, smiles_list
 
     def compute_unique_smiles(self,
                               interp_df,

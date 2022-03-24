@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from megamolbart.service import GenerativeSampler
 import generativesampler_pb2
 import generativesampler_pb2_grpc
+from util import (DEFAULT_NUM_LAYERS, DEFAULT_D_MODEL, DEFAULT_NUM_HEADS, CHECKPOINTS_DIR)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,14 @@ def similarity(add_server_method, service_cls, stub_cls):
             yield stub_cls(channel)
     finally:
         server.stop(None)
+
+def test_fetch_iterations():
+    sys.argv = [sys.argv[0]]
+    with similarity(generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server,
+                    GenerativeSampler,
+                    generativesampler_pb2_grpc.GenerativeSamplerStub) as stub:
+
+        result = stub.GetIteration(generativesampler_pb2.google_dot_protobuf_dot_empty__pb2.Empty())
 
 
 def test_dataframe_similar():

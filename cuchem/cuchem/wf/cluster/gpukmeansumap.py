@@ -22,6 +22,8 @@ import cudf
 import cuml
 import dask
 import dask_cudf
+import sys
+from dask.distributed import wait
 from cuchemcommon.context import Context
 from cuchemcommon.data import ClusterWfDAO
 from cuchemcommon.data.cluster_wf import ChemblClusterWfDao
@@ -42,43 +44,51 @@ MIN_RECLUSTER_SIZE = 200
 
 
 @singledispatch
-def _gpu_cluster_wrapper(embedding, n_pca, self):
+def _gpu_cluster_wrapper(embedding, n_pca, reuse_umap, reuse_pca, self):
     return NotImplemented
 
 
 @_gpu_cluster_wrapper.register(dask.dataframe.core.DataFrame)
-def _(embedding, n_pca, self):
+def _(embedding, n_pca, reuse_umap, reuse_pca, self):
     embedding = dask_cudf.from_dask_dataframe(embedding)
-    return _gpu_cluster_wrapper(embedding, n_pca, self)
+    return _gpu_cluster_wrapper(embedding, n_pca, reuse_umap, reuse_pca, self)
 
 
 @_gpu_cluster_wrapper.register(cudf.DataFrame)
-def _(embedding, n_pca, self):
+def _(embedding, n_pca, reuse_umap, reuse_pca, self):
     embedding = dask_cudf.from_cudf(embedding,
-                                    chunksize=int(embedding.shape[0] * 0.1))
-    return _gpu_cluster_wrapper(embedding, n_pca, self)
+                                    chunksize=max(10, int(embedding.shape[0] * 0.1)))
+    return _gpu_cluster_wrapper(embedding, n_pca, reuse_umap, reuse_pca, self)
 
 
 @_gpu_cluster_wrapper.register(dask_cudf.core.DataFrame)
-def _(embedding, n_pca, self):
+def _(embedding, n_pca, reuse_umap, reuse_pca, self):
     embedding = embedding.persist()
-    return self._cluster(embedding, n_pca)
+    return self._cluster(embedding, n_pca, reuse_umap, reuse_pca)
 
 
 class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
-
+    # TODO: support changing fingerprint radius and nBits in other kmeans workflows as well (hybrid, random projection)
     def __init__(self,
                  n_molecules: int = None,
                  dao: ClusterWfDAO = ChemblClusterWfDao(MorganFingerprint),
                  pca_comps=64,
                  n_clusters=7,
-                 seed=0):
+                 seed=0,
+                 fingerprint_radius=2,
+                 fingerprint_nBits=512
+        ):
         super().__init__()
 
-        self.dao = dao
+        self.dao = dao if dao is not None else ChemblClusterWfDao(
+            MorganFingerprint, radius=fingerprint_radius, nBits=fingerprint_nBits
+        )
+        self.fingerprint_radius = fingerprint_radius
+        self.fingerprint_nBits = fingerprint_nBits
         self.n_molecules = n_molecules
         self.pca_comps = pca_comps
         self.pca = None
+        self.umap = None
         self.n_clusters = n_clusters
 
         self.df_embedding = None
@@ -87,12 +97,12 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         self.n_spearman = 5000
         self.n_silhouette = 500000
 
-    def _cluster(self, embedding, n_pca):
+    def _cluster(self, embedding, n_pca, reuse_umap=False, reuse_pca=True):
         """
         Generates UMAP transformation on Kmeans labels generated from
         molecular fingerprints.
         """
-
+        reuse_umap = reuse_umap and reuse_pca
         dask_client = self.context.dask_client
         embedding = embedding.reset_index()
 
@@ -106,15 +116,17 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         if n_pca and n_obs > n_pca:
             with MetricsLogger('pca', self.n_molecules) as ml:
-                if self.pca is None:
+                if (self.pca is None) or not reuse_pca:
                     self.pca = cuDaskPCA(client=dask_client, n_components=n_pca)
                     self.pca.fit(embedding)
+                else:
+                    logger.info(f'Using available pca')
                 embedding = self.pca.transform(embedding)
                 embedding = embedding.persist()
 
         with MetricsLogger('kmeans', self.n_molecules) as ml:
-            if self.n_molecules < MIN_RECLUSTER_SIZE:
-                raise Exception('Reclustering less than %d molecules is not supported.' % MIN_RECLUSTER_SIZE)
+            if self.n_molecules < self.n_clusters: # < MIN_RECLUSTER_SIZE:
+                raise Exception('Reclustering {self.n_molecules} molecules into {self.n_clusters} clusters not supported.')# % MIN_RECLUSTER_SIZE)
 
             kmeans_cuml = cuDaskKMeans(client=dask_client,
                                        n_clusters=self.n_clusters)
@@ -137,13 +149,18 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
             local_model = cuUMAP()
             local_model.fit(X_train)
 
-            umap_model = cuDaskUMAP(local_model,
-                                    n_neighbors=100,
-                                    a=1.0,
-                                    b=1.0,
-                                    learning_rate=1.0,
-                                    client=dask_client)
-            Xt = umap_model.transform(embedding)
+            if not (reuse_umap and self.umap):
+                self.umap = cuDaskUMAP(
+                    local_model,
+                    n_neighbors=100,
+                    a=1.0,
+                    b=1.0,
+                    learning_rate=1.0,
+                    client=dask_client
+                )
+            else:
+                logger.info(f'reusing {self.umap}')
+            Xt = self.umap.transform(embedding)
 
             ml.metric_name = 'spearman_rho'
             ml.metric_func = self._compute_spearman_rho
@@ -165,30 +182,55 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         return embedding
 
-    def cluster(self, df_mol_embedding=None):
+    def cluster(
+        self, 
+        df_mol_embedding=None, 
+        reuse_umap=False, 
+        reuse_pca=True, 
+        fingerprint_radius=2, 
+        fingerprint_nBits=512
+    ):
 
-        logger.info("Executing GPU workflow...")
-
-        if df_mol_embedding is None:
+        logger.info(f"GpuKmeansUmap.cluster(radius={fingerprint_radius}, nBits={fingerprint_nBits}), df_mol_embedding={df_mol_embedding}")
+        sys.stdout.flush()
+        if (df_mol_embedding is None) or (fingerprint_radius != self.fingerprint_radius) or (fingerprint_nBits != self.fingerprint_nBits):
             self.n_molecules = self.context.n_molecule
-
+            self.dao = ChemblClusterWfDao(
+                MorganFingerprint, radius=fingerprint_radius, nBits=fingerprint_nBits)
+            self.fingerprint_radius = fingerprint_radius
+            self.fingerprint_nBits = fingerprint_nBits
+            logger.info(f'dao={self.dao}, getting df_mol_embedding...')
             df_mol_embedding = self.dao.fetch_molecular_embedding(
                 self.n_molecules,
                 cache_directory=self.context.cache_directory,
+                radius=fingerprint_radius,
+                nBits=fingerprint_nBits
             )
-
             df_mol_embedding = df_mol_embedding.persist()
+            wait(df_mol_embedding)
 
-        self.df_embedding = _gpu_cluster_wrapper(df_mol_embedding,
-                                                 self.pca_comps,
-                                                 self)
+        self.df_embedding = _gpu_cluster_wrapper(
+            df_mol_embedding,
+            self.pca_comps,
+            reuse_umap,
+            reuse_pca,
+            self
+        )
         return self.df_embedding
 
     def recluster(self,
                   filter_column=None,
                   filter_values=None,
-                  n_clusters=None):
+                  n_clusters=None, 
+                  fingerprint_radius=2, 
+                  fingerprint_nBits=512
+    ):
 
+        # The user may have changed the fingerprint specification, in which case, we cannot reuse the embeddings
+        if (fingerprint_radius != self.fingerprint_radius) or (fingerprint_nBits != self.fingerprint_nBits):
+            return self.cluster(df_mol_embedding=None, reuse_umap=False, reuse_pca=False, fingerprint_radius=fingerprint_radius, fingerprint_nBits=fingerprint_nBits)
+
+        logger.info(f"recluster(radius={fingerprint_radius}, nBits={fingerprint_nBits}): reusing embedding")
         df_embedding = self.df_embedding
         if filter_values is not None:
             filter = df_embedding[filter_column].isin(filter_values)
@@ -199,11 +241,11 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
         if n_clusters is not None:
             self.n_clusters = n_clusters
 
-        self.df_embedding = _gpu_cluster_wrapper(df_embedding, None, self)
+        self.df_embedding = _gpu_cluster_wrapper(df_embedding, None, False, True, self)
 
         return self.df_embedding
 
-    def add_molecules(self, chemblids: List):
+    def add_molecules(self, chemblids: List, radius=2, nBits=512):
 
         chemblids = [x.strip().upper() for x in chemblids]
         chem_mol_map = {row[0]: row[1] for row in self.dao.fetch_id_from_chembl(chemblids)}
@@ -245,8 +287,6 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
             if hasattr(self.df_embedding, 'compute'):
                 self.df_embedding = self.df_embedding.compute()
 
-            logger.info(self.df_embedding.shape)
-
         return chem_mol_map, molregnos, self.df_embedding
 
 
@@ -264,7 +304,7 @@ class GpuKmeansUmapHybrid(GpuKmeansUmap, metaclass=Singleton):
                          n_clusters=n_clusters,
                          seed=seed)
 
-    def _cluster(self, embedding, n_pca):
+    def _cluster(self, embedding, n_pca, reuse_umap=False, reuse_pca=False):
         """
         Generates UMAP transformation on Kmeans labels generated from
         molecular fingerprints.
@@ -284,7 +324,7 @@ class GpuKmeansUmapHybrid(GpuKmeansUmap, metaclass=Singleton):
 
         if n_pca and n_obs > n_pca:
             with MetricsLogger('pca', self.n_molecules) as ml:
-                if self.pca == None:
+                if (self.pca == None) or not reuse_pca:
                     self.pca = cuml.PCA(n_components=n_pca)
                     self.pca.fit(embedding)
                 embedding = self.pca.transform(embedding)
@@ -308,8 +348,8 @@ class GpuKmeansUmapHybrid(GpuKmeansUmap, metaclass=Singleton):
                 ml.metric_func_args = (embedding_sample, kmeans_labels_sample)
 
         with MetricsLogger('umap', self.n_molecules) as ml:
-            umap = cuml.manifold.UMAP()
-            Xt = umap.fit_transform(embedding)
+            self.umap = cuml.manifold.UMAP()
+            Xt = self.umap.fit_transform(embedding)
 
             ml.metric_name = 'spearman_rho'
             ml.metric_func = self._compute_spearman_rho

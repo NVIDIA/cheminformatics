@@ -79,7 +79,6 @@ start() {
     validate_docker
     # run a container and start dash inside container.
     echo "${CUCHEM_CONT} ${MEGAMOLBART_CONT}"
-
     export ADDITIONAL_PARAM="$@"
 
     download_model
@@ -102,7 +101,7 @@ start() {
 
 
 stop() {
-    docker-compose --env-file .env  \
+    ./docker-compose --env-file .env  \
         -f docker_compose.yml \
         --project-directory . \
         down

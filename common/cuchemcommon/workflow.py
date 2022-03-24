@@ -1,37 +1,13 @@
-<<<<<<< HEAD
 from functools import singledispatch
-from typing import List
-
 import pandas as pd
 import numpy as np
-=======
 import logging
 from typing import List
 
->>>>>>> dev
 from cuchemcommon.data import GenerativeWfDao
 from cuchemcommon.fingerprint import BaseTransformation
 
-<<<<<<< HEAD
-@singledispatch
-def add_jitter(embedding, radius, cnt, shape):
-    return NotImplemented
-
-
-@add_jitter.register(np.ndarray)
-def _(embedding, radius, cnt, shape):
-
-    distorteds = []
-    for i in range(cnt):
-        noise = np.random.normal(0, radius, embedding.shape)
-        distorted = noise + embedding
-        distorteds.append(distorted)
-
-    return distorteds
-=======
 logger = logging.getLogger(__name__)
->>>>>>> dev
-
 
 class BaseGenerativeWorkflow(BaseTransformation):
 

@@ -71,7 +71,7 @@ class Cddd(BaseGenerativeWorkflow):
                               forceUnique=force_unique,
                               sanitize=sanitize)
         result = self.stub.FindSimilars(spec)
-        generatedSmiles = result.generatedSmiles
+        generatedSmiles = list(result.generatedSmiles)
         embeddings = []
         dims = []
         for embedding in result.embeddings:
@@ -100,7 +100,7 @@ class Cddd(BaseGenerativeWorkflow):
                               sanitize=sanitize)
 
         result = self.stub.Interpolate(spec)
-        result = result.generatedSmiles
+        result = list(result.generatedSmiles)
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})

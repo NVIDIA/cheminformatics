@@ -1,3 +1,4 @@
+from cmath import log
 import sys
 import grpc
 import logging
@@ -66,6 +67,7 @@ def test_dataframe_interpolate():
             numRequested=10)
 
         result = stub.Interpolate(spec)
+        logger.info(list(result.generatedSmiles))
 
 
 def test_transform():

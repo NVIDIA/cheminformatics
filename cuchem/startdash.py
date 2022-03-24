@@ -72,17 +72,12 @@ class Launcher(object):
 Following commands are supported:
    cache      : Create cache
    analyze    : Start Jupyter notebook in a container
-   service    : Start in service mode
-   grpc       : Start in grpc service
 
 To start dash:
     ./start analyze
 
 To create cache:
     ./start cache -p
-
-To start dash:
-    ./start service
 
 ''')
 
@@ -175,63 +170,6 @@ To start dash:
 
             logger.info('Fingerprint generated in (hh:mm:ss.ms) {}'.format(
                 datetime.now() - task_start_time))
-
-    def service(self):
-        """
-        Start services
-        """
-        parser = argparse.ArgumentParser(description='Service')
-        parser.add_argument('-d', '--debug',
-                            dest='debug',
-                            action='store_true',
-                            default=False,
-                            help='Show debug message')
-
-        args = parser.parse_args(sys.argv[2:])
-
-        if args.debug:
-            logger.setLevel(logging.DEBUG)
-
-        from waitress import serve
-        from api import app
-
-        Context()
-        # port = context.get_config('plotly_port', 6000)
-        port = 8081
-        serve(app, host='0.0.0.0', port=port)
-
-    def grpc(self):
-        """
-        Start services
-        """
-        parser = argparse.ArgumentParser(description='Service')
-        parser.add_argument('-p', '--port',
-                            dest='port',
-                            type=int,
-                            default=50051,
-                            help='GRPC server Port')
-        parser.add_argument('-d', '--debug',
-                            dest='debug',
-                            action='store_true',
-                            default=False,
-                            help='Show debug message')
-
-        args = parser.parse_args(sys.argv[2:])
-
-        if args.debug:
-            logger.setLevel(logging.DEBUG)
-
-        sys.path.insert(0, "generated")
-        import grpc
-        import similaritysampler_pb2_grpc
-        from concurrent import futures
-        from cuchem.cheminformatics.grpc import SimilaritySampler
-
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        similaritysampler_pb2_grpc.add_SimilaritySamplerServicer_to_server(SimilaritySampler(), server)
-        server.add_insecure_port(f'[::]:{args.port}')
-        server.start()
-        server.wait_for_termination()
 
     def analyze(self):
         """

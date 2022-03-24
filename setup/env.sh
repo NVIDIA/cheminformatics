@@ -36,6 +36,7 @@ function config() {
 
     CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.1.2}
     MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/megamolbart:0.1.2}
+    CDDD_CONT=${CDDD_CONT:=nvcr.io/nvidia/clara/cddd:1.0.0}
     MEGAMOLBART_MODEL=${MEGAMOLBART_MODEL:=nvidia/clara/megamolbart:0.1}
     PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
     CONTENT_PATH=${CONTENT_PATH:=$(pwd)}
@@ -49,6 +50,7 @@ function config() {
     if [ $write_env -eq 1 ]; then
         echo CUCHEM_CONT=${CUCHEM_CONT} > $LOCAL_ENV
         echo MEGAMOLBART_CONT=${MEGAMOLBART_CONT} >> $LOCAL_ENV
+        echo CDDD_CONT=${CDDD_CONT} >> $LOCAL_ENV
         echo MEGAMOLBART_MODEL=${MEGAMOLBART_MODEL} >> $LOCAL_ENV
         echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
         echo CONTENT_PATH=${CONTENT_PATH} >> $LOCAL_ENV

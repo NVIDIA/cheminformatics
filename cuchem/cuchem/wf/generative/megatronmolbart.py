@@ -100,7 +100,7 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                               forceUnique=force_unique,
                               sanitize=sanitize)
         result = self.stub.FindSimilars(spec)
-        generatedSmiles = result.generatedSmiles
+        generatedSmiles = list(result.generatedSmiles)
         embeddings = []
         dims = []
         for embedding in result.embeddings:
@@ -140,7 +140,7 @@ class MegatronMolBART(BaseGenerativeWorkflow):
                               sanitize=sanitize)
 
         result = self.stub.Interpolate(spec)
-        result = result.generatedSmiles
+        result = list(result.generatedSmiles)
         n_pairs = len(compound_ids) - 1
         n_generated = num_points + 2
         n_generated_total = n_generated * n_pairs

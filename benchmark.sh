@@ -29,7 +29,6 @@ done
 source ${SOURCE_ROOT}/.env
 
 export CUCHEM_UI_START_CMD="python3 -m cuchembm --config-dir ${CONFIG_DIR}"
-export MEGAMOLBART_CMD="bash -c 'python3 -m megamolbart'"
 
 export WORKSPACE=/workspace
 export MEGAMOLBART_PATH=/workspace/megamolbart

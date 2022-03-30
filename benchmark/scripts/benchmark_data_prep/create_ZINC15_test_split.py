@@ -21,7 +21,7 @@ import numpy as np
 import multiprocessing as mp
 import pathlib
 
-from cuchembm.utils.smiles import calc_morgan_fingerprints
+from cuchembench.utils.smiles import calc_morgan_fingerprints
 
 from rdkit.Chem.Crippen import MolLogP
 from rdkit.Chem.Descriptors import ExactMolWt
@@ -30,7 +30,7 @@ from rdkit import Chem
 from CDDD_train_data_overlap import MOLECULES_IN_CDDD_TRAIN_DATA
 
 DATA_BENCHMARK_DIR = os.path.join(pathlib.Path(__file__).absolute().parent.parent.parent,
-                                'cuchembm', 'csv_data')
+                                'cuchembench', 'csv_data')
 NUM_PROCESSES = (mp.cpu_count() * 2) - 1 # --> max num proceses, but needs more memory
 NUM_DATA = 20000
 ZINC_DATA_DIR = '/data/zinc_csv_split'

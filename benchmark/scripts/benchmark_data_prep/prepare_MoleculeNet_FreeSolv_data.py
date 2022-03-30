@@ -19,14 +19,14 @@ import logging
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchembm.utils.smiles import calc_morgan_fingerprints
+from cuchembench.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
 # Data as provided by AstraZeneca
 # Location of original data: https://deepchemdata.s3.us-west-1.amazonaws.com/datasets/freesolv.csv.gz
 
-DATA_BENCHMARK_DIR = '/workspace/benchmark/cuchembm/csv_data'
+DATA_BENCHMARK_DIR = '/workspace/benchmark/cuchembench/csv_data'
 
 columns = ['SMILES']
 physchem_columns = ['y']

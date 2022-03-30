@@ -18,8 +18,8 @@ import os
 import logging
 import numpy as np
 import pandas as pd
-from cuchembm.utils.chembldata import ChEmblData
-from cuchembm.utils.smiles import calc_morgan_fingerprints
+from cuchembench.utils.chembldata import ChEmblData
+from cuchembench.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 

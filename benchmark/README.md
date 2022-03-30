@@ -16,14 +16,14 @@ Depending on the model to be benchmarked start container using `launch.sh`
 ### Step 2 - Start benchmark test
 To start a benchmark task
 ```
-python3 -m cuchembm --config-dir /workspace/benchmark/scripts/
+python3 -m cuchembench --config-dir /workspace/benchmark/scripts/
 ```
 
 ### TIP - To start a run in a container in daemon mode please execute the following command
 
 ```
 # For benchmarking MegaMolBART
-./launch.sh dev 2 "python3 -m cuchembm --config-dir /workspace/benchmark/scripts/"
+./launch.sh dev 2 "python3 -m cuchembench --config-dir /workspace/benchmark/scripts/"
 ```
 <hr>
 <br>
@@ -90,7 +90,7 @@ root:
 
 model:
 
-  name:  cuchembm.inference.SomeModelInferenceWrapper
+  name:  cuchembench.inference.SomeModelInferenceWrapper
   training_data: /data/db/zinc_train.sqlite3
 
 sampling:

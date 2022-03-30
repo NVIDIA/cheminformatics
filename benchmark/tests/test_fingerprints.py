@@ -1,14 +1,14 @@
 import logging
 import pandas as pd
 
-from cuchembm.utils.smiles import calc_morgan_fingerprints
+from cuchembench.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
 
 def test_smiles_fingerprint():
 
-    df_smiles = pd.read_csv('cuchembm/csv_data/benchmark_MoleculeNet_FreeSolv.csv')
+    df_smiles = pd.read_csv('cuchembench/csv_data/benchmark_MoleculeNet_FreeSolv.csv')
 
     fp = calc_morgan_fingerprints(df_smiles, smiles_col='SMILES')
     shape = fp.shape

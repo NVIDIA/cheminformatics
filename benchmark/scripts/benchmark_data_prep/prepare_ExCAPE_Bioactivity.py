@@ -19,7 +19,7 @@ import logging
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchembm.utils.smiles import calc_morgan_fingerprints
+from cuchembench.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 # Data as provided by AstraZeneca
 # Location of original data: https://zenodo.org/record/2543724/files/pubchem.chembl.dataset4publication_inchi_smiles_v2.tsv.xz?download=1
 
-DATA_BENCHMARK_DIR = '/workspace/benchmark/cuchembm/csv_data'
+DATA_BENCHMARK_DIR = '/workspace/benchmark/cuchembench/csv_data'
 columns = ['SMILES']
 physchem_columns = ['pXC50']
 

@@ -1,12 +1,12 @@
 # Copyright 2020 NVIDIA Corporation
-FROM nvcr.io/nvidia/nemo:1.2.0
+FROM nvcr.io/nvidia/nemo:1.3.0
 ARG GITHUB_ACCESS_TOKEN
 ARG GITHUB_BRANCH=main
 ARG NEMO_HOME=/opt/nemo
 ARG CHEMINFO_HOME=/opt/nvidia/cheminfomatics
 
 RUN apt-get update \
-    && apt-get upgrade -y \
+    # && apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 docker.io\
     && rm -rf /var/lib/apt/lists/*
 

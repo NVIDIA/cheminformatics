@@ -30,8 +30,6 @@ dask-worker-space
 .cache_dir
 benchmark.csv
 .env
-chemportal/frontend/node_modules/
-chemportal/outputs/
 outputs/
 **/*.onnx
 

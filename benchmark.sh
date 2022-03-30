@@ -4,7 +4,7 @@ SCRIPT_LOC=$(dirname "$0")
 
 ACTION="up -d --scale megamolbart=4"
 MODEL_DIR="/models"
-CONFIG_DIR="/workspace/benchmark/cuchembm/config"
+CONFIG_DIR="/workspace/benchmark/cuchembench/config"
 
 SOURCE_ROOT=.
 
@@ -28,7 +28,7 @@ done
 
 source ${SOURCE_ROOT}/.env
 
-export CUCHEM_UI_START_CMD="python3 -m cuchembm --config-dir ${CONFIG_DIR}"
+export CUCHEM_UI_START_CMD="python3 -m cuchembench --config-dir ${CONFIG_DIR}"
 
 export WORKSPACE=/workspace
 export MEGAMOLBART_PATH=/workspace/megamolbart

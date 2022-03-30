@@ -1,5 +1,3 @@
-#!/bin/bash
-#
 # Copyright (c) 2020, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -188,7 +186,6 @@ dev() {
 
     if [[ ${CONTAINER_OPTION} -eq 1 ]]; then
         DOCKER_CMD="${DOCKER_CMD} --privileged"
-        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/chemportal/config:/etc/nvidia/cuChem/"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"

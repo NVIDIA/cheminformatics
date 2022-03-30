@@ -204,7 +204,7 @@ To create cache:
         parser.add_argument('-m', '--n_mol',
                             dest='n_mol',
                             type=int,
-                            default=10000,
+                            default=1000,
                             help='Number of molecules for analysis. Use negative numbers for using the whole dataset.')
 
         parser.add_argument('--batch_size',

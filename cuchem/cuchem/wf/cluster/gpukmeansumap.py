@@ -169,19 +169,20 @@ class GpuKmeansUmap(BaseClusterWorkflow, metaclass=Singleton):
 
         logger.info("Executing GPU workflow...")
 
-        if df_mol_embedding is None:
-            self.n_molecules = self.context.n_molecule
+        with MetricsLogger('fp', self.n_molecules) as ml:
+            if df_mol_embedding is None:
+                self.n_molecules = self.context.n_molecule
 
-            df_mol_embedding = self.dao.fetch_molecular_embedding(
-                self.n_molecules,
-                cache_directory=self.context.cache_directory,
-            )
+                df_mol_embedding = self.dao.fetch_molecular_embedding(
+                    self.n_molecules,
+                    cache_directory=self.context.cache_directory,
+                )
 
-            df_mol_embedding = df_mol_embedding.persist()
+                df_mol_embedding = df_mol_embedding.persist()
 
-        self.df_embedding = _gpu_cluster_wrapper(df_mol_embedding,
-                                                 self.pca_comps,
-                                                 self)
+            self.df_embedding = _gpu_cluster_wrapper(df_mol_embedding,
+                                                    self.pca_comps,
+                                                    self)
         return self.df_embedding
 
     def recluster(self,

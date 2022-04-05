@@ -29,7 +29,6 @@ from dask.distributed import Client, LocalCluster
 from cuchemcommon.context import Context
 from cuchemcommon.data.helper.chembldata import ChEmblData
 from cuchemcommon.data.cluster_wf import FINGER_PRINT_FILES
-from cuchemcommon.utils.logger import initialize_logfile
 from cuchem.utils.dask import initialize_cluster
 
 warnings.filterwarnings('ignore', 'Expected ')
@@ -204,7 +203,7 @@ To create cache:
         parser.add_argument('-m', '--n_mol',
                             dest='n_mol',
                             type=int,
-                            default=1000,
+                            default=100000,
                             help='Number of molecules for analysis. Use negative numbers for using the whole dataset.')
 
         parser.add_argument('--batch_size',
@@ -236,7 +235,6 @@ To create cache:
         if args.debug:
             logger.setLevel(logging.DEBUG)
 
-        # TODO: Move the clustering benchmark testing into benchmank module
         # initialize_logfile()
         client = initialize_cluster(not args.cpu,
                                     n_cpu=args.n_cpu,

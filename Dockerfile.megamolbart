@@ -42,7 +42,7 @@ COPY setup/env.sh ${CHEMINFO_HOME}/cuchemcommon/
 COPY setup/launch ${CHEMINFO_HOME}/cuchemcommon/
 
 # Comment this before production rollout
-# COPY ./models/ /models
+COPY ./models/ /models
 
 ENV PYTHONPATH ${CHEMINFO_HOME}/cuchemcommon/grpc/:${CHEMINFO_HOME}/common:$PYTHONPATH
 ENV CHEMINFO_HOME ${CHEMINFO_HOME}

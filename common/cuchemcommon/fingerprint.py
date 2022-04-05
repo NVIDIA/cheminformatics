@@ -7,6 +7,8 @@ import numpy as np
 from rdkit import Chem
 from rdkit.Chem import AllChem
 
+from cuchemcommon.utils.smiles import calculate_morgan_fingerprint
+
 
 logger = logging.getLogger(__name__)
 
@@ -58,13 +60,10 @@ class MorganFingerprint(BaseTransformation):
 
     def transform(self, data, col_name='transformed_smiles'):
         """Single threaded processing of list"""
-        data = data[col_name]
-        fp_array = []
-        for smiles in data:
-            fp = self.transform_single(smiles)
-            fp_array.append(fp)
-        fp_array = cupy.stack(fp_array)
-        return fp_array
+        fp = calculate_morgan_fingerprint(data[col_name].values,
+                                          self.kwargs['radius'],
+                                          self.kwargs['nBits'])
+        return fp
 
     def __len__(self):
         return self.kwargs['nBits']

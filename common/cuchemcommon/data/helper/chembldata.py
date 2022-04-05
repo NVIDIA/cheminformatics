@@ -198,19 +198,9 @@ class ChEmblData(object, metaclass=Singleton):
                              sqlite3.connect(self.chembl_db, uri=True))
 
         # Smiles -> Smiles transformation and filtering
-        # TODO: Discuss internally to find use or refactor this code to remove
-        # model specific filtering
         df['transformed_smiles'] = df['canonical_smiles']
-        # if smiles_transforms is not None:
-        #     if len(smiles_transforms) > 0:
-        #         for xf in smiles_transforms:
-        #             df['transformed_smiles'] = df['transformed_smiles'].map(xf.transform)
-        #             df.dropna(subset=['transformed_smiles'], axis=0, inplace=True)
-
-        # Conversion to fingerprints or embeddings
-        # transformed_smiles = df['transformed_smiles']
         transformation = self.fp_type(**transformation_kwargs)
-        cache_data = transformation.transform(df)
+        cache_data = transformation.transform(df, col_name='transformed_smiles')
         return_df = pandas.DataFrame(cache_data)
 
         return_df = pandas.DataFrame(

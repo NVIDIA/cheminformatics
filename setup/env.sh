@@ -130,8 +130,7 @@ DOCKER_CMD="docker run \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
     -e HOME=/workspace \
-    -e TF_CPP_MIN_LOG_LEVEL=3 \
-    -w /workspace"
+    -e TF_CPP_MIN_LOG_LEVEL=3"
 
 
 dbSetup() {

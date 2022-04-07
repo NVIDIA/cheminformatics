@@ -3,6 +3,7 @@ import warnings
 import pandas
 import sqlite3
 import logging
+from subprocess import run, PIPE
 
 from typing import List
 from dask import delayed, dataframe
@@ -39,6 +40,18 @@ WHERE  md.molregno in (%s)
 """
 
 
+def download_chembl_db():
+    setup_script = '/opt/nvidia/cheminfomatics/launch.sh'
+    if os.path.exists(setup_script):
+        logger.info('Triggering db setup...')
+        result = run(['bash', '-c',
+                        f'cd /opt/nvidia/cheminfomatics && {setup_script} setup'])
+        logger.info(f'Model download result: {result.stdout}')
+        logger.info(f'Model download result: {result.stderr}')
+        if result.returncode != 0:
+            raise Exception('Error downloading model')
+
+
 # DEPRECATED. Please add code to DAO classes.
 class ChEmblData(object, metaclass=Singleton):
 
@@ -49,8 +62,9 @@ class ChEmblData(object, metaclass=Singleton):
         db_file = os.path.join(db_file, 'db', 'chembl_27.db')
 
         if not os.path.exists(db_file):
-            logger.error('%s not found', db_file)
-            raise Exception('{} not found'.format(db_file))
+            logger.warning('%s not found', db_file)
+            download_chembl_db()
+            # raise Exception('{} not found'.format(db_file))
 
         self.fp_type = fp_type
         self.chembl_db = 'file:%s?mode=ro' % db_file

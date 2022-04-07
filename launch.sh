@@ -260,14 +260,13 @@ stop() {
 
 cache() {
     if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-        set -x
         # Executed within container or a managed env.
-        dbSetup "${DATA_MOUNT_PATH}"a601b2a2a627
-        cd ${CHEMINFO_DIR}/cuchem/; python3 startdash.py cache $@
+        dbSetup "${DATA_MOUNT_PATH}"
+        cd ${CHEMINFO_DIR}; python3 ./cuchem/startdash.py cache $@
     else
         dbSetup "${DATA_PATH}"
         # run a container and start dash inside container.
-        ${DOCKER_CMD} -it ${CUCHEM_CONT} ./launch.sh cache $@
+        ${DOCKER_CMD} -v /var/log:/logs -it ${CUCHEM_CONT} ./launch.sh cache $@
     fi
 }
 

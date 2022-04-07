@@ -25,4 +25,5 @@ RUN pip install --upgrade werkzeug==2.0.3
 ENV UCX_LOG_LEVEL error
 ENV PYTHONPATH ./common/generated:./common:./cuchem:
 WORKDIR /opt/nvidia/cheminfomatics
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.4/compat/
 CMD cd /opt/nvidia/cheminfomatics; ./launch.sh start

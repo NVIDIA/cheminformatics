@@ -101,13 +101,6 @@ To create cache:
 
         parser = argparse.ArgumentParser(description='Create cache')
 
-        parser.add_argument('-ct', '--cache_type',
-                            dest='cache_type',
-                            type=str,
-                            default='MorganFingerprint',
-                            choices=['MorganFingerprint','Embeddings'],
-                            help='Type of data preprocessing (MorganFingerprint or Embeddings)')
-
         parser.add_argument('-c', '--cache_directory',
                             dest='cache_directory',
                             type=str,
@@ -155,12 +148,8 @@ To create cache:
                 logger.info('Creating folder %s...' % args.cache_directory)
                 os.makedirs(args.cache_directory)
 
-            if (args.cache_type == 'MorganFingerprint'):
-                from cuchemcommon.fingerprint import MorganFingerprint
-                prepocess_type = MorganFingerprint
-            elif (args.cache_type == 'Embeddings'):
-                from cuchemcommon.fingerprint import Embeddings
-                prepocess_type = Embeddings
+            from cuchemcommon.fingerprint import MorganFingerprint
+            prepocess_type = MorganFingerprint
 
             chem_data = ChEmblData(fp_type=prepocess_type)
             chem_data.save_fingerprints(
@@ -209,7 +198,7 @@ To create cache:
         parser.add_argument('--batch_size',
                             dest='batch_size',
                             type=int,
-                            default=100000,
+                            default=10000,
                             help='Chunksize.')
 
         parser.add_argument('--n_gpu',
@@ -252,15 +241,14 @@ To create cache:
         else:
             logger.debug('Number of workers %d.', len(client.scheduler_info()['workers'].keys()))
 
-        n_molecules = args.n_mol
         if not args.cpu:
             from cuchem.wf.cluster.gpukmeansumap import GpuKmeansUmapHybrid
-            workflow = GpuKmeansUmapHybrid(n_molecules=n_molecules,
+            workflow = GpuKmeansUmapHybrid(n_molecules=context.n_molecule,
                                            pca_comps=args.pca_comps,
                                            n_clusters=args.num_clusters)
         else:
             from cuchem.wf.cluster.cpukmeansumap import CpuKmeansUmap
-            workflow = CpuKmeansUmap(n_molecules=n_molecules,
+            workflow = CpuKmeansUmap(n_molecules=context.n_molecule,
                                      pca_comps=args.pca_comps,
                                      n_clusters=args.num_clusters)
 

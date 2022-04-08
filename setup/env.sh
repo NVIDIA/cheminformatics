@@ -36,7 +36,7 @@ function config() {
 
     CUCHEM_CONT=${CUCHEM_CONT:=nvcr.io/nvidia/clara/cheminformatics_demo:0.1.2}
     MEGAMOLBART_CONT=${MEGAMOLBART_CONT:=nvcr.io/nvidia/clara/megamolbart:0.1.2}
-    CDDD_CONT=${CDDD_CONT:=nvcr.io/nvidia/clara/cddd:1.0.0}
+    CDDD_CONT=${CDDD_CONT:=claraparabricks/cddd:1.0.0}
     MEGAMOLBART_MODEL=${MEGAMOLBART_MODEL:=nvidia/clara/megamolbart:0.1}
     PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
     CONTENT_PATH=${CONTENT_PATH:=$(pwd)}

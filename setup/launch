@@ -86,13 +86,11 @@ start() {
     dbSetup ${DATA_PATH}
 
     export CUCHEM_UI_START_CMD="./launch.sh start $@"
-    export UID=$(id -u)
-    export GID=$(id -g)
 
     # Working directory for the individual containers.
     export WORKING_DIR_CUCHEMUI=/opt/nvidia/cheminfomatics
     export WORKING_DIR_MEGAMOLBART=/opt/nvidia/megamolbart
-    export NGINX_CONFIG=nginx.conf
+    export NGINX_CONFIG='./nginx.conf'
 
     docker-compose --env-file .env  \
         -f docker_compose.yml \

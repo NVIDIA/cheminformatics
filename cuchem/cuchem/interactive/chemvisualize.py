@@ -43,7 +43,7 @@ PROP_DISP_NAME = {
     'hba': 'H-Bond Acceptors',
     'hbd': 'H-Bond Donors',
     'psa': 'Polar Surface Area',
-    'rtb': 'Rotatable Area',
+    'rtb': 'Rotatable Bond',
     'ro3_pass': 'Rule of 3 Passes',
     'num_ro5_violations': 'Lipinski Ro5 Violation',
     'cx_most_apka': 'Acidic pKa (ChemAxon)',

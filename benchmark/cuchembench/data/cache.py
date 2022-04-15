@@ -43,7 +43,8 @@ class MoleculeGenerator():
             ['smiles']).fetchone()
         if result[0] == 0:
             with closing(self.conn.cursor()) as cursor:
-                sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
+                # @(dreidenbach) changed to my workspace path
+                sql_file = open("/workspace/code/cheminformatics/benchmark/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
 

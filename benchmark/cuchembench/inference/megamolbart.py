@@ -20,18 +20,20 @@ logger = logging.getLogger(__name__)
 
 class MegaMolBARTWrapper(metaclass=Singleton):
 
-    def __init__(self) -> None:
+    def __init__(self, checkpoint_file = None) -> None:
         self.min_jitter_radius = 1
 
         # TODO: make this configurable/resuable accross all modules.
-        checkpoint_file = 'megamolbart_checkpoint.nemo'
+        if checkpoint_file == None:
+            checkpoint_file = 'Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo'
         files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
         if len(files) == 0:
             raise ValueError(f'Checkpoint file "{checkpoint_file}"" in "/models".')
 
         dir = files[-1].absolute().parent.as_posix()
 
-        from megamolbart.inference import MegaMolBART
+        from megamolbart.inference_perceiver import MegaMolBART
+        # this wrapper is not yet ready for MegaMolBARTLatent
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
         self.megamolbart = MegaMolBART(model_dir=os.path.join(dir, checkpoint_file))
@@ -194,3 +196,40 @@ class GrpcMegaMolBARTWrapper():
         generated_df.iat[0, 1] = False
         generated_df.iat[-1, 1] = False
         return generated_df
+
+class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
+
+    def __init__(self, checkpoint_file = None) -> None:
+        self.min_jitter_radius = 1
+
+        # TODO: make this configurable/resuable accross all modules.
+        if checkpoint_file == None:
+            checkpoint_file = 'Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo'
+        files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
+        if len(files) == 0:
+            raise ValueError(f'Checkpoint file "{checkpoint_file}"" in "/models".')
+
+        dir = files[-1].absolute().parent.as_posix()
+
+        from megamolbart.inference_perceiver import MegaMolBARTLatent
+        # this wrapper is not yet ready for MegaMolBARTLatent
+
+        logger.info(f'Loading model from {dir}/{checkpoint_file}')
+        self.megamolbart = MegaMolBART(model_dir=os.path.join(dir, checkpoint_file))
+        logger.info(f'Loaded Version {self.megamolbart.version}')
+
+    def is_ready(self, timeout: int = 10) -> bool:
+        return True
+
+    def smiles_to_embedding(self,
+                            smiles: str,
+                            pad_length: int):
+
+        embedding_, z, z_mean, z_logv, pad_mask = self.megamolbart.smiles2embedding(smiles,
+                                                                pad_length=pad_length)
+        dim = z_mean.shape
+        embedding = z_mean.flatten().tolist()
+        return EmbeddingList(embedding=embedding,
+                             dim=dim,
+                             pad_mask=pad_mask)
+

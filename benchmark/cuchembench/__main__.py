@@ -87,36 +87,37 @@ def create_dataset(cfg):
             sample_data_req = True
 
     #TODO: the path to dataset restricts the usage in dev mode only.
+    # @(dreidenbach) updated to my /workspace
     if sample_data_req:
         data_files['benchmark_ZINC15_test_split'] =\
             {'col_name': 'canonical_smiles',
              'dataset_type': 'SAMPLE',
              'input_size': sample_input,
-             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_ZINC15_test_split.csv'}
+             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_ZINC15_test_split.csv'}
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
         data_files['benchmark_ChEMBL_approved_drugs_physchem'] =\
             {'col_name': 'canonical_smiles',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.nearest_neighbor_correlation.input_size,
-             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'}
+             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'}
 
     if cfg.metric.modelability.physchem.enabled:
         data_files['benchmark_MoleculeNet_Lipophilicity'] =\
             {'col_name': 'SMILES',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'}
+             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'}
         data_files['benchmark_MoleculeNet_ESOL.csv'] =\
             {'col_name': 'SMILES',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_ESOL.csv'}
+             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_ESOL.csv'}
         data_files['benchmark_MoleculeNet_FreeSolv'] =\
             {'col_name': 'SMILES',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_FreeSolv.csv'}
+             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_FreeSolv.csv'}
 
     return data_files, radii
 
@@ -140,7 +141,11 @@ def main(cfg):
     max_seq_len = int(cfg.sampling.max_seq_len)
     if cfg.model.name == 'MegaMolBART':
         from cuchembench.inference.megamolbart import MegaMolBARTWrapper
-        inferrer = MegaMolBARTWrapper()
+        inferrer = MegaMolBARTWrapper(checkpoint_file = cfg.model.checkpoint_file)
+    elif cfg.model.name == 'MegaMolBARTLatent':
+        assert(1 == 0) # Not Implmented Yet 4/12
+        from cuchembench.inference.megamolbart import MegaMolBARTLatentWrapper
+        inferrer = MegaMolBARTLatentWrapper(checkpoint_file = cfg.model.checkpoint_file)
     elif cfg.model.name == 'CDDD':
         from cuchembench.inference.cddd import CdddWrapper
         inferrer = CdddWrapper()

@@ -64,14 +64,15 @@ EOF
 }
 
 source setup/env.sh
-CHEMINFO_DIR='/workspace'
-if [ -e /workspace/cuchem/startdash.py ]; then
+CHEMINFO_DIR='/workspace/code/cheminformatics'
+if [ -e /workspace/code/cheminformatics/cuchem/startdash.py ]; then
     # When inside container in dev/test mode
     CHEMINFO_DIR='/workspace'
 elif [ -e /opt/nvidia/cheminfomatics/cuchem/startdash.py ]; then
     # When inside container in prod mode
     CHEMINFO_DIR="/opt/nvidia/cheminfomatics"
 fi
+echo TEST_$CHEMINFO_DIR
 PYTHONPATH_CUCHEM="${CHEMINFO_DIR}/cuchem:${CHEMINFO_DIR}/common:${CHEMINFO_DIR}/common/generated/"
 
 build() {
@@ -191,11 +192,16 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     elif [[ ${CONTAINER_OPTION} -eq 2 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
+        # DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
+        # DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
+        # DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
+        # DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
+        # DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/megamolbart:/workspace/benchmark"
+        # CONT=${MEGAMOLBART_CONT}
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/megamolbart:/workspace/benchmark"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace"
         CONT=${MEGAMOLBART_CONT}
     elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"

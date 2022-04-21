@@ -14,9 +14,9 @@ model:
   # Please change following properties when changing model.name
   #   - sampling.concurrent_requests
   #   - model.params.url (50052 for lb grpc)
-  # MegaMolBART Seq2Seq Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo
+  # MegaMolBART Seq2Seq Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
   name: MegaMolBART
-  checkpoint_file: Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo
+  checkpoint_file: Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo
   training_data: /data/db/zinc_train_test.sqlite3 #/data/db/cddd_train.sqlit
 
   # name:  cuchembench.inference.GrpcMegaMolBARTWrapper

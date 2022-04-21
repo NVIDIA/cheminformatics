@@ -53,9 +53,10 @@ class MegaMolBART():
         self.encoder_type = self.model.model.encoder_type
 
     def _compute_radius(self, scaled_radius):
-        if scaled_radius:
+        if isinstance(scaled_radius, (int, float)):
             return float(scaled_radius * self.min_jitter_radius)
         else:
+            logger.debug(f'Scaled Radius {scaled_radius} Not being used')
             return self.min_jitter_radius
 
     #TODO: why do we permute?
@@ -433,9 +434,9 @@ class MegaMolBARTLatent(MegaMolBART):
         return logv
     
     def _compute_radius(self, scaled_radius):
-        if scaled_radius and self.noise_mode == 2:
+        if isinstance(scaled_radius, (int, float)) and self.noise_mode == 2:
             return self._set_logv(scaled_radius)
-        elif scaled_radius:
+        elif isinstance(scaled_radius, (int, float)):
             return float(scaled_radius * self.min_jitter_radius)
         else:
             return self.min_jitter_radius

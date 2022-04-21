@@ -43,51 +43,69 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         return True
 
     def smiles_to_embedding(self,
-                            smiles: str,
+                            smiles: list,
                             pad_length: int):
 
-        embedding, pad_mask = self.megamolbart.smiles2embedding(smiles,
-                                                                pad_length=pad_length)
-        dim = embedding.shape
-        embedding = embedding.flatten().tolist()
-        return EmbeddingList(embedding=embedding,
-                             dim=dim,
-                             pad_mask=pad_mask)
+        embedding, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
+        storage = []
+        for molecule in range(len(smiles)):
+            emb = embedding[:, molecule, :].unsqueeze(1)
+            dim = emb.shape
+            mask = pad_mask[:, molecule].unsqueeze(1)
+            elem = EmbeddingList(embedding=emb.flatten().tolist(), dim=dim, pad_mask=mask)
+            storage.append(elem)
+        #TODO: fix how this storage is saved and used
+        return embedding, pad_mask, storage
 
     def embedding_to_smiles(self,
                             embedding,
-                            dim: int,
-                            pad_mask):
+                            pad_mask,
+                            storage = None,
+                            batch_size = 100):
         '''
         Converts input embedding to SMILES.
         @param transform_spec: Input spec with embedding and mask.
         '''
+        #TODO: How is this used will determine the inputs
         import torch
+        if storage:
+            beaker = []
+            cabinet = []
+            for emb in storage:
+            #Rebuild bulk embedding
+                embedding = torch.FloatTensor(list(emb.embedding))
+                pad_mask = torch.BoolTensor(list(emb.pad_mask))
+                dim = tuple(emb.dim)
+                embedding = torch.reshape(embedding, dim).cuda()
+                pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
+                beaker.append(embedding)
+                cabinet.append(pad_mask)
+            embedding = torch.cat(beaker, dim=1)
+            pad_mask = torch.cat(cabinet, dim=1)
 
-        embedding = torch.FloatTensor(list(embedding))
-        pad_mask = torch.BoolTensor(list(pad_mask))
-        dim = tuple(dim)
+        (_, num_molecules, _) = tuple(embedding.size())
+        embeddings = [embedding[:, i:i+batch_size,i] for i in range(0, num_molecules, batch_size)]
+        pad_masks =  [pad_mask[:, i:i+batch_size,i] for i in range(0, num_molecules, batch_size)]
 
-        embedding = torch.reshape(embedding, dim).cuda()
-        pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
-
-        generated_mols = self.megamolbart.inverse_transform(embedding, pad_mask)
-        return SmilesList(generatedSmiles=generated_mols)
+        # embeddings is a list of embeddings  SeqXBatchxModel
+        generated_mols = self.megamolbart.inverse_transform(embeddings, pad_masks)
+        #generated_moles is a list of num_molecules
+        return [SmilesList(generatedSmiles=generated_mols[molecule]) for molecule in range(num_molecules)]
 
     def find_similars_smiles(self,
-                             smiles: str,
+                             smiles: list,
                              num_requested: int = 10,
                              scaled_radius=None,
                              force_unique=False,
                              sanitize=True):
-
-        generated_df = self.megamolbart.find_similars_smiles(
+        #TODO: Must bubble up a product of a list of df instead of a single df
+        generated_dfs = self.megamolbart.find_similars_smiles(
                 smiles,
                 num_requested=num_requested,
                 scaled_radius=scaled_radius,
                 sanitize=sanitize,
                 force_unique=force_unique)
-        return generated_df
+        return generated_dfs
 
     def interpolate_smiles(self,
                            smiles: List,

@@ -27,7 +27,7 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_seq2seq_test.sqlite3
+  db: /data/db/embedding_cache_megamolbart_seq2seq_batch_2_test.sqlite3
   concurrent_requests: 10
 
 output:
@@ -36,7 +36,7 @@ output:
 metric:
   validity:
     enabled: True
-    input_size: 100 #20000
+    input_size: 200 #20000
     radius:
       - 0
       - 1

@@ -319,10 +319,10 @@ def main(cfg):
         metric.cleanup()
 
     # Plotting
-    create_latest_aggregated_plots(output_dir) # TODO: improve test handling if specific metric data is absent
-    create_timeseries_aggregated_plots(output_dir)
-    make_model_plots(max_seq_len, 'physchem', output_dir)
-    make_model_plots(max_seq_len, 'bioactivity', output_dir)
+    # create_latest_aggregated_plots(output_dir) # TODO: improve test handling if specific metric data is absent
+    # create_timeseries_aggregated_plots(output_dir)
+    # make_model_plots(max_seq_len, 'physchem', output_dir)
+    # make_model_plots(max_seq_len, 'bioactivity', output_dir)
 
 
 if __name__ == '__main__':

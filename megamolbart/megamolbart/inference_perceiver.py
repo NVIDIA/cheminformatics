@@ -182,14 +182,16 @@ class MegaMolBART():
         # mem_pad_mask = mem_pad_mask.clone()
         with torch.no_grad():
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                futures = {executor.submit(self._inverse_transform_batch, memory, mem_pad_mask.clone(), sanitize, k): memory for memory, mem_pad_mask in zip(embeddings, mem_pad_masks)}
+                futures = {executor.submit(self._inverse_transform_batch, memory, mem_pad_mask.clone(
+                ), k, sanitize): memory for memory, mem_pad_mask in zip(embeddings, mem_pad_masks)}
                 for future in concurrent.futures.as_completed(futures):
                     smiles = futures[future]
                     try:
                         g_smiles = future.result()
                         smiles_interp_list.append(g_smiles)
                     except Exception as exc:
-                        logger.warning(f'{smiles.smiles} generated an exception: {exc}')
+                        logger.info(f'{type(futures)}, {type(future)}')
+                        logger.exception(exc)
         return smiles_interp_list
     # def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
     #     mem_pad_mask = mem_pad_mask.clone()
@@ -332,7 +334,7 @@ class MegaMolBART():
             generated_df.iat[0, 3] = False
             if force_unique:
                 inv_transform_funct = partial(self.inverse_transform, mem_pad_mask=pad_mask[:, smile_idx, :].unsqueeze(1))
-                #TODO: Does the compute smiles have to be sfurther batched or no since we do it in the inner molecule loop?
+                #TODO: Does the compute smiles have to be further batched or no since we do it in the inner molecule loop?
                 generated_df = self.compute_unique_smiles(generated_df, inv_transform_funct,scaled_radius=scaled_radius)
             dfs.append(generated_df)
 

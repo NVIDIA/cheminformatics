@@ -659,9 +659,13 @@ class ChemVisualization(metaclass=Singleton):
 
         return html.Div([
             html.Div(className='row', children=[
-                dcc.Graph(id='main-figure', figure=fig,
-                          className='nine columns',
-                          style={'verticalAlign': 'text-top'}),
+                html.Div([
+                dcc.Loading(
+                    id="loading-main_fig",
+                    type="default",
+                    children=dcc.Graph(id='main-figure', figure=fig),
+                    style={'verticalAlign': 'text-top', 'width': '100%'}
+                )], className='nine columns'),
 
                 html.Div([
                     dcc.Markdown("""**Molecule(s) of Interest**"""),
@@ -827,7 +831,13 @@ class ChemVisualization(metaclass=Singleton):
                             style={'verticalAlign': 'text-bottom', 'text-align': 'right'}
                         ),
                     ], style={'margin': 12}),
-                    html.Div(id='tb_selected_molecules', children=[], style={'width': '100%'})
+                    dcc.Loading(
+                        id="loading_mol_prop_tables",
+                        type="default",
+                        children=html.Div(id='tb_selected_molecules', children=[], style={'width': '100%'}),
+                        className='nine columns',
+                        style={'verticalAlign': 'text-top'}
+                    ),
                 ], style={'display': 'none', 'width': '100%'}),
             ], style={'margin': 12}),
 

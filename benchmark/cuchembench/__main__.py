@@ -2,6 +2,7 @@ import os
 import time
 from pydoc import locate
 import logging
+# from cheminformatics.benchmark.cuchembench.metrics.sampling import EffectiveNovelty, Identicality
 import hydra
 import pandas as pd
 from datetime import datetime
@@ -20,6 +21,8 @@ from cuchembench.datasets.bioactivity import ExCAPEDataset
 from cuchembench.metrics import (Validity,
                               Unique,
                               Novelty,
+                              Identicality,
+                              EffectiveNovelty,
                               NearestNeighborCorrelation,
                               Modelability)
 
@@ -78,7 +81,7 @@ def create_dataset(cfg):
     data_files = {}
 
     sample_data_req = False
-    for sampling_metric in [Validity, Unique, Novelty]:
+    for sampling_metric in [Validity, Unique, Novelty, Identicality, EffectiveNovelty]:
         name = sampling_metric.name
         sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
         radii.update(eval(f'cfg.metric.{name}.radius'))
@@ -158,7 +161,7 @@ def main(cfg):
     # Metrics
     metric_list = []
 
-    for sampling_metric in [Validity, Unique, Novelty]:
+    for sampling_metric in [Validity, Unique, Novelty, Identicality, EffectiveNovelty]:
         name = sampling_metric.name
         metric_cfg = eval(f'cfg.metric.{name}')
         if metric_cfg.enabled:
@@ -287,7 +290,7 @@ def main(cfg):
                 else:
                     kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
 
-            if metric.name in ['validity', 'unique', 'novelty']:
+            if metric.name in ['validity', 'unique', 'novelty', 'identicality', 'effective_novelty']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
                 metric_cfg = eval('cfg.metric.' + metric.name)
                 kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)

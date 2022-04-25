@@ -27,28 +27,40 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_seq2seq_batch_2_test.sqlite3
+  db: /data/db/embedding_cache_megamolbart_seq2seq_batch_3_test.sqlite3
   concurrent_requests: 10
 
 output:
-  path: /data/benchmark_output/
+  path: /data/benchmark_output/test #use unique names here
 
 metric:
   validity:
     enabled: True
-    input_size: 200 #20000
+    input_size: 100 #20000
     radius:
       - 0
-      - 1
+      # - 1
 
   unique:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: False
+    enabled: True
+    input_size: ${metric.validity.input_size}
+    remove_invalid: False
+    radius: ${metric.validity.radius}
+
+  effective_novelty:
+    enabled: True
+    input_size: ${metric.validity.input_size}
+    remove_invalid: False
+    radius: ${metric.validity.radius}
+
+  identicality:
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}

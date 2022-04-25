@@ -9,7 +9,7 @@ from contextlib import closing
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Validity', 'Unique', 'Novelty']
+__all__ = ['Validity', 'Unique', 'Novelty', 'Identicality', 'EffectiveNovelty']
 
 
 class BaseSampleMetric():
@@ -181,7 +181,7 @@ class Identicality(BaseSampleMetric):
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.identiclaity.radius)
+        radius_list = list(cfg.metric.identicality.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
@@ -193,40 +193,38 @@ class Identicality(BaseSampleMetric):
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
                                      check_same_thread=False)) as conn:
-            conn.execute('ATTACH ? AS training_db', [self.training_data])
             res = conn.execute('''
-            SELECT sum(ratio)
-            FROM (
-                SELECT CAST(count(ss.smiles) as float) / CAST(valid_smiles.cnt as float) ratio
-            FROM smiles s, smiles_samples ss,
-            (SELECT s2.id, count(*) cnt
-            FROM smiles s2, smiles_samples ss2
-            WHERE s2.id = ss2.input_id
-                AND s2.model_name = ?
-                AND s2.scaled_radius = ?
-                AND s2.force_unique = 0
-                AND s2.sanitize = 1
-                AND ss2.is_valid = 1
-                AND ss2.is_generated = 1
-                AND s2.processed = 1
-                AND s2.dataset_type = 'SAMPLE'
-            GROUP BY s2.id) as valid_smiles
-            WHERE s.id = ss.input_id
-                AND s.smiles = ss.smiles
-                AND valid_smiles.id = s.id
-                AND s.model_name = ?
-                AND s.scaled_radius = ?
-                AND s.force_unique = 0
-                AND s.sanitize = 1
-                AND ss.is_valid = 1
-                AND ss.is_generated = 1
-                AND s.processed = 1
-                AND s.dataset_type = 'SAMPLE'
-            GROUP BY s.id 
-            )''',
+                SELECT sum(ratio)
+                FROM (
+                    SELECT CAST(identical_smiles.cnt as float) / CAST(count(ss.smiles) as float) ratio
+                FROM smiles s, smiles_samples ss,
+                (SELECT s2.id, count(*) cnt
+                FROM smiles s2, smiles_samples ss2
+                WHERE s2.id = ss2.input_id
+                    AND s2.smiles = ss2.smiles
+                    AND s2.model_name = ?
+                    AND s2.scaled_radius = ?
+                    AND s2.force_unique = 0
+                    AND s2.sanitize = 1
+                    AND ss2.is_valid = 1
+                    AND ss2.is_generated = 1
+                    AND s2.processed = 1
+                    AND s2.dataset_type = 'SAMPLE'
+                GROUP BY s2.id) as identical_smiles
+                WHERE s.id = ss.input_id
+                    AND identical_smiles.id = s.id
+                    AND s.model_name = ?
+                    AND s.scaled_radius = ?
+                    AND s.force_unique = 0
+                    AND s.sanitize = 1
+                    AND ss.is_valid = 1
+                    AND ss.is_generated = 1
+                    AND s.processed = 1
+                    AND s.dataset_type = 'SAMPLE'
+                GROUP BY s.id 
+                )''',
                 [self.inferrer.__class__.__name__, radius, self.inferrer.__class__.__name__, radius])
             rec = res.fetchone()
-            self.total_molecules = self.total_molecules//num_samples
         return rec[0], self.total_molecules
 
 class EffectiveNovelty(BaseSampleMetric):
@@ -238,7 +236,7 @@ class EffectiveNovelty(BaseSampleMetric):
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.novelty.radius)
+        radius_list = list(cfg.metric.effective_novelty.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
@@ -276,5 +274,4 @@ class EffectiveNovelty(BaseSampleMetric):
             rec = res.fetchone()
             effective_novel_molecules = rec[0]
 
-        return effective_novel_molecules, self.total_molecules #sampled_molecules
-
+        return effective_novel_molecules, self.total_molecules

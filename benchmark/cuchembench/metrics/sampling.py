@@ -249,29 +249,60 @@ class EffectiveNovelty(BaseSampleMetric):
                                      uri=True,
                                      check_same_thread=False)) as conn:
             conn.execute('ATTACH ? AS training_db', [self.training_data])
-            # res1 = conn.execute('''
-            #     SELECT count(*)
-            #     FROM main.smile_samples s
-            #     ''')
-            # sampled_molecules = res1.fetchone()[0]
-
             res = conn.execute('''
-                SELECT count(distinct ss.smiles)
-                FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
-                WHERE ss.smiles <> td.smiles
-                    AND s.id = ss.input_id
-                    AND s.smiles <> ss.smiles
-                    AND s.model_name = ?
-                    AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
-                    AND ss.is_valid = 1
-                    AND ss.is_generated = 1
-                    AND s.processed = 1
-                    AND s.dataset_type = ?
-                ''',
-                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+            select unique_smiles.cnt - dup_training.cnt
+            FROM (Select sum(smiles_cnt) cnt
+                From (SELECT count(*) smiles_cnt
+                    FROM main.smiles s, main.smiles_samples ss
+                    WHERE s.id = ss.input_id
+                        AND s.smiles <> ss.smiles
+                        AND ss.is_valid = 1
+                        AND ss.is_generated = 1
+                        AND s.processed = 1
+                        AND s.model_name = ?
+                        AND s.scaled_radius = ?
+                        AND s.force_unique = ?
+                        AND s.sanitize = ?
+                        AND s.dataset_type = ?
+                GROUP BY ss.smiles)) as unique_smiles,
+                (select sum(recs) as cnt
+                FROM (
+                    SELECT distinct ss.smiles, count(*) recs
+                    FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
+                    WHERE ss.smiles == td.smiles
+                        AND s.id = ss.input_id
+                        AND ss.is_valid = 1
+                        AND ss.is_generated = 1
+                        AND s.processed = 1
+                        AND s.model_name = ?
+                        AND s.scaled_radius = ?
+                        AND s.force_unique = ?
+                        AND s.sanitize = ?
+                        AND s.dataset_type = ?
+                    GROUP BY ss.smiles
+                    )) as dup_training
+            ''',
+            [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE',  self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
             rec = res.fetchone()
-            effective_novel_molecules = rec[0]
+            return rec[0], self.total_molecules
 
-        return effective_novel_molecules, self.total_molecules
+        #     res = conn.execute('''
+        #         SELECT count(distinct ss.smiles)
+        #         FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
+        #         WHERE ss.smiles <> td.smiles
+        #             AND s.id = ss.input_id
+        #             AND s.smiles <> ss.smiles
+        #             AND s.model_name = ?
+        #             AND s.scaled_radius = ?
+        #             AND s.force_unique = ?
+        #             AND s.sanitize = ?
+        #             AND ss.is_valid = 1
+        #             AND ss.is_generated = 1
+        #             AND s.processed = 1
+        #             AND s.dataset_type = ?
+        #         ''',
+        #         [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+        #     rec = res.fetchone()
+        #     effective_novel_molecules = rec[0]
+
+        # return effective_novel_molecules, self.total_molecules

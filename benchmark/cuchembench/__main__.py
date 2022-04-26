@@ -83,6 +83,9 @@ def create_dataset(cfg):
     sample_data_req = False
     for sampling_metric in [Validity, Unique, Novelty, Identicality, EffectiveNovelty]:
         name = sampling_metric.name
+        # log.info(name)
+        # log.info(sample_input)
+        # log.info( eval(f'cfg.metric.{name}.input_size'))
         sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
         radii.update(eval(f'cfg.metric.{name}.radius'))
         metric_cfg = eval(f'cfg.metric.{name}')
@@ -259,7 +262,7 @@ def main(cfg):
             if metric_cfg.gene_cnt > 0 and genes_cnt > metric_cfg.gene_cnt:
                 break
 
-    generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db)
+    generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db, batch_size=cfg.model.batch_size)
     for radius in radii:
         log.info(f'Generating samples for radius {radius}...')
         generator.generate_and_store(data_files,

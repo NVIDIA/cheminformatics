@@ -27,9 +27,10 @@ lock = threading.Lock()
 
 
 class MoleculeGenerator():
-    def __init__(self, inferrer, db_file=None) -> None:
+    def __init__(self, inferrer, db_file=None, batch_size=100) -> None:
         self.db = db_file
         self.inferrer = inferrer
+        self.batch_size = batch_size
 
         if self.db is None:
             self.db = tempfile.NamedTemporaryFile(prefix='gsmiles_',
@@ -157,9 +158,9 @@ class MoleculeGenerator():
             df = pd.read_sql_query('''
                 SELECT id, smiles
                 FROM smiles
-                WHERE processed = 0 AND scaled_radius = ? AND num_samples = ? AND dataset_type = 'SAMPLE' LIMIT 100
+                WHERE processed = 0 AND scaled_radius = ? AND num_samples = ? AND dataset_type = 'SAMPLE' LIMIT ?
                 ''',
-                self.conn, params = [scaled_radius, num_requested])
+                self.conn, params = [scaled_radius, num_requested, self.batch_size])
             if df.shape[0] == 0:
                 break
 

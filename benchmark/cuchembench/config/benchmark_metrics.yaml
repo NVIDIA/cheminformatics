@@ -18,6 +18,7 @@ model:
   name: MegaMolBART
   checkpoint_file: Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo
   training_data: /data/db/zinc_train_test.sqlite3 #/data/db/cddd_train.sqlit
+  batch_size: 500
 
   # name:  cuchembench.inference.GrpcMegaMolBARTWrapper
   # training_data: /data/db/zinc_train.sqlite3
@@ -27,7 +28,7 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_seq2seq_batch_3_test.sqlite3
+  db: /data/db/embedding_cache_megamolbart_seq2seq_20k_500_bs.sqlite3
   concurrent_requests: 10
 
 output:
@@ -36,9 +37,9 @@ output:
 metric:
   validity:
     enabled: True
-    input_size: 100 #20000
+    input_size: 20000
     radius:
-      - 0
+      - 0.75
       # - 1
 
   unique:

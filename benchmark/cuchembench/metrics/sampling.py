@@ -250,24 +250,22 @@ class EffectiveNovelty(BaseSampleMetric):
                                      check_same_thread=False)) as conn:
             conn.execute('ATTACH ? AS training_db', [self.training_data])
             res = conn.execute('''
-            select unique_smiles.cnt - dup_training.cnt
-            FROM (Select sum(smiles_cnt) cnt
-                From (SELECT count(*) smiles_cnt
-                    FROM main.smiles s, main.smiles_samples ss
-                    WHERE s.id = ss.input_id
-                        AND s.smiles <> ss.smiles
-                        AND ss.is_valid = 1
-                        AND ss.is_generated = 1
-                        AND s.processed = 1
-                        AND s.model_name = ?
-                        AND s.scaled_radius = ?
-                        AND s.force_unique = ?
-                        AND s.sanitize = ?
-                        AND s.dataset_type = ?
-                GROUP BY ss.smiles)) as unique_smiles,
-                (select sum(recs) as cnt
-                FROM (
-                    SELECT distinct ss.smiles, count(*) recs
+                SELECT SUM(CAST(a.smiles_cnt - case when b.recs is null then 0 else b.recs end as float) / ?)
+                FROM (SELECT s.id as id, count(*) smiles_cnt
+                        FROM main.smiles s, main.smiles_samples ss
+                        WHERE s.id = ss.input_id
+                            AND s.smiles <> ss.smiles
+                            AND ss.is_valid = 1
+                            AND ss.is_generated = 1
+                            AND s.processed = 1
+                            AND s.model_name = ?
+                            AND s.scaled_radius = ?
+                            AND s.force_unique = ?
+                            AND s.sanitize = ?
+                            AND s.dataset_type = ?
+                        GROUP BY s.id) as a
+                    LEFT OUTER JOIN
+                    (SELECT s.id, count(distinct ss.smiles) recs
                     FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
                     WHERE ss.smiles == td.smiles
                         AND s.id = ss.input_id
@@ -279,12 +277,12 @@ class EffectiveNovelty(BaseSampleMetric):
                         AND s.force_unique = ?
                         AND s.sanitize = ?
                         AND s.dataset_type = ?
-                    GROUP BY ss.smiles
-                    )) as dup_training
-            ''',
-            [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE',  self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                    GROUP BY s.id) as b
+                ON a.id = b.id
+                ''',
+                [num_samples, self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE',  self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
             rec = res.fetchone()
-            return rec[0], self.total_molecules
+        return rec[0], self.total_molecules
 
         #     res = conn.execute('''
         #         SELECT count(distinct ss.smiles)

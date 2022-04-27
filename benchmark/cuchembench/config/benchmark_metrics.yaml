@@ -16,7 +16,7 @@ model:
   #   - model.params.url (50052 for lb grpc)
   # MegaMolBART Seq2Seq Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
   name: MegaMolBART
-  checkpoint_file: Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo
+  checkpoint_file: Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
   training_data: /data/db/zinc_train_test.sqlite3 #/data/db/cddd_train.sqlit
   batch_size: 500
 
@@ -28,11 +28,11 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_seq2seq_20k_500_bs.sqlite3
+  db: /data/db/embedding_cache_megamolbart_prcvr_k4_20k_500_bs.sqlite3
   concurrent_requests: 10
 
 output:
-  path: /data/benchmark_output/test #use unique names here
+  path: /data/benchmark_output/prcvr_k4 #use unique names here
 
 metric:
   validity:

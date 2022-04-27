@@ -83,9 +83,6 @@ def create_dataset(cfg):
     sample_data_req = False
     for sampling_metric in [Validity, Unique, Novelty, Identicality, EffectiveNovelty]:
         name = sampling_metric.name
-        # log.info(name)
-        # log.info(sample_input)
-        # log.info( eval(f'cfg.metric.{name}.input_size'))
         sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
         radii.update(eval(f'cfg.metric.{name}.radius'))
         metric_cfg = eval(f'cfg.metric.{name}')
@@ -175,7 +172,7 @@ def main(cfg):
         name = NearestNeighborCorrelation.name
         metric_cfg = cfg.metric.nearest_neighbor_correlation
         input_size = get_input_size(metric_cfg)
-
+        #TODO can change filename here to include the nbits
         smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
 
         smiles_dataset.load(data_len=input_size)

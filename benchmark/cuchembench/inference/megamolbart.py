@@ -233,7 +233,7 @@ class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
         # this wrapper is not yet ready for MegaMolBARTLatent
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
-        self.megamolbart = MegaMolBART(model_dir=os.path.join(dir, checkpoint_file))
+        self.megamolbart = MegaMolBARTLatent(model_dir=os.path.join(dir, checkpoint_file))
         logger.info(f'Loaded Version {self.megamolbart.version}')
 
     def is_ready(self, timeout: int = 10) -> bool:
@@ -243,8 +243,8 @@ class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
                             smiles: str,
                             pad_length: int):
 
-        embedding_, z, z_mean, z_logv, pad_mask = self.megamolbart.smiles2embedding(smiles,
-                                                                pad_length=pad_length)
+        emb_info, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
+        embedding_, z, z_mean, z_logv = emb_info
         dim = z_mean.shape
         embedding = z_mean.flatten().tolist()
         return EmbeddingList(embedding=embedding,

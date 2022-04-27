@@ -37,8 +37,7 @@ def calculate_morgan_fingerprint(smiles, radius, nbits):
         fingerprints[i] = fp
     return fingerprints
 
-
-def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_invalid=True):
+def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_invalid=True, nbits = 512):
     """Calculate Morgan fingerprints on SMILES strings
 
     Args:
@@ -48,7 +47,7 @@ def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_in
     Returns:
         pandas/cudf.DataFrame: new dataframe containing fingerprints
     """
-    fp = calculate_morgan_fingerprint(dataframe[smiles_col].values, 2, 512)
+    fp = calculate_morgan_fingerprint(dataframe[smiles_col].values, 2, nbits)
     fp = pd.DataFrame(fp, index=dataframe.index)
 
     # Check for invalid smiles

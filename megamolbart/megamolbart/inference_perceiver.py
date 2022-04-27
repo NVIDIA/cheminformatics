@@ -502,13 +502,14 @@ class MegaMolBARTLatent(MegaMolBART):
         else:
             return self.min_jitter_radius
 
-    def add_jitter(self,  embedding, z, z_mean, z_logv, radius, cnt):
+    def add_jitter(self,  emb_info, radius, cnt):
         distorteds = []
+        embedding, z, z_mean, z_logv = emb_info
         if self.noise_mode == 0:
             # Standard Discrete Noise Radius Steps
             for _ in range(cnt):
-                noise = torch.normal(0, radius, embedding.shape).to(embedding.device)
-                distorted = (noise + embedding)
+                noise = torch.normal(0, radius, z_mean.shape).to(z_mean.device)
+                distorted = (noise + z_mean)
                 distorteds.append(distorted)
         elif self.noise_mode == 1:
             # Radius scales learned Standard Deviation
@@ -528,126 +529,135 @@ class MegaMolBARTLatent(MegaMolBART):
             for _ in range(cnt):
                 sample = z_mean
                 distorteds.append(sample)
-
         return distorteds
-    # TODO: Can we leave padding the smae
-    # def smiles2embedding(self, smiles, pad_length=None):
-    #     """Calculate embedding and padding mask for smiles with optional extra padding
 
-    #     Params
-    #         smiles: string, input SMILES molecule
-    #         pad_length: optional extra
+    def smiles2embedding(self, smiles, pad_length=None):
+        """Calculate embedding and padding mask for smiles with optional extra padding
 
-    #     Returns
-    #         embedding array and boolean mask
-    #     """
+        Params
+            smiles: string, input SMILES molecule
+            pad_length: optional extra
 
-    #     # assert isinstance(smiles, str)
-    #     # TODO Make changes to base model
-    #     if isinstance(smiles, str):
-    #         smiles = [smiles]
-    #     # TODO: removing for now
-    #     # if pad_length:
-    #     #     assert pad_length >= len(smiles) + 2
+        Returns
+            embedding array and boolean mask
+        """
 
-    #     tokens = self.tokenizer.tokenize(smiles, mask = False, pad=True)
+        # assert isinstance(smiles, str)
+        # TODO Make changes to base model
+        if isinstance(smiles, str):
+            smiles = [smiles]
+        # TODO: removing for now
+        # if pad_length:
+        #     assert pad_length >= len(smiles) + 2
 
-    #     # Append to tokens and mask if appropriate
-    #     # if pad_length:
-    #     #     for i in range(len(tokens['original_tokens'])):
-    #     #         n_pad = pad_length - len(tokens['original_tokens'][i])
-    #     #         tokens['original_tokens'][i] += [self.tokenizer.pad_token] * n_pad
-    #     #         tokens['masked_pad_masks'][i] += [1] * n_pad
+        tokens = self.tokenizer.tokenize(smiles, mask = False, pad=True)
 
-    #     token_ids = torch.tensor(self.tokenizer.convert_tokens_to_ids(tokens['original_tokens'])).cuda().T
-    #     pad_mask = torch.tensor(tokens['masked_pad_masks']).bool().cuda().T
-    #     encode_input = {"encoder_input": token_ids, "encoder_pad_mask": pad_mask}
+        # Append to tokens and mask if appropriate
+        # if pad_length:
+        #     for i in range(len(tokens['original_tokens'])):
+        #         n_pad = pad_length - len(tokens['original_tokens'][i])
+        #         tokens['original_tokens'][i] += [self.tokenizer.pad_token] * n_pad
+        #         tokens['masked_pad_masks'][i] += [1] * n_pad
 
-    #     embedding = self.model.model.encode(encode_input, chosen_logv = self.sample_logv)
-    #     z, z_mean, z_logv = self.model.model.encode_latent(hidden=embedding, logv_clamp = self.sample_logv) # TODO tie in with radius
-    #     torch.cuda.empty_cache()
-    #     return embedding, z, z_mean, z_logv, pad_mask
+        token_ids = torch.tensor(self.tokenizer.convert_tokens_to_ids(tokens['original_tokens'])).cuda().T
+        pad_mask = torch.tensor(tokens['masked_pad_masks']).bool().cuda().T
+        encode_input = {"encoder_input": token_ids, "encoder_pad_mask": pad_mask}
 
-    # def _inverse_transform(self, memory, mem_pad_mask, batch_size, sanitize, k):
-    #     memory = self.model.model.latent2hidden(memory)
-    #     if self.encoder_type == "perceiver":
-    #         mem_pad_mask = torch.zeros((memory.shape[0:2]), dtype=mem_pad_mask.dtype, device=mem_pad_mask.device)
-    #     with torch.no_grad():
-    #         decode_fn = partial(self.model.model._decode_fn,
-    #                             mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
-    #                             memory=memory)
+        embedding = self.model.model.encode(encode_input, chosen_logv = self.sample_logv)
+        z, z_mean, z_logv = self.model.model.encode_latent(hidden=embedding, logv_clamp = self.sample_logv)
+        torch.cuda.empty_cache()
+        return (embedding, z, z_mean, z_logv), pad_mask
 
-    #         mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
-    #                                                     batch_size=batch_size,
-    #                                                     device='cuda',
-    #                                                     k=k)
+    def _inverse_transform_batch(self, memory, mem_pad_mask, k=1, sanitize=True):
+        memory = self.model.model.latent2hidden(memory)
+        #Above needed for LVM
+        mem_pad_mask = mem_pad_mask.clone()
+        smiles_interp_list = []
+        (_, batch_size, _) = tuple(memory.size())
+        if self.encoder_type == "perceiver":
+            mem_pad_mask = torch.zeros((memory.shape[0:2]), dtype=mem_pad_mask.dtype, device=mem_pad_mask.device)
+        with torch.no_grad():
+            decode_fn = partial(self.model.model._decode_fn,
+                                mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
+                                memory=memory)
+
+            mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
+                                                        batch_size=batch_size,
+                                                        device='cuda',
+                                                        k=k)
             
-    #         mol_strs = sum(mol_strs, [])  # flatten list
-    #         g_smiles = None
-    #         for smiles in mol_strs:
-    #             g_smiles = smiles
-    #             if sanitize:
-    #                 mol = Chem.MolFromSmiles(g_smiles, sanitize=sanitize)
-    #                 if mol:
-    #                     g_smiles = Chem.MolToSmiles(mol)
-    #                     break
-    #             else:
-    #                 break
-
-    #         logger.debug(f'Sanitized SMILES {g_smiles} added...')
-    #         return g_smiles
-
-    # def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
-    #     mem_pad_mask = mem_pad_mask.clone()
+            mol_strs = sum(mol_strs, [])  # flatten list
+            g_smiles = None
+            for smiles in mol_strs:
+                g_smiles = smiles
+                if sanitize:
+                    mol = Chem.MolFromSmiles(g_smiles, sanitize=sanitize)
+                    if mol:
+                        g_smiles = Chem.MolToSmiles(mol)
+                smiles_interp_list.append(g_smiles)
+        return smiles_interp_list
+        
+    # TODO: Class hierarchy allows us to comment out
+    # def inverse_transform(self, embeddings, mem_pad_masks, k=1, sanitize=True):
     #     smiles_interp_list = []
-
-    #     batch_size = 1
+    #     # mem_pad_mask = mem_pad_mask.clone()
     #     with torch.no_grad():
     #         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-    #             futures = {executor.submit(self._inverse_transform,\
-    #                 memory, mem_pad_mask, batch_size, sanitize, k):\
-    #                     memory for memory in embeddings}
-
+    #             futures = {executor.submit(self._inverse_transform_batch, memory, mem_pad_mask.clone(
+    #             ), k, sanitize): memory for memory, mem_pad_mask in zip(embeddings, mem_pad_masks)}
     #             for future in concurrent.futures.as_completed(futures):
     #                 smiles = futures[future]
-
     #                 try:
     #                     g_smiles = future.result()
     #                     smiles_interp_list.append(g_smiles)
     #                 except Exception as exc:
-    #                     logger.warning(f'{smiles.smiles} generated an exception: {exc}')
-
+    #                     logger.info(f'{type(futures)}, {type(future)}')
+    #                     logger.exception(exc)
     #     return smiles_interp_list
 
-    # def find_similars_smiles_list(self,
-    #                               smiles: str,
-    #                               num_requested: int = 10,
-    #                               scaled_radius=None,
-    #                               force_unique=False,
-    #                               sanitize=True,
-    #                               pad_length=None):
-    #     distance = self._compute_radius(scaled_radius)
-    #     if self.noise_mode==2:
-    #         logger.info(f'Sampling {num_requested} around {smiles} with logv {distance}...')
-    #     else:
-    #         logger.info(f'Sampling {num_requested} around {smiles} with distance {distance}...')
+    def find_similars_smiles_list(self,
+                                  smiles: list,
+                                  num_requested: int = 10,
+                                  scaled_radius=None,
+                                  force_unique=False,
+                                  sanitize=True,
+                                  pad_length=None):
+        distance = self._compute_radius(scaled_radius)
+        logger.info(f'Sampling {num_requested} around {len(smiles)} SMILES with distance {distance}...')
 
-    #     embedding, z, z_mean, z_logv, pad_mask = self.smiles2embedding(smiles, pad_length=pad_length)
+        embedding_info, pad_mask = self.smiles2embedding(smiles, pad_length=pad_length)
+        embedding, z, z_mean, z_logv = embedding_info
+        # emb = NxBxM
+        num_molecules = z_mean.shape[1]
+        neighboring_embeddings = self.add_jitter(embedding_info, distance, num_requested)
+        # neigh = [NxBxM] * num_requested
+        generated_mols = self.inverse_transform(neighboring_embeddings,
+                                                [pad_mask.bool().cuda()]*num_requested,
+                                                k=1, sanitize=sanitize)
+        # gens = [B] * num_requested
+        # need to resize it to [num_requested] * B
+        generated_molcules = []
+        generated_embeddings = []
+        for idx in range(num_molecules):
+            molecules = [generated_mols[k][idx] for k in range(len(generated_mols))]
+            embs = [nemb[:, idx,:] for nemb in neighboring_embeddings]
+            if force_unique:
+                molecules = list(set(molecules))
+            generated_molcules.append(molecules)
+            generated_embeddings.append(embs)
 
-    #     neighboring_embeddings = self.add_jitter(embedding,  z, z_mean, z_logv, distance, num_requested)
+        total_molecules = []
+        total_embeddings = []
+        for smile, gens in zip(smiles, generated_molcules):
+            total_molecules.append([smile] + gens)
+        for smile_idx, gens in zip(list(range(embedding.shape[1])), generated_embeddings):
+            total_embeddings.append([embedding[:, smile_idx, :]] + gens)
 
-    #     generated_mols = self.inverse_transform(neighboring_embeddings,
-    #                                             pad_mask.bool().cuda(),
-    #                                             k=1, sanitize=sanitize)
-    #     if force_unique:
-    #         generated_mols = list(set(generated_mols))
+        return total_molecules, total_embeddings, pad_mask
 
-    #     generated_mols = [smiles] + generated_mols
-    #     neighboring_embeddings = [embedding] + neighboring_embeddings
-    #     return generated_mols, neighboring_embeddings, pad_mask
-
+    # TODO: I beleive due to class hierachry we can comment
     # def find_similars_smiles(self,
-    #                          smiles: str,
+    #                          smiles: list,
     #                          num_requested: int = 10,
     #                          scaled_radius=None,
     #                          force_unique=False,
@@ -663,22 +673,22 @@ class MegaMolBARTLatent(MegaMolBART):
 
     #     # Rest of the applications and libraries use RAPIDS and cuPY libraries.
     #     # For interoperability, we need to convert the embeddings to cupy.
-    #     embeddings = []
-    #     dims = []
-    #     for neighboring_embedding in neighboring_embeddings:
-    #         dims.append(tuple(neighboring_embedding.shape))
-    #         embeddings.append(neighboring_embedding.flatten().tolist())
+    #     dfs = []
+    #     for smile_idx in range(len(smiles)):
+    #         embeddings = []
+    #         dims = []
+    #         for neighboring_embedding in neighboring_embeddings[smile_idx]:
+    #             dims.append(tuple(neighboring_embedding.shape))
+    #             embeddings.append(neighboring_embedding.flatten().tolist())
 
-    #     generated_df = pd.DataFrame({'SMILES': generated_mols,
-    #                                  'embeddings': embeddings,
-    #                                  'embeddings_dim': dims,
-    #                                  'Generated': [True for i in range(len(generated_mols))]})
-    #     generated_df.iat[0, 3] = False
+    #         generated_df = pd.DataFrame({'SMILES': generated_mols[smile_idx],
+    #                                     'embeddings': embeddings,
+    #                                     'embeddings_dim': dims,
+    #                                     'Generated': [True for i in range(len(generated_mols[smile_idx]))]})
+    #         generated_df.iat[0, 3] = False
+    #         if force_unique:
+    #             inv_transform_funct = partial(self.inverse_transform, mem_pad_mask=pad_mask[:, smile_idx, :].unsqueeze(1))
+    #             generated_df = self.compute_unique_smiles(generated_df, inv_transform_funct,scaled_radius=scaled_radius)
+    #         dfs.append(generated_df)
 
-    #     if force_unique:
-    #         inv_transform_funct = partial(self.inverse_transform,
-    #                                       mem_pad_mask=pad_mask)
-    #         generated_df = self.compute_unique_smiles(generated_df,
-    #                                                   inv_transform_funct,
-    #                                                   scaled_radius=scaled_radius)
-    #     return generated_df
+    #     return dfs

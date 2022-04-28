@@ -36,9 +36,10 @@ class ExCAPEDataset(GenericCSVDataset):
     def load(self,
              columns=['canonical_smiles'],
              length_column='length',
-             data_len=None):
+             data_len=None,
+             nbits = 512):
 
-        super().load(columns, length_column, data_len)
+        super().load(columns, length_column, data_len, nbits)
         self.smiles = self.smiles.rename(columns={'Gene_Symbol': 'gene'}).set_index('gene', append=True)
 
 #### Deprecated ####

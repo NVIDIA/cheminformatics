@@ -217,9 +217,8 @@ class GrpcMegaMolBARTWrapper():
 
 class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
 
-    def __init__(self, checkpoint_file = None) -> None:
+    def __init__(self, checkpoint_file = None, noise_mode = 0) -> None:
         self.min_jitter_radius = 1
-
         # TODO: make this configurable/resuable accross all modules.
         if checkpoint_file == None:
             checkpoint_file = 'Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo'
@@ -233,7 +232,7 @@ class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
         # this wrapper is not yet ready for MegaMolBARTLatent
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
-        self.megamolbart = MegaMolBARTLatent(model_dir=os.path.join(dir, checkpoint_file))
+        self.megamolbart = MegaMolBARTLatent(model_dir=os.path.join(dir, checkpoint_file), noise_mode = noise_mode)
         logger.info(f'Loaded Version {self.megamolbart.version}')
 
     def is_ready(self, timeout: int = 10) -> bool:

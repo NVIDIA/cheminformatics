@@ -393,13 +393,13 @@ class Modelability(BaseEmbeddingMetric):
                     embeddings.append(embedding)
         return embeddings
 
-    def calculate(self, estimator, param_dict, **kwargs):
-
+    def calculate(self, estimator, param_dict, average_tokens, **kwargs):
+        # TODO: Turn off embedding averaging
         logger.info(f'Processing {self.label}...')
         cache = Cache()
         embeddings = cache.get_data(f'Modelability_{self.label}_embeddings')
         if embeddings is None:
-            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
+            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens)
             embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
             fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
 

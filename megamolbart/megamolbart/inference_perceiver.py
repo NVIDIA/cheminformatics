@@ -463,14 +463,14 @@ class MegaMolBART():
         return interp_df
 
 class MegaMolBARTLatent(MegaMolBART):
-    def __init__(self, model_dir, sample_logv = -6.0, noise_mode = 0):
-        super().__init__()
+    def __init__(self, model_dir, noise_mode = 0):
+        # super().__init__()
 
         self.model, self.version = self.load_model(model_dir)
         self.max_model_position_embeddings = self.model.max_seq_len
         self.tokenizer = self.model.tokenizer
         self.encoder_type = self.model.model.encoder_type
-        self.sample_logv = sample_logv
+        self.sample_logv = -6.0
         self.noise_mode = noise_mode
         # Noise Mode allows the user to set the sampling method
         # When using sample logv "radius" is used as the sample_logv value

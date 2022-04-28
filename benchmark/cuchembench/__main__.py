@@ -142,16 +142,28 @@ def main(cfg):
     os.makedirs(output_dir, exist_ok=True)
 
     max_seq_len = int(cfg.sampling.max_seq_len)
+    exp_name = cfg.model.exp_name
     if cfg.model.name == 'MegaMolBART':
         from cuchembench.inference.megamolbart import MegaMolBARTWrapper
         inferrer = MegaMolBARTWrapper(checkpoint_file = cfg.model.checkpoint_file)
+        encoder_type = inferrer.megamolbart.model.model.encoder_type
+        if encoder_type == 'perceiver':
+            nbits = inferrer.megamolbart.model.model.max_seq_len * inferrer.megamolbart.model.model.steps_model #512 * k
+        else:
+            nbits = 512
+        log.info(f'Creating model {encoder_type} with {nbits} bits')
     elif cfg.model.name == 'MegaMolBARTLatent':
-        assert(1 == 0) # Not Implmented Yet 4/12
         from cuchembench.inference.megamolbart import MegaMolBARTLatentWrapper
-        inferrer = MegaMolBARTLatentWrapper(checkpoint_file = cfg.model.checkpoint_file)
+        inferrer = MegaMolBARTLatentWrapper(checkpoint_file = cfg.model.checkpoint_file, noise_mode = cfg.model.noise_mode)
+        if encoder_type == 'perceiver':
+            nbits = inferrer.megamolbart.model.model.max_seq_len * inferrer.megamolbart.model.model.steps_model #512 * k
+        else:
+            nbits = 512
+        log.info(f'Creating model {encoder_type} with {nbits} bits')
     elif cfg.model.name == 'CDDD':
         from cuchembench.inference.cddd import CdddWrapper
         inferrer = CdddWrapper()
+        nbits = 512
     else:
         log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
         inf_class = locate(cfg.model.name)
@@ -173,9 +185,9 @@ def main(cfg):
         metric_cfg = cfg.metric.nearest_neighbor_correlation
         input_size = get_input_size(metric_cfg)
         #TODO can change filename here to include the nbits
-        smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len)
+        smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len, data_filename=f'benchmark_ChEMBL_approved_drugs_physchem_{exp_name}.csv', fp_filename=f'fingerprints_ChEMBL_approved_drugs_physchem_{nbits}.csv')
 
-        smiles_dataset.load(data_len=input_size)
+        smiles_dataset.load(data_len=input_size, nbits=nbits)
 
         metric_list.append({name: NearestNeighborCorrelation(inferrer,
                                                              cfg,
@@ -185,15 +197,16 @@ def main(cfg):
         metric_cfg = cfg.metric.modelability.physchem
         input_size = get_input_size(metric_cfg)
         # Could concat datasets to make prep similar to bioactivity
-        smiles_dataset_list = [MoleculeNetESOL(max_seq_len=max_seq_len),
-                               MoleculeNetFreeSolv(max_seq_len=max_seq_len),
-                               MoleculeNetLipophilicity(max_seq_len=max_seq_len)]
+        smiles_dataset_list = [MoleculeNetESOL(max_seq_len=max_seq_len, data_filename=f'benchmark_MoleculeNet_ESOL_{exp_name}.csv', fp_filename=f'fingerprints_MoleculeNet_ESOL_{nbits}.csv'),
+                               MoleculeNetFreeSolv(max_seq_len=max_seq_len, data_filename=f'benchmark_MoleculeNet_FreeSolv_{exp_name}.csv', fp_filename=f'fingerprints_MoleculeNet_FreeSolv_{nbits}.csv'),
+                               MoleculeNetLipophilicity(max_seq_len=max_seq_len, data_filename=f'benchmark_MoleculeNet_Lipophilicity_{exp_name}.csv', fp_filename=f'fingerprints_MoleculeNet_Lipophilicity_{nbits}.csv')]
 
         n_splits = metric_cfg.n_splits
 
         for smiles_dataset in smiles_dataset_list:
             log.info(f'Loading {smiles_dataset.table_name}...')
-            smiles_dataset.load(data_len=input_size, columns=['SMILES'])
+            #TODO pipe in finger print size. Should be piped through but double check
+            smiles_dataset.load(data_len=input_size, columns=['SMILES'], nbits = nbits)
 
             metric_list.append(
                 {smiles_dataset.table_name: Modelability('modelability-physchem',
@@ -209,23 +222,23 @@ def main(cfg):
         metric_cfg = cfg.metric.modelability.bioactivity
         metric_name = 'modelability-bioactivity'
 
-        excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len)
+        excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len, data_filename=f'benchmark_ExCAPE_Bioactivity_{exp_name}.csv', fp_filename=f'fingerprints_ExCAPE_Bioactivity_{nbits}.csv')
         excape_dataset.load(columns=['SMILES', 'Gene_Symbol'],
-                            data_len=metric_cfg.input_size)
+                            data_len=metric_cfg.input_size, nbits = nbits)
 
         log.info('Creating groups...')
         n_splits = metric_cfg.n_splits
         gene_dataset = deepcopy(excape_dataset)
         genes_cnt = 0
 
-        data_files['benchmark_ExCAPE_Bioactivity'] =\
+        data_files[f'benchmark_ExCAPE_Bioactivity_{exp_name}'] =\
             {'col_name': 'canonical_smiles',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.modelability.bioactivity.input_size,
              'dataset': excape_dataset.smiles}
 
         # Get a list of genes already processed
-        results_file = os.path.join(output_dir, f'{cfg.model.name}_{metric_name}.csv')
+        results_file = os.path.join(output_dir, f'{cfg.model.name}_{exp_name}_{metric_name}.csv')
         if os.path.exists(results_file):
             results_df = pd.read_csv(results_file)
             processed_genes = set(results_df['gene'])
@@ -254,7 +267,7 @@ def main(cfg):
                                                     n_splits,
                                                     metric_cfg.return_predictions,
                                                     metric_cfg.normalize_inputs,
-                                                    data_file=data_files['benchmark_ExCAPE_Bioactivity']['dataset'])})
+                                                    data_file=data_files[f'benchmark_ExCAPE_Bioactivity_{exp_name}']['dataset'])})
             genes_cnt += 1
             if metric_cfg.gene_cnt > 0 and genes_cnt > metric_cfg.gene_cnt:
                 break
@@ -282,6 +295,7 @@ def main(cfg):
 
             kwargs = {iter_label: iter_val}
             if metric.name.startswith('modelability'):
+                kwargs['average_tokens'] = encoder_type == 'seq2seq'
                 estimator, param_dict = metric.model_dict[iter_val]
                 kwargs.update({'estimator': estimator, 'param_dict': param_dict})
                 if metric.name.endswith('bioactivity'):
@@ -318,7 +332,7 @@ def main(cfg):
             return_predictions = cfg.metric.modelability[metric_name]['return_predictions']
         else:
             return_predictions = False
-        save_metric_results(cfg.model.name, result_list, output_dir, return_predictions=return_predictions)
+        save_metric_results(f'{cfg.model.name}_{exp_name}', result_list, output_dir, return_predictions=return_predictions)
         metric.cleanup()
 
     # Plotting

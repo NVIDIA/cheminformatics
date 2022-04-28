@@ -15,10 +15,12 @@ model:
   #   - sampling.concurrent_requests
   #   - model.params.url (50052 for lb grpc)
   # MegaMolBART Seq2Seq Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
-  name: MegaMolBART
-  checkpoint_file: Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
+  name: MegaMolBART #MegaMolBARTLatent # MegaMolBART
+  exp_name: seq2seq
+  checkpoint_file: Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo #MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
   training_data: /data/db/zinc_train_test.sqlite3 #/data/db/cddd_train.sqlit
-  batch_size: 500
+  batch_size: 100 # 500 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
+  noise_mode: 2 # For LVM sampling selection
 
   # name:  cuchembench.inference.GrpcMegaMolBARTWrapper
   # training_data: /data/db/zinc_train.sqlite3
@@ -28,18 +30,19 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_prcvr_k4_20k_500_bs.sqlite3
+  db: /data/db/embedding_cache_megamolbart_seq2seq_1.2_bs_100.sqlite3 #mim_logv_k1_20k_500_bs.sqlite3
   concurrent_requests: 10
 
 output:
-  path: /data/benchmark_output/prcvr_k4 #use unique names here
+#TODO: Change path for new models
+  path: /data/benchmark_output/seq2seq #prcvr_k4 #use unique names here
 
 metric:
   validity:
     enabled: True
     input_size: 20000
     radius:
-      - 0.75
+      - 1.2
       # - 1
 
   unique:

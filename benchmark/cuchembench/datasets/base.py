@@ -50,8 +50,8 @@ class GenericCSVDataset():
         self.properties = None
         self.fingerprints = None
 
-    def _generate_fingerprints(self, data, columns):
-        fp = calc_morgan_fingerprints(data, smiles_col=columns[0])
+    def _generate_fingerprints(self, data, columns, nbits = 512):
+        fp = calc_morgan_fingerprints(data, smiles_col=columns[0], nbits = nbits)
         # fp = fp.to_pandas()
         fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
         for col in fp.columns: # TODO why are these floats
@@ -72,7 +72,8 @@ class GenericCSVDataset():
                   columns,
                   length_column=None,
                   return_remaining=True,
-                  data_len=None):
+                  data_len=None,
+                  nbits = 512):
         columns = [columns] if not isinstance(columns, list) else columns
         data = pd.read_csv(self.prop_data_path)
 
@@ -108,7 +109,8 @@ class GenericCSVDataset():
         if generate_fingerprints_file:
             # Generate here so that column names are consistent with inputs
             logger.info(f'Creating temporary fingerprints file {self.fp_data_path} for {data.shape} input size.')
-            self._generate_fingerprints(data, columns)
+            # TODO
+            self._generate_fingerprints(data, columns, nbits)
 
         cleaned_data = data[columns]
         if return_remaining:
@@ -122,11 +124,12 @@ class GenericCSVDataset():
     def load(self,
              columns=['canonical_smiles'],
              length_column='length',
-             data_len=None):
+             data_len=None,
+             nbits = 512):
 
         # Load physchem properties
         logger.info(f'Loading data from {self.prop_data_path}')
-        self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len)
+        self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len, nbits = nbits)
 
         if self.smiles_col is not None:
             self.smiles = self.smiles.rename(columns={self.smiles_col: 'canonical_smiles'})

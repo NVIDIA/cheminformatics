@@ -1,5 +1,12 @@
 # Copyright 2020 NVIDIA Corporation
-FROM rapidsai/rapidsai:22.02-cuda11.4-base-ubuntu20.04-py3.8
+FROM rapidsai/rapidsai:22.04-cuda11.4-base-ubuntu20.04-py3.8
+
+RUN cd /tmp && apt-key del 7fa2af80 && \
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb && \
+	dpkg -i cuda-keyring_1.0-1_all.deb
+
+RUN sed -i '/developer\.download\.nvidia\.com\/compute\/cuda\/repos/d' /etc/apt/sources.list.d/*
+RUN sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/*
 
 RUN apt-get update \
     && apt-get upgrade -y \

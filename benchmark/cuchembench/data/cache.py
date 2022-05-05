@@ -154,7 +154,6 @@ class MoleculeGenerator():
             log.warn(f"Please rerun after this job to process {csv_data_files}.")
 
         while True:
-            #TODO: fix SAMPLE only case --> make sepearete loop for EMBEDDING
             df = pd.read_sql_query('''
                 SELECT id, smiles
                 FROM smiles
@@ -172,24 +171,43 @@ class MoleculeGenerator():
                         future.result()
                     except Exception as exc:
                         log.warning(f'generated an exception: {exc}')
+        while True:
+            #TODO: fix SAMPLE only case --> make sepearete loop for EMBEDDING
+            df = pd.read_sql_query('''
+                SELECT id, smiles
+                FROM smiles
+                WHERE processed = 0 AND dataset_type = 'EMBEDDING' LIMIT ?
+                ''',
+                self.conn, params = [self.batch_size])
+            if df.shape[0] == 0:
+                break
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
+                futures = {executor.submit(self._sample, df['id'].tolist(), df['smiles'].tolist(), num_requested, scaled_radius, force_unique, sanitize, dataset_type = "EMBEDDING")}
+                for future in concurrent.futures.as_completed(futures):
+                    # smiles = futures[future]
+                    try:
+                        future.result()
+                    except Exception as exc:
+                        log.exception(exc)
 
     def _sample(self, ids, smiles, num_samples, scaled_radius, force_unique, sanitize, dataset_type = "SAMPLE"):
-        try:
-            if dataset_type == 'SAMPLE':
-                results = self.inferrer.find_similars_smiles(smiles,
-                                                            num_requested=num_samples,
-                                                            scaled_radius=scaled_radius,
-                                                            force_unique=(force_unique == 1),
-                                                            sanitize=(sanitize == 1))
-            else:
-                #TODO: Need to make both conditions handle multiple smiles
-                embedding_list = self.inferrer.smiles_to_embedding(smiles, 512)
+        if dataset_type == 'SAMPLE':
+            results = self.inferrer.find_similars_smiles(smiles,
+                                                        num_requested=num_samples,
+                                                        scaled_radius=scaled_radius,
+                                                        force_unique=(force_unique == 1),
+                                                        sanitize=(sanitize == 1))
+        else:
+            #TODO: Do we need this padding? We removed the functionality? --> Not needed
+            _, _, embedding_list = self.inferrer.smiles_to_embedding(smiles)
+            results = []
+            for idx in range(len(smiles)):
                 result = pd.DataFrame()
-                result['SMILES'] = [smiles]
-                result['embeddings'] = [embedding_list.embedding]
-                result['embeddings_dim'] = [embedding_list.dim]
-                
-            for id, result in zip(ids, results):
-                self._insert_generated_smiles(id, result)
-        except Exception as e:
-            log.exception(e)
+                result['SMILES'] = [smiles[idx]]
+                result['embeddings'] = [embedding_list[idx].embedding]
+                result['embeddings_dim'] = [embedding_list[idx].dim]
+                results.append(result)
+            
+        for id, result in zip(ids, results):
+            self._insert_generated_smiles(id, result)

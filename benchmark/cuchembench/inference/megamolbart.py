@@ -44,7 +44,7 @@ class MegaMolBARTWrapper(metaclass=Singleton):
 
     def smiles_to_embedding(self,
                             smiles: list,
-                            pad_length: int):
+                            pad_length: int = None):
 
         embedding, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
         storage = []
@@ -142,7 +142,7 @@ class GrpcMegaMolBARTWrapper():
 
     def smiles_to_embedding(self,
                             smiles: str,
-                            padding: int,
+                            padding: int = None,
                             scaled_radius=None,
                             num_requested: int = 10,
                             sanitize=True):
@@ -239,14 +239,31 @@ class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
         return True
 
     def smiles_to_embedding(self,
-                            smiles: str,
-                            pad_length: int):
+                            smiles: list,
+                            pad_length: int = None):
 
         emb_info, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
-        embedding_, z, z_mean, z_logv = emb_info
-        dim = z_mean.shape
-        embedding = z_mean.flatten().tolist()
-        return EmbeddingList(embedding=embedding,
-                             dim=dim,
-                             pad_mask=pad_mask)
+        _, _, z_mean, z_logv = emb_info
+        embedding = z_mean
+        storage = []
+        for molecule in range(len(smiles)):
+            emb = embedding[:, molecule, :].unsqueeze(1)
+            dim = emb.shape
+            mask = pad_mask[:, molecule].unsqueeze(1)
+            elem = EmbeddingList(embedding=emb.flatten().tolist(), dim=dim, pad_mask=mask)
+            storage.append(elem)
+        return embedding, pad_mask, storage
+
+    # # TODO: Fix this to match non LVM return
+    # def smiles_to_embedding(self,
+    #                         smiles: str,
+    #                         pad_length: int):
+    #     assert(1==0)
+    #     emb_info, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
+    #     embedding_, z, z_mean, z_logv = emb_info
+    #     dim = z_mean.shape
+    #     embedding = z_mean.flatten().tolist()
+    #     return EmbeddingList(embedding=embedding,
+    #                          dim=dim,
+    #                          pad_mask=pad_mask)
 

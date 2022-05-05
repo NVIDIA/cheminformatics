@@ -61,7 +61,7 @@ def get_model_dict():
     rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
     return {'linear_regression': [lr_estimator, lr_param_dict],
-            'elastic_net': [en_estimator, en_param_dict],
+            # 'elastic_net': [en_estimator, en_param_dict], # Removing Elastic Net for timing
             'support_vector_machine': [sv_estimator, sv_param_dict],
             'random_forest': [rf_estimator, rf_param_dict]
             }
@@ -176,15 +176,14 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         corr = spearmanr(fingerprints_dist, embeddings_dist, top_k=top_k)
         return corr
 
-    def calculate(self, top_k=None, **kwargs):
+    def calculate(self, top_k=None, average_tokens = False, **kwargs):
 
         start_time = time.time()
         cache = Cache()
-        embeddings = cache.get_data('NN_embeddings')
-
+        embeddings = None #cache.get_data('NN_embeddings')
+        assert(embeddings is None)
         if embeddings is None:
-            embeddings = self.encode_many(zero_padded_vals=True,
-                                          average_tokens=False)
+            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens) #zero_padded_vals=True
             logger.info(f'Embedding len and type {len(embeddings)}  {type(embeddings[0])}')
             embeddings = xpy.vstack(embeddings)
             fingerprints = xpy.asarray(self.fingerprint_dataset)
@@ -394,11 +393,12 @@ class Modelability(BaseEmbeddingMetric):
         return embeddings
 
     def calculate(self, estimator, param_dict, average_tokens, **kwargs):
-        # TODO: Turn off embedding averaging
         logger.info(f'Processing {self.label}...')
         cache = Cache()
-        embeddings = cache.get_data(f'Modelability_{self.label}_embeddings')
+        embeddings = None #cache.get_data(f'Modelability_{self.label}_embeddings') Caching with this label is unaccurate for benchmarking multiple models
+        assert(embeddings is None)
         if embeddings is None:
+            logger.info(f'Grabbing Fresh Embeddings with average_tokens = {average_tokens}')
             embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens)
             embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
             fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)

@@ -225,7 +225,9 @@ class Identicality(BaseSampleMetric):
                 )''',
                 [self.inferrer.__class__.__name__, radius, self.inferrer.__class__.__name__, radius])
             rec = res.fetchone()
-        return rec[0], self.total_molecules
+        # logger.info(f'{rec}, {rec[0]}, {self.total_molecules}')
+        identical = rec[0] if rec[0] is not None else 0
+        return identical, self.total_molecules
 
 class EffectiveNovelty(BaseSampleMetric):
     name = 'effective_novelty'

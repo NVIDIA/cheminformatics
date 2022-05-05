@@ -28,12 +28,15 @@ class GenericCSVDataset():
             pathlib.Path(__file__).parent.parent.absolute(), 'csv_data', data_filename)
         assert os.path.exists(self.prop_data_path)
 
+        # prop_data = pd.DataFrame(columns=properties_cols)
+        # prop_data.to_csv(self.prop_data_path, index=False)
+        # #TODO cols must be passed in
         fp_data_path = os.path.join(
             pathlib.Path(__file__).parent.parent.absolute(), 'csv_data', fp_filename)
-        if not os.path.exists(fp_data_path):
-            logger.info(f'Fingerprint path {fp_data_path} does not exist, generating temporary fingerprints file.')
-            temp_dir = '/tmp' #tempfile.TemporaryDirectory().name
-            fp_data_path = os.path.join(temp_dir, self.fp_filename)
+        # if not os.path.exists(fp_data_path):
+        #     logger.info(f'Fingerprint path {fp_data_path} does not exist, generating temporary fingerprints file.')
+        #     temp_dir = '/tmp' #tempfile.TemporaryDirectory().name
+        #     fp_data_path = os.path.join(temp_dir, self.fp_filename)
 
         self.fp_data_path = fp_data_path
 
@@ -149,7 +152,7 @@ class GenericCSVDataset():
         if self.index_col:
             self.fingerprints = self.fingerprints.set_index(self.index_col).sort_index()
 
-        assert len(self.fingerprints.columns) == 512, AssertionError(f'Fingerprint dataframe appears to contain incorrect number of column(s)')
+        assert len(self.fingerprints.columns) == nbits, AssertionError(f'Fingerprint dataframe appears to contain incorrect number of column(s)')
         try:
             self.fingerprints.columns.astype(int)
         except:

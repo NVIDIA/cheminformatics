@@ -18,7 +18,7 @@ BIOACTIVITY_TABLE_LIST = ['excape_activity', 'excape_fp']
 class ExCAPEDataset(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(data_filename='benchmark_ExCAPE_Bioactivity.csv',
-                         fp_filename='fingerprints_ExCAPE_Bioactivity.csv',
+                        #  fp_filename='fingerprints_ExCAPE_Bioactivity.csv',
                          **kwargs)
         self.name = 'ExCAPE'
         self.table_name = 'excape'

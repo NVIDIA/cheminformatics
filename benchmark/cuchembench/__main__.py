@@ -224,7 +224,7 @@ def main(cfg):
         metric_cfg = cfg.metric.modelability.bioactivity
         metric_name = 'modelability-bioactivity'
 
-        excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len, data_filename=f'benchmark_ExCAPE_Bioactivity_{exp_name}.csv', fp_filename=f'fingerprints_ExCAPE_Bioactivity_{nbits}.csv')
+        excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len, fp_filename=f'fingerprints_ExCAPE_Bioactivity_{nbits}.csv')
         excape_dataset.load(columns=['SMILES', 'Gene_Symbol'],
                             data_len=metric_cfg.input_size, nbits = nbits)
 

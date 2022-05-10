@@ -34,7 +34,7 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         from megamolbart.inference import MegaMolBART
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
-        self.megamolbart = MegaMolBART(model_dir=os.path.join(dir, checkpoint_file))
+        self.megamolbart = MegaMolBART(model_path=os.path.join(dir, checkpoint_file))
         logger.info(f'Loaded Version {self.megamolbart.version}')
 
     def is_ready(self, timeout: int = 10) -> bool:
@@ -69,7 +69,7 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         embedding = torch.reshape(embedding, dim).cuda()
         pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
 
-        generated_mols = self.megamolbart.inverse_transform(embedding, pad_mask)
+        generated_mols = self.megamolbart.embedding2smiles(embedding, pad_mask)
         return SmilesList(generatedSmiles=generated_mols)
 
     def find_similars_smiles(self,

@@ -1,31 +1,33 @@
 #!/usr/bin/env python3
-
 import logging
-import concurrent.futures
 from functools import partial
 from typing import List
+from omegaconf import open_dict
 
-from rdkit import Chem
 from rdkit.Chem import PandasTools, CanonSmiles
 
 import torch
 import pandas as pd
 
-from nemo.collections.chem.models.megamolbart.megatron_bart_model import MegaMolBARTModel
+from pytorch_lightning.trainer.trainer import Trainer
+
+from nemo_chem.models.megamolbart import MegaMolBARTModel
+from nemo.collections.nlp.modules.common.megatron.megatron_utils import compute_model_parallel_rank
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin
+from nemo.utils.app_state import AppState
+
 
 logger = logging.getLogger(__name__)
 
 
 class MegaMolBART():
 
-    def __init__(self, model_dir) -> None:
+    def __init__(self, cfg) -> None:
         super().__init__()
 
-        torch.set_grad_enabled(False)
         self.device = 'cuda'
         self.min_jitter_radius = 1.0
-        self.model, self.version = self.load_model(model_dir)
-        self.max_model_position_embeddings = self.model.max_seq_len
+        self.model, self.version = self.load_model(cfg)
         self.tokenizer = self.model.tokenizer
 
     def _compute_radius(self, scaled_radius):
@@ -49,7 +51,7 @@ class MegaMolBART():
 
         return distorteds
 
-    def load_model(self, checkpoint_path):
+    def load_model(self, cfg):
         """Load saved model checkpoint
 
         Params:
@@ -58,91 +60,106 @@ class MegaMolBART():
         Returns:
             MegaMolBART trained model
         """
-        model = MegaMolBARTModel.restore_from(checkpoint_path)
-        model = model.cuda()
-        model.eval()
+        torch.set_grad_enabled(False)
+        trainer = Trainer(plugins=NLPDDPPlugin(),
+                          gpus=cfg.model.parallel_size,
+                          precision=32)
+        # app_state = AppState()
+        # if cfg.model.parallel_size > 1:
+        #     app_state.model_parallel_size = cfg.model.parallel_size
+        #     app_state.model_parallel_rank = \
+        #         compute_model_parallel_rank(trainer.local_rank,
+        #                                     app_state.model_parallel_size)
 
-        # TODO: get version from model (self.megamolbart.model)
+        # Load config to set precision. WAR for dtype issue in NeMO. This issue
+        # in NeMo is expected to be fixed in v1.8.x
+        model_config = MegaMolBARTModel.restore_from(cfg.model.model_path,
+                                                     trainer=trainer,
+                                                     return_config=True)
+        with open_dict(model_config):
+            model_config.precision = 32
+
+        # Load model for inference
+        from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
+        model = MegaMolBARTModel.restore_from(restore_path=cfg.model.model_path,
+                                              trainer=trainer,
+                                              override_config_path=model_config,
+                                              save_restore_connector=NLPSaveRestoreConnector())
+
+        model.freeze()
+
+        # TODO: get version from model
         return model, '0.2.0'
 
-    def smiles2embedding(self, smiles, pad_length=None):
+    def _transform(self, smi):
+        return self.model._transform(smi)
+        # token_output = self.tokenizer.tokenize(smi, pad=True)
+        # tokens = token_output["original_tokens"]
+        # pad_masks = token_output["original_pad_masks"]
+
+        # # import pdb; pdb.set_trace()
+        # tokens = torch.tensor(self.tokenizer.convert_tokens_to_ids(tokens)).cuda()
+        # pad_masks = torch.tensor(pad_masks, device=tokens.device)
+
+        # # resp = self.model.enc_dec_model(tokens,
+        # #                                 pad_masks,
+        # #                                 None,
+        # #                                 None,
+        # #                                 output_enc_hidden_only=True)
+        # from operator import itemgetter
+        # resp = itemgetter("enc_output")(
+        #     self(
+        #         encoder_input_ids=tokens,
+        #         decoder_input_ids=None,
+        #         encoder_attn_mask=pad,
+        #         decoder_attn_mask=None,
+        #         tokentype_ids=None,
+        #         lm_labels=None,
+        #         enc_hidden_states=None,
+        #         output_enc_hidden_only=True,
+        #     )
+        # )
+
+        # hidden_states, pad_masks = resp["enc_output"], resp["enc_output_mask"]
+        # return tokens, hidden_states, pad_masks
+
+    def _inverse_transform(self, tokens, hidden_states, pad_masks):
+        return self.model._inverse_transform(tokens, hidden_states, pad_masks)
+        # predicted_tokens_ids, _ =  self.model.decode(tokens,
+        #                                              pad_masks,
+        #                                              None,
+        #                                              encoder_hidden_states=hidden_states)
+        # predicted_tokens_ids = predicted_tokens_ids.cpu().detach().numpy().tolist()
+
+        # # Prune tokens by eos / padding and convert to SMILES
+        # for item, predicted_tokens_ in enumerate(predicted_tokens_ids):
+        #     if self.tokenizer.eos_id in predicted_tokens_:
+        #         idx = predicted_tokens_.index(self.tokenizer.eos_id)
+        #         predicted_tokens_ids[item] = predicted_tokens_[:idx]
+        #     else:
+        #         # NB: this is slightly different from previous version in that pad tokens can be in the middle of sequence
+        #         predicted_tokens_ids[item] = [id for id in predicted_tokens_ if id != self.tokenizer.pad_id]
+
+        # predicted_tokens_text = self.tokenizer.ids_to_tokens(predicted_tokens_ids)
+        # sampled_smiles = self.tokenizer.tokens_to_text(predicted_tokens_text)
+        # return sampled_smiles
+
+    def smiles2embedding(self, smi):
         """Calculate embedding and padding mask for smiles with optional extra padding
 
         Params
-            smiles: string, input SMILES molecule
-            pad_length: optional extra
+            smi: string, input SMILES molecule
 
         Returns
             embedding array and boolean mask
         """
+        tokens, hidden_states, pad_masks = self._transform(smi)
+        return tokens, hidden_states, pad_masks
 
-        assert isinstance(smiles, str)
-        if pad_length:
-            assert pad_length >= len(smiles) + 2
-
-        tokens = self.tokenizer.tokenize([smiles], pad=True)
-
-        # Append to tokens and mask if appropriate
-        if pad_length:
-            for i in range(len(tokens['original_tokens'])):
-                n_pad = pad_length - len(tokens['original_tokens'][i])
-                tokens['original_tokens'][i] += [self.tokenizer.pad_token] * n_pad
-                tokens['masked_pad_masks'][i] += [1] * n_pad
-
-        token_ids = torch.tensor(self.tokenizer.convert_tokens_to_ids(tokens['original_tokens'])).cuda().T
-        pad_mask = torch.tensor(tokens['masked_pad_masks']).bool().cuda().T
-        encode_input = {"encoder_input": token_ids, "encoder_pad_mask": pad_mask}
-
-        embedding = self.model.model.encode(encode_input)
-        torch.cuda.empty_cache()
-        return embedding, pad_mask
-
-    def _inverse_transform(self, memory, mem_pad_mask, batch_size, sanitize, k):
-        with torch.no_grad():
-            decode_fn = partial(self.model.model._decode_fn,
-                                mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
-                                memory=memory)
-
-            mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
-                                                        batch_size=batch_size,
-                                                        device='cuda',
-                                                        k=k)
-            mol_strs = sum(mol_strs, [])  # flatten list
-            g_smiles = None
-            for smiles in mol_strs:
-                g_smiles = smiles
-                if sanitize:
-                    mol = Chem.MolFromSmiles(g_smiles, sanitize=sanitize)
-                    if mol:
-                        g_smiles = Chem.MolToSmiles(mol)
-                        break
-                else:
-                    break
-
-            logger.debug(f'Sanitized SMILES {g_smiles} added...')
-            return g_smiles
-
-    def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
-        mem_pad_mask = mem_pad_mask.clone()
-        smiles_interp_list = []
-
-        batch_size = 1
-        with torch.no_grad():
-            with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                futures = {executor.submit(self._inverse_transform,\
-                    memory, mem_pad_mask, batch_size, sanitize, k):\
-                        memory for memory in embeddings}
-
-                for future in concurrent.futures.as_completed(futures):
-                    smiles = futures[future]
-
-                    try:
-                        g_smiles = future.result()
-                        smiles_interp_list.append(g_smiles)
-                    except Exception as exc:
-                        logger.warning(f'{smiles.smiles} generated an exception: {exc}')
-
-        return smiles_interp_list
+    def embedding2smiles(self, tokens, hidden_states, pad_masks):
+        pad_masks = pad_masks.clone()
+        smi = self._inverse_transform(tokens, hidden_states, pad_masks)
+        return smi
 
     def interpolate_molecules(self, smiles1, smiles2, num_interp, tokenizer, k=1, sanitize=True):
         """Interpolate between two molecules in embedding space.
@@ -158,20 +175,16 @@ class MegaMolBART():
             list of interpolated smiles molecules
         """
         # add 2 for start / stop
-        pad_length = max(len(smiles1), len(smiles2)) + 2
-        embedding1, pad_mask1 = self.smiles2embedding(smiles1,
-                                                      pad_length=pad_length)
-
-        embedding2, pad_mask2 = self.smiles2embedding(smiles2,
-                                                      pad_length=pad_length)
+        tokens1, hidden_states1, pad_masks1 = self.smiles2embedding(smiles1)
+        tokens2, hidden_states2, pad_masks2 = self.smiles2embedding(smiles2)
 
         # skip first and last because they're the selected molecules
         scale = torch.linspace(0.0, 1.0, num_interp + 2)[1:-1]
         scale = scale.unsqueeze(0).unsqueeze(-1).cuda()
 
         # dims: batch, tokens, embedding
-        interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()
-        combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
+        interpolated_emb = torch.lerp(hidden_states1, hidden_states2, scale).cuda()
+        combined_mask = (pad_masks1 & pad_masks2).bool().cuda()
 
         embeddings = []
         dims = []
@@ -179,13 +192,14 @@ class MegaMolBART():
             dims.append(tuple(emb.shape))
             embeddings.append(emb)
 
-        generated_mols = self.inverse_transform(embeddings,
-                                      combined_mask,
-                                      k=k,
-                                      sanitize=sanitize)
+        generated_mols = self.embedding2smiles(tokens1,
+                                               embeddings,
+                                               combined_mask,
+                                               k=k,
+                                               sanitize=sanitize)
         generated_mols = [smiles1] + generated_mols + [smiles2]
-        embeddings = [embedding1] + embeddings + [embedding2]
-        dims = [tuple(embedding1.shape)] + dims + [tuple(embedding2.shape)]
+        embeddings = [hidden_states1] + embeddings + [hidden_states2]
+        dims = [tuple(hidden_states1.shape)] + dims + [tuple(hidden_states2.shape)]
         return generated_mols, embeddings, combined_mask, dims
 
     def find_similars_smiles_list(self,
@@ -198,19 +212,18 @@ class MegaMolBART():
         distance = self._compute_radius(scaled_radius)
         logger.info(f'Sampling {num_requested} around {smiles} with distance {distance}...')
 
-        embedding, pad_mask = self.smiles2embedding(smiles,
-                                                    pad_length=pad_length)
+        token, hidden_state, pad_mask = self.smiles2embedding(smiles)
 
-        neighboring_embeddings = self.add_jitter(embedding, distance, num_requested)
+        neighboring_embeddings = self.add_jitter(hidden_state, distance, num_requested)
 
-        generated_mols = self.inverse_transform(neighboring_embeddings,
-                                                pad_mask.bool().cuda(),
-                                                k=1, sanitize=sanitize)
+        generated_mols = self.embedding2smiles(token,
+                                               neighboring_embeddings,
+                                               pad_mask)
         if force_unique:
             generated_mols = list(set(generated_mols))
 
         generated_mols = [smiles] + generated_mols
-        neighboring_embeddings = [embedding] + neighboring_embeddings
+        neighboring_embeddings = [hidden_state] + neighboring_embeddings
         return generated_mols, neighboring_embeddings, pad_mask
 
     def find_similars_smiles(self,
@@ -235,7 +248,6 @@ class MegaMolBART():
         for neighboring_embedding in neighboring_embeddings:
             dims.append(tuple(neighboring_embedding.shape))
             embeddings.append(neighboring_embedding.flatten().tolist())
-
         generated_df = pd.DataFrame({'SMILES': generated_mols,
                                      'embeddings': embeddings,
                                      'embeddings_dim': dims,
@@ -243,7 +255,7 @@ class MegaMolBART():
         generated_df.iat[0, 3] = False
 
         if force_unique:
-            inv_transform_funct = partial(self.inverse_transform,
+            inv_transform_funct = partial(self.embedding2smiles,
                                           mem_pad_mask=pad_mask)
             generated_df = self.compute_unique_smiles(generated_df,
                                                       inv_transform_funct,
@@ -282,7 +294,7 @@ class MegaMolBART():
                                       'embeddings_dim': dims,
                                       'Generated': [True for i in range(len(interpolated_mol))]})
 
-            inv_transform_funct = partial(self.inverse_transform, mem_pad_mask=combined_mask)
+            inv_transform_funct = partial(self.embedding2smiles, mem_pad_mask=combined_mask)
 
             # Mark the source and desinations as not generated
             interp_df.iat[0, 3] = False

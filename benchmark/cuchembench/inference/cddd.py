@@ -24,7 +24,7 @@ class CdddWrapper(metaclass=Singleton):
 
     def smiles_to_embedding(self,
                             smiles: str,
-                            pad_length: int):
+                            pad_length: int = None):
 
         embedding = self.inferrer.smiles_to_embedding(smiles,
                                                       padding=pad_length)

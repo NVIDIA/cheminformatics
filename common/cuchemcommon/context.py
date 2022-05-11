@@ -23,7 +23,7 @@ class Context(metaclass=Singleton):
         self.config = {}
         config_file = '.env'
         if not os.path.exists('.env'):
-            config_file = '/workspace/.env'
+            config_file = '/workspace/code/cheminformatics/.env'
 
         if os.path.exists(config_file):
             logger.info('Reading properties from %s...', config_file)

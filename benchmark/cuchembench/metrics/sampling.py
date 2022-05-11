@@ -9,7 +9,7 @@ from contextlib import closing
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Validity', 'Unique', 'Novelty', 'Identicality', 'EffectiveNovelty']
+__all__ = ['Validity', 'Unique', 'Novelty', 'NonIdenticality', 'EffectiveNovelty']
 
 
 class BaseSampleMetric():
@@ -172,16 +172,16 @@ class Novelty(BaseSampleMetric):
 
         return novel_molecules, valid_molecules
 
-class Identicality(BaseSampleMetric):
-    name = 'identicality'
+class NonIdenticality(BaseSampleMetric):
+    name = 'non_identicality'
 
     def __init__(self, inferrer, cfg):
         super().__init__(inferrer, cfg)
-        self.name = Identicality.name
+        self.name = NonIdenticality.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.identicality.radius)
+        radius_list = list(cfg.metric.non_identicality.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
@@ -225,9 +225,9 @@ class Identicality(BaseSampleMetric):
                 )''',
                 [self.inferrer.__class__.__name__, radius, self.inferrer.__class__.__name__, radius])
             rec = res.fetchone()
-        # logger.info(f'{rec}, {rec[0]}, {self.total_molecules}')
+        # logger.info(f'{rec}, {rec[0]}, {self.total_molecules}, {(self.total_molecules - rec[0])/self.total_molecules}, {(rec[0])/self.total_molecules}')
         identical = rec[0] if rec[0] is not None else 0
-        return identical, self.total_molecules
+        return self.total_molecules - identical, self.total_molecules
 
 class EffectiveNovelty(BaseSampleMetric):
     name = 'effective_novelty'

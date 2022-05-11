@@ -2,7 +2,7 @@ import os
 import time
 from pydoc import locate
 import logging
-# from cheminformatics.benchmark.cuchembench.metrics.sampling import EffectiveNovelty, Identicality
+
 import hydra
 import pandas as pd
 from datetime import datetime
@@ -21,7 +21,7 @@ from cuchembench.datasets.bioactivity import ExCAPEDataset
 from cuchembench.metrics import (Validity,
                               Unique,
                               Novelty,
-                              Identicality,
+                              NonIdenticality,
                               EffectiveNovelty,
                               NearestNeighborCorrelation,
                               Modelability)
@@ -81,7 +81,7 @@ def create_dataset(cfg):
     data_files = {}
     exp_name = cfg.model.exp_name
     sample_data_req = False
-    for sampling_metric in [Validity, Unique, Novelty, Identicality, EffectiveNovelty]:
+    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty]:
         name = sampling_metric.name
         sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
         radii.update(eval(f'cfg.metric.{name}.radius'))
@@ -96,7 +96,7 @@ def create_dataset(cfg):
             {'col_name': 'canonical_smiles',
              'dataset_type': 'SAMPLE',
              'input_size': sample_input,
-             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_ZINC15_test_split.csv'}
+             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_ZINC15_test_split.csv'}
 
     if cfg.metric.nearest_neighbor_correlation.enabled:
         data_files['benchmark_ChEMBL_approved_drugs_physchem'] =\
@@ -143,6 +143,7 @@ def main(cfg):
 
     max_seq_len = int(cfg.sampling.max_seq_len)
     exp_name = cfg.model.exp_name
+    # import pdb;pdb.set_trace()
     if cfg.model.name == 'MegaMolBART':
         from cuchembench.inference.megamolbart import MegaMolBARTWrapper
         inferrer = MegaMolBARTWrapper(checkpoint_file = cfg.model.checkpoint_file)
@@ -169,12 +170,13 @@ def main(cfg):
         log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
+    log.info(f'ERROR: {type(inferrer)}')
     wait_for_megamolbart_service(inferrer)
     data_files, radii = create_dataset(cfg)
     # Metrics
     metric_list = []
 
-    for sampling_metric in [Validity, Unique, Novelty, Identicality, EffectiveNovelty]:
+    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty]:
         name = sampling_metric.name
         metric_cfg = eval(f'cfg.metric.{name}')
         if metric_cfg.enabled:
@@ -296,9 +298,11 @@ def main(cfg):
             log.debug(f'Metric name: {metric.name}::{iter_val}')
 
             kwargs = {iter_label: iter_val}
-            kwargs['average_tokens'] =  cfg.model.perceiver_average or encoder_type == 'seq2seq' # encoder_type == 'seq2seq'
+            if cfg.model.name == 'CDDD':
+                kwargs['average_tokens'] =  True
+            else:    
+                kwargs['average_tokens'] =  cfg.model.perceiver_average or encoder_type == 'seq2seq' # encoder_type == 'seq2seq'
             if metric.name.startswith('modelability'):
-                # kwargs['average_tokens'] = encoder_type == 'seq2seq'
                 estimator, param_dict = metric.model_dict[iter_val]
                 kwargs.update({'estimator': estimator, 'param_dict': param_dict})
                 if metric.name.endswith('bioactivity'):
@@ -307,7 +311,7 @@ def main(cfg):
                 else:
                     kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
 
-            if metric.name in ['validity', 'unique', 'novelty', 'identicality', 'effective_novelty']:
+            if metric.name in ['validity', 'unique', 'novelty', 'non_identicality', 'effective_novelty']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
                 metric_cfg = eval('cfg.metric.' + metric.name)
                 kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)

@@ -13,9 +13,7 @@ import pandas as pd
 
 import sys
 import numpy as np
-sys.path.insert(0, '/workspace/code/NeMo_MegaMolBART')
-# sys.path.insert(0, '/workspace/code/cheminformatics/cuchemcommon/grpc')
-# sys.path.insert(0, '/workspace/code/cheminformatics/common')
+# sys.path.insert(0, '/workspace/code/NeMo_MegaMolBART')
 from collections import defaultdict
 import random
 import logging

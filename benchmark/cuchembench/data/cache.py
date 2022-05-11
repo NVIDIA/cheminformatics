@@ -45,7 +45,7 @@ class MoleculeGenerator():
         if result[0] == 0:
             with closing(self.conn.cursor()) as cursor:
                 # @(dreidenbach) changed to my workspace path
-                sql_file = open("/workspace/code/cheminformatics/benchmark/scripts/generated_smiles_db.sql")
+                sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
 
@@ -54,7 +54,6 @@ class MoleculeGenerator():
                                  smiles_df):
 
         log.info(f'Inserting samples for {smiles_id}...')
-
         generated_smiles = smiles_df['SMILES'].to_list()
         embeddings = smiles_df['embeddings'].to_list()
         embeddings_dim = smiles_df['embeddings_dim'].to_list()
@@ -171,6 +170,7 @@ class MoleculeGenerator():
                         future.result()
                     except Exception as exc:
                         log.warning(f'generated an exception: {exc}')
+                        log.exception(exc)
         while True:
             #TODO: fix SAMPLE only case --> make sepearete loop for EMBEDDING
             df = pd.read_sql_query('''
@@ -193,21 +193,36 @@ class MoleculeGenerator():
 
     def _sample(self, ids, smiles, num_samples, scaled_radius, force_unique, sanitize, dataset_type = "SAMPLE"):
         if dataset_type == 'SAMPLE':
+            # import pdb; pdb.set_trace()
+            if len(smiles) == 1: # for CDDD and legacy
+                smiles = smiles[0]
             results = self.inferrer.find_similars_smiles(smiles,
                                                         num_requested=num_samples,
                                                         scaled_radius=scaled_radius,
                                                         force_unique=(force_unique == 1),
                                                         sanitize=(sanitize == 1))
+            if isinstance(smiles, str):
+                results = [results]
         else:
             #TODO: Do we need this padding? We removed the functionality? --> Not needed
-            _, _, embedding_list = self.inferrer.smiles_to_embedding(smiles)
-            results = []
-            for idx in range(len(smiles)):
+            if len(smiles) == 1: # for CDDD and legacy
+                smiles = smiles[0]
+                emb = self.inferrer.smiles_to_embedding(smiles)
+                # import pdb; pdb.set_trace()
                 result = pd.DataFrame()
-                result['SMILES'] = [smiles[idx]]
-                result['embeddings'] = [embedding_list[idx].embedding]
-                result['embeddings_dim'] = [embedding_list[idx].dim]
-                results.append(result)
-            
+                result['SMILES'] = [smiles]
+                result['embeddings_dim'] = [emb.dim]
+                result['embeddings'] = [emb.embedding]
+                results = [result]
+            else:
+                _, _, embedding_list = self.inferrer.smiles_to_embedding(smiles)
+                results = []
+                for idx in range(len(smiles)):
+                    result = pd.DataFrame()
+                    result['SMILES'] = [smiles[idx]]
+                    result['embeddings'] = [embedding_list[idx].embedding]
+                    result['embeddings_dim'] = [embedding_list[idx].dim]
+                    results.append(result)
+        
         for id, result in zip(ids, results):
             self._insert_generated_smiles(id, result)

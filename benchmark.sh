@@ -4,7 +4,7 @@ SCRIPT_LOC=$(dirname "$0")
 
 ACTION="up -d --scale megamolbart=4"
 MODEL_DIR="/models"
-CONFIG_DIR="/workspace/code/cheminformatics/benchmark/cuchembench/config"
+CONFIG_DIR="/workspace/benchmark/cuchembench/config"
 
 # pip install seaborn
 
@@ -41,9 +41,9 @@ source ${SOURCE_ROOT}/.env
 
 # export PYTHONPATH_MEGAMOLBART="${WORKSPACE}/common:${WORKSPACE}/common/generated:${WORKSPACE}/megamolbart"
 # export PYTHONPATH_MEGAMOLBART="${PYTHONPATH_MEGAMOLBART}:${WORKSPACE}/benchmark:${WORKSPACE}/cuchem:"
-export PYTHONPATH="${PYTHONPATH}:/workspace/code/cheminformatics/benchmark"
+export PYTHONPATH="${PYTHONPATH}:/workspace/benchmark:/workspace/megamolbart"
 # export PYTHONPATH="${PYTHONPATH}:/workspace/code/cheminformatics/cuchem"
-export PYTHONPATH="${PYTHONPATH}:/workspace/code/cheminformatics/megamolbart"
+# export PYTHONPATH="${PYTHONPATH}:/workspace/megamolbart"
 # export PYTHONPATH="/workspace/code/cheminformatics/common/generate:${PYTHONPATH}"
 echo ${PYTHONPATH}
 python3 -m cuchembench --config-dir ${CONFIG_DIR}

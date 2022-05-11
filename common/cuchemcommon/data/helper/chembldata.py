@@ -41,15 +41,16 @@ WHERE  md.molregno in (%s)
 
 
 def download_chembl_db():
-    setup_script = '/opt/nvidia/cheminfomatics/launch.sh'
-    if os.path.exists(setup_script):
-        logger.info('Triggering db setup...')
-        result = run(['bash', '-c',
-                        f'cd /opt/nvidia/cheminfomatics && {setup_script} setup'])
-        logger.info(f'Model download result: {result.stdout}')
-        logger.info(f'Model download result: {result.stderr}')
-        if result.returncode != 0:
-            raise Exception('Error downloading model')
+    pass
+    # setup_script = '/opt/nvidia/cheminfomatics/launch.sh'
+    # if os.path.exists(setup_script):
+    #     logger.info('Triggering db setup...')
+    #     result = run(['bash', '-c',
+    #                     f'cd /opt/nvidia/cheminfomatics && {setup_script} setup'])
+    #     logger.info(f'Model download result: {result.stdout}')
+    #     logger.info(f'Model download result: {result.stderr}')
+    #     if result.returncode != 0:
+    #         raise Exception('Error downloading model')
 
 
 # DEPRECATED. Please add code to DAO classes.

@@ -64,8 +64,8 @@ EOF
 }
 
 source setup/env.sh
-CHEMINFO_DIR='/workspace/code/cheminformatics'
-if [ -e /workspace/code/cheminformatics/cuchem/startdash.py ]; then
+CHEMINFO_DIR='/workspace'
+if [ -e /workspace/cuchem/startdash.py ]; then
     # When inside container in dev/test mode
     CHEMINFO_DIR='/workspace'
 elif [ -e /opt/nvidia/cheminfomatics/cuchem/startdash.py ]; then
@@ -201,12 +201,12 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace:/megamolbart:/workspace/cuchemcommon/grpc:/workspace/common"
         CONT=${MEGAMOLBART_CONT}
     elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/cddd"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/cddd:/workspace/benchmark"
         CONT=${CDDD_CONT}
     else
         echo "${RED}${BOLD}Invalid container option${RESET}"

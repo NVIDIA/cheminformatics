@@ -124,6 +124,8 @@ DOCKER_CMD="docker run \
     -p ${DASK_PORT}:${DASK_PORT} \
     -p ${PLOTLY_PORT}:5000 \
     -v ${PROJECT_PATH}:/workspace \
+    -v ${MEGAMOLBART_PATH}:/megamolbart \
+    -v ${CONTENT_PATH}:/home \
     -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
     -v ${MODEL_PATH}:/models \
     --shm-size=1g \

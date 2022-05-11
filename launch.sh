@@ -201,7 +201,7 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace:/megamolbart:/workspace/cuchemcommon/grpc:/workspace/common"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace:/workspace/megamolbart:/workspace/benchmark:/workspace/cuchemcommon/grpc:/workspace/common:/nemo_megamolbart"
         CONT=${MEGAMOLBART_CONT}
     elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"

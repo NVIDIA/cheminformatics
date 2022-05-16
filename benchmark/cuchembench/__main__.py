@@ -103,24 +103,24 @@ def create_dataset(cfg):
             {'col_name': 'canonical_smiles',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.nearest_neighbor_correlation.input_size,
-             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'}
+             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'}
 
     if cfg.metric.modelability.physchem.enabled:
         data_files['benchmark_MoleculeNet_Lipophilicity'] =\
             {'col_name': 'SMILES',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'}
+             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'}
         data_files['benchmark_MoleculeNet_ESOL.csv'] =\
             {'col_name': 'SMILES',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_ESOL.csv'}
+             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_ESOL.csv'}
         data_files['benchmark_MoleculeNet_FreeSolv'] =\
             {'col_name': 'SMILES',
              'dataset_type': 'EMBEDDING',
              'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/code/cheminformatics/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_FreeSolv.csv'}
+             'dataset': '/workspace/benchmark/cuchembench/csv_data/benchmark_MoleculeNet_FreeSolv.csv'}
 
     return data_files, radii
 

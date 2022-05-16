@@ -16,7 +16,7 @@ model:
   #   - model.params.url (50052 for lb grpc)
   # MegaMolBART Seq2Seq Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
   name: MegaMolBARTLatent # MegaMolBART #CDDD
-  exp_name:  mim_k4 #seq2seq # prcvr_k4 #seq2seq # mim_same_aug_k1 #
+  exp_name: mim_k4 # prcvr_k4 #seq2seq # mim_same_aug_k1 #
   checkpoint_file: MIM_SSA_steps_4_latent_dim_-1_same_aug_sample_logv.nemo # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo
   training_data: /data/db/zinc_train_test.sqlite3 #/rilango_data/data/db/cddd_train.sqlite3 /data/db/cddd_train.sqlite3 # 
   batch_size: 500 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
@@ -31,7 +31,7 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_mim_k4_sampling.sqlite3 #seq2seq_physchem #_bioactivity.sqlite3 #prcvr_k4_physchem.sqlite3 #prcvr_k4_0.7_bs_500.sqlite3 #seq2seq_20k_500_bs.sqlite3 #mim_logv_k1_20k_500_bs.sqlite3 _mim_logv_k1_same_aug.sqlite3
+  db: /data/db/embedding_cache_megamolbart_mim_k4_full_embedding.sqlite3 # seq2seq_embedding.sqlite3 #
   concurrent_requests: 10
 
 output:
@@ -40,31 +40,31 @@ output:
 
 metric:
   validity:
-    enabled: True
+    enabled: False
     input_size: 20000
     radius:
       - 0.75
 
   unique:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   effective_novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   non_identicality:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
@@ -79,7 +79,7 @@ metric:
 
   modelability:
     physchem:
-      enabled: False
+      enabled: True
       input_size: -1
       n_splits: 20
       normalize_inputs: True

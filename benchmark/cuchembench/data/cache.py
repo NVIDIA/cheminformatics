@@ -8,7 +8,7 @@ import concurrent.futures
 import threading
 
 from contextlib import closing
-from cuchembench.utils.smiles import validate_smiles
+from cuchembench.utils.smiles import validate_smiles, get_murcko_scaffold
 
 format = '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
 logging.basicConfig(level=logging.INFO,
@@ -27,11 +27,11 @@ lock = threading.Lock()
 
 
 class MoleculeGenerator():
-    def __init__(self, inferrer, db_file=None, batch_size=100) -> None:
+    def __init__(self, inferrer, db_file=None, batch_size=100, nbits=512) -> None:
         self.db = db_file
         self.inferrer = inferrer
         self.batch_size = batch_size
-
+        self.nbits = nbits
         if self.db is None:
             self.db = tempfile.NamedTemporaryFile(prefix='gsmiles_',
                                                   suffix='.sqlite3',
@@ -48,7 +48,8 @@ class MoleculeGenerator():
                 sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
-
+    
+    #TODO: update for scaffolds
     def _insert_generated_smiles(self,
                                  smiles_id,
                                  smiles_df):
@@ -64,8 +65,9 @@ class MoleculeGenerator():
                 generated = False
                 # Replace this loop with pandas to SQLite insert
                 for i in range(len(generated_smiles)):
-                    gsmiles, is_valid, fp = validate_smiles(generated_smiles[i],
-                                                            return_fingerprint=True)
+                    gsmiles, is_valid, fp = validate_smiles(generated_smiles[i], return_fingerprint=True, nbits = self.nbits)
+                    gscaffold = get_murcko_scaffold(gsmiles)
+                    # log.info(f'Scaffold {gscaffold}...')
                     embedding = list(embeddings[i])
                     embedding_dim = list(embeddings_dim[i])
 
@@ -76,12 +78,12 @@ class MoleculeGenerator():
                         '''
                         INSERT INTO smiles_samples(input_id, smiles, embedding,
                                                 embedding_dim, is_valid,
-                                                finger_print, is_generated)
-                        VALUES(?, ?, ?, ?, ?, ?, ?)
+                                                finger_print, is_generated, scaffold)
+                        VALUES(?, ?, ?, ?, ?, ?, ?, ?)
                         ''',
                         [smiles_id, gsmiles, sqlite3.Binary(embedding),
-                        sqlite3.Binary(embedding_dim), is_valid, fp, generated])
-                    generated = True
+                        sqlite3.Binary(embedding_dim), is_valid, fp, generated, gscaffold])
+                    generated = True # First molecule is always the input
 
                 cursor.execute(
                     'UPDATE smiles set processed = 1 WHERE id = ?',
@@ -204,7 +206,7 @@ class MoleculeGenerator():
             if isinstance(smiles, str):
                 results = [results]
         else:
-            #TODO: Do we need this padding? We removed the functionality? --> Not needed
+            #TODO: Scaffolding for insert
             if len(smiles) == 1: # for CDDD and legacy
                 smiles = smiles[0]
                 emb = self.inferrer.smiles_to_embedding(smiles)

@@ -129,6 +129,46 @@ class Unique(BaseSampleMetric):
         self.total_molecules = self.total_molecules//num_samples
         return rec[0], self.total_molecules
 
+class ScaffoldUnique(BaseSampleMetric):
+    name = 'scaffold_unique'
+
+    def __init__(self, inferrer, cfg):
+        super().__init__(inferrer, cfg)
+        self.name = ScaffoldUnique.name
+
+    def variations(self, cfg, **kwargs):
+        radius_list = list(cfg.metric.scaffold_unique.radius)
+        radius_list = [float(x) for x in radius_list]
+        return {'radius': radius_list}
+
+    def compute_metrics(self, num_samples, radius):
+        validity = Validity(self.inferrer, self.cfg)
+        with closing(sqlite3.connect(self.cfg.sampling.db,
+                                     uri=True,
+                                     check_same_thread=False)) as conn:
+            unique_result = conn.execute(f'''
+                SELECT sum(ratio)
+                FROM (
+                    SELECT CAST(count(DISTINCT ss.scaffold) as float) / CAST(count(ss.scaffold) as float) ratio
+                FROM smiles s, smiles_samples ss
+                WHERE s.id = ss.input_id
+                    AND s.model_name = ?
+                    AND s.scaled_radius = ?
+                    AND s.force_unique = ?
+                    AND s.sanitize = ?
+                    AND ss.is_valid = 1
+                    AND ss.is_generated = 1
+                    AND s.processed = 1
+                    AND s.dataset_type = ?
+                GROUP BY s.id
+                )''',
+                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+
+            rec = unique_result.fetchone()
+        _, self.total_molecules = validity.compute_metrics(num_samples, radius)
+        self.total_molecules = self.total_molecules//num_samples
+        return rec[0], self.total_molecules
+
 
 class Novelty(BaseSampleMetric):
     name = 'novelty'
@@ -199,6 +239,67 @@ class NonIdenticality(BaseSampleMetric):
                     SELECT CAST(identical_smiles.cnt as float) / CAST(count(ss.smiles) as float) ratio
                 FROM smiles s, smiles_samples ss,
                 (SELECT s2.id, count(*) cnt
+                FROM smiles s2, smiles_samples ss2
+                WHERE s2.id = ss2.input_id
+                    AND s2.smiles = ss2.smiles
+                    AND s2.model_name = ?
+                    AND s2.scaled_radius = ?
+                    AND s2.force_unique = 0
+                    AND s2.sanitize = 1
+                    AND ss2.is_valid = 1
+                    AND ss2.is_generated = 1
+                    AND s2.processed = 1
+                    AND s2.dataset_type = 'SAMPLE'
+                GROUP BY s2.id) as identical_smiles
+                WHERE s.id = ss.input_id
+                    AND identical_smiles.id = s.id
+                    AND s.model_name = ?
+                    AND s.scaled_radius = ?
+                    AND s.force_unique = 0
+                    AND s.sanitize = 1
+                    AND ss.is_valid = 1
+                    AND ss.is_generated = 1
+                    AND s.processed = 1
+                    AND s.dataset_type = 'SAMPLE'
+                GROUP BY s.id 
+                )''',
+                [self.inferrer.__class__.__name__, radius, self.inferrer.__class__.__name__, radius])
+            rec = res.fetchone()
+        # logger.info(f'{rec}, {rec[0]}, {self.total_molecules}, {(self.total_molecules - rec[0])/self.total_molecules}, {(rec[0])/self.total_molecules}')
+        identical = rec[0] if rec[0] is not None else 0
+        return self.total_molecules - identical, self.total_molecules
+
+#TODO: duplicate this for entire molecules
+class ScaffoldNonIdenticalSimilarity(BaseSampleMetric):
+    name = 'scaffold_non_identical_similarity'
+
+    def __init__(self, inferrer, cfg):
+        super().__init__(inferrer, cfg)
+        self.name = ScaffoldNonIdenticalSimilarity.name
+        self.training_data = cfg.model.training_data
+        self.nbits = cfg.metric.scaffold_non_identical_similarity.nbits
+
+    def variations(self, cfg, **kwargs):
+        radius_list = list(cfg.metric.scaffold_non_identical_similarity.radius)
+        radius_list = [float(x) for x in radius_list]
+        return {'radius': radius_list}
+
+    def compute_metrics(self, num_samples, radius):
+        validity = Validity(self.inferrer, self.cfg)
+        _, self.total_molecules = validity.compute_metrics(num_samples, radius)
+        self.total_molecules = self.total_molecules//num_samples
+
+        # What is the average tanimoto similarity between the scaffolds of the input molecule and the non identical generated molecules
+        #TODO: TEST this
+        with closing(sqlite3.connect(self.cfg.sampling.db,
+                                     uri=True,
+                                     check_same_thread=False)) as conn:
+            res = conn.execute('''
+                SELECT *
+                FROM (
+                    identical_smiles.scaffolds, identical_smiles.smiles
+                FROM smiles s, smiles_samples ss,
+                (SELECT s2.id, s2.smiles, ss2.scaffolds
                 FROM smiles s2, smiles_samples ss2
                 WHERE s2.id = ss2.input_id
                     AND s2.smiles = ss2.smiles

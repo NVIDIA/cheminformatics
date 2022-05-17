@@ -152,7 +152,7 @@ def main(cfg):
             nbits = inferrer.megamolbart.model.model.max_seq_len * inferrer.megamolbart.model.model.steps_model #512 * k
         else:
             nbits = 512
-        log.info(f'Creating model {encoder_type} with {nbits} bits')
+        log.info(f'Creating model {cfg.model.name} {encoder_type} with {nbits} bits')
     elif cfg.model.name == 'MegaMolBARTLatent':
         from cuchembench.inference.megamolbart import MegaMolBARTLatentWrapper
         inferrer = MegaMolBARTLatentWrapper(checkpoint_file = cfg.model.checkpoint_file, noise_mode = cfg.model.noise_mode)
@@ -161,7 +161,7 @@ def main(cfg):
             nbits = inferrer.megamolbart.model.model.max_seq_len * inferrer.megamolbart.model.model.steps_model #512 * k
         else:
             nbits = 512
-        log.info(f'Creating model {encoder_type} with {nbits} bits')
+        log.info(f'Creating model {cfg.model.name} {encoder_type} with {nbits} bits')
     elif cfg.model.name == 'CDDD':
         from cuchembench.inference.cddd import CdddWrapper
         inferrer = CdddWrapper()
@@ -170,7 +170,7 @@ def main(cfg):
         log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
-    log.info(f'ERROR: {type(inferrer)}')
+    # log.info(f'ERROR: {type(inferrer)}')
     wait_for_megamolbart_service(inferrer)
     data_files, radii = create_dataset(cfg)
     # Metrics
@@ -276,7 +276,7 @@ def main(cfg):
             if metric_cfg.gene_cnt > 0 and genes_cnt > metric_cfg.gene_cnt:
                 break
 
-    generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db, batch_size=cfg.model.batch_size)
+    generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db, batch_size=cfg.model.batch_size, nbits = nbits)
     for radius in radii:
         log.info(f'Generating samples for radius {radius}...')
         generator.generate_and_store(data_files,

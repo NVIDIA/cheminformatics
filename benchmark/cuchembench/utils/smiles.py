@@ -62,6 +62,13 @@ def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_in
 
     return fp
 
+def get_murcko_scaffold(smiles: str):
+    if smiles is None:
+        return ''
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return ''
+    return Chem.Scaffolds.MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smiles)
 
 def validate_smiles(smiles: str,
                     canonicalize=False,

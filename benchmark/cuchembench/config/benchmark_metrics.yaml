@@ -31,7 +31,7 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_mim_k1_sampling_new.sqlite3 # seq2seq_embedding.sqlite3 #
+  db: /data/db/embedding_cache_megamolbart_mim_k1_embedding_new.sqlite3 # seq2seq_embedding.sqlite3 #
   concurrent_requests: 10
 
 output:
@@ -40,34 +40,47 @@ output:
 
 metric:
   validity:
-    enabled: True
+    enabled: False
     input_size: 20000
     radius:
       - 0.7
 
   unique:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   effective_novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   non_identicality:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
+
+  scaffold_unique:
+    enabled: False
+    input_size: ${metric.validity.input_size}
+    remove_invalid: False
+    radius: ${metric.validity.radius}
+  
+  scaffold_non_identical_similarity:
+    enabled: False
+    input_size: ${metric.validity.input_size}
+    remove_invalid: False
+    radius: ${metric.validity.radius}
+    nbits: 2048
 
   nearest_neighbor_correlation:
     enabled: False
@@ -79,7 +92,7 @@ metric:
 
   modelability:
     physchem:
-      enabled: False
+      enabled: True
       input_size: -1
       n_splits: 20
       normalize_inputs: True

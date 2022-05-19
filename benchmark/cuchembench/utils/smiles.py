@@ -5,7 +5,8 @@ from numba.types import bool_, string, int64
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import AllChem
+from rdkit.Chem import AllChem, Scaffolds
+from rdkit import DataStructs
 
 
 logger = logging.getLogger(__name__)
@@ -64,11 +65,28 @@ def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_in
 
 def get_murcko_scaffold(smiles: str):
     if smiles is None:
-        return ''
+        return 'NONE'
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
-        return ''
-    return Chem.Scaffolds.MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smiles)
+        return 'NONE'
+    return Scaffolds.MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smiles)
+
+def calc_fingerprint(smiles, radius = 2, nbits = 2048):
+    mol = Chem.MolFromSmiles(smiles)
+    fp = None
+    if mol:
+        fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=nbits)
+    return fp
+
+def calc_similarity(smiles_pairs, nbits = 2048):
+    sims = []
+    for start, end in smiles_pairs:
+        fp_start = calc_fingerprint(start, nbits=nbits)
+        fp_end = calc_fingerprint(end, nbits=nbits)
+        if fp_start == None or fp_end == None:
+            continue
+        sims.append(DataStructs.TanimotoSimilarity(fp_start, fp_end))
+    return np.mean(sims) if len(sims) > 0 else 0
 
 def validate_smiles(smiles: str,
                     canonicalize=False,

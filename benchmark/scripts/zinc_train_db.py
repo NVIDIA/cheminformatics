@@ -5,6 +5,7 @@ import logging
 import sqlite3
 from contextlib import closing
 
+from cuchembench.utils.smiles import get_murcko_scaffold
 from dask import dataframe as dd
 from dask.distributed import LocalCluster, Client
 from rdkit import Chem
@@ -24,7 +25,7 @@ def canonicalize_smiles(smiles):
 
 def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
     logger.info(f'Loading data from {path}...')
-    db = f'sqlite:////data/db/{db_name}.sqlite3'
+    db = f'sqlite:////data/db/{db_name}.sqlite3' 
     with closing (LocalCluster(n_workers=n_workers,
                                threads_per_worker=threads_per_worker)) as cluster, cluster,\
         closing(Client(cluster, asynchronous=True)) as client:
@@ -36,6 +37,9 @@ def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
                                                             meta=('smiles', 'object'))
             zinc_data = zinc_data.drop('smiles', axis=1)
             zinc_data['smiles'] = canonical_zinc_data
+
+        scaffolds = zinc_data['smiles'].apply(get_murcko_scaffold, meta=('smiles', 'object'))
+        zinc_data['scaffold'] = scaffolds  
 
         zinc_data.to_sql('train_data', db)
 
@@ -49,18 +53,19 @@ def parse_args():
     parser.add_argument('-p', '--data_path',
                         dest='data_path',
                         type=str,
-                        default='/data/cddd_data/*.csv',
+                        default='/data/zinc_csv/train/*.csv',
                         help='Wildcard path to the CSV files containing training data')
     parser.add_argument('-d', '--db_name',
                         dest='db_name',
                         type=str,
-                        required=True,
-                        choices=['cddd_train', 'zinc_train'],
+                        required=False,
+                        default='zinc_train_1',
+                        choices=['cddd_train', 'zinc_train', 'zinc_train_1'],
                         help='Database name')
     parser.add_argument('-w', '--workers',
                         dest='workers',
                         type=int,
-                        default=4
+                        default=24
                         )
     parser.add_argument('-t', '--threads_per_worker',
                         dest='threads_per_worker',

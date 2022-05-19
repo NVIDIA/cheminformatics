@@ -263,7 +263,7 @@ class Modelability(BaseEmbeddingMetric):
             logger.info(f"Grid search param {param}")
 
             # Generate CV folds
-            kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
+            kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=1) #0
             kfold_mse = []
 
             for train_idx, test_idx in kfold_gen.split(xdata, ydata):

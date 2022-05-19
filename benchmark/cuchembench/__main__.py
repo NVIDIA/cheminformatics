@@ -23,6 +23,8 @@ from cuchembench.metrics import (Validity,
                               Novelty,
                               NonIdenticality,
                               EffectiveNovelty,
+                              ScaffoldUnique,
+                              ScaffoldNonIdenticalSimilarity,
                               NearestNeighborCorrelation,
                               Modelability)
 
@@ -81,7 +83,7 @@ def create_dataset(cfg):
     data_files = {}
     exp_name = cfg.model.exp_name
     sample_data_req = False
-    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty]:
+    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty, ScaffoldUnique, ScaffoldNonIdenticalSimilarity]:
         name = sampling_metric.name
         sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
         radii.update(eval(f'cfg.metric.{name}.radius'))
@@ -176,7 +178,7 @@ def main(cfg):
     # Metrics
     metric_list = []
 
-    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty]:
+    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty, ScaffoldUnique, ScaffoldNonIdenticalSimilarity]:
         name = sampling_metric.name
         metric_cfg = eval(f'cfg.metric.{name}')
         if metric_cfg.enabled:
@@ -311,7 +313,7 @@ def main(cfg):
                 else:
                     kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
 
-            if metric.name in ['validity', 'unique', 'novelty', 'non_identicality', 'effective_novelty']:
+            if metric.name in ['validity', 'unique', 'novelty', 'non_identicality', 'effective_novelty', 'scaffold_unique', 'scaffold_non_identical_similarity']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
                 metric_cfg = eval('cfg.metric.' + metric.name)
                 kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)

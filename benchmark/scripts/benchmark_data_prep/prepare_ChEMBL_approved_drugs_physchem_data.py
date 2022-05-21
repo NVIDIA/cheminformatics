@@ -19,8 +19,8 @@ import logging
 import numpy as np
 import pandas as pd
 import pathlib
-from cuchembench.utils.chembldata import ChEmblData
-from cuchembench.utils.smiles import calc_morgan_fingerprints
+from chembench.utils.chembldata import ChEmblData
+from chembench.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 

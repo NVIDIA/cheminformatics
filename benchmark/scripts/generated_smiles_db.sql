@@ -1,17 +1,16 @@
 CREATE TABLE IF NOT EXISTS smiles (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
-   	model_name TEXT NULL,
    	smiles TEXT NULL,
+   	model_name TEXT NULL,
 	num_samples INTEGER DEFAULT 10,
 	scaled_radius REAL,
-    force_unique INTEGER,
-    sanitize INTEGER,
-	processed INTEGER DEFAULT 0,
 	dataset_type TEXT NOT NULL,
-	UNIQUE(model_name, smiles, num_samples, scaled_radius, force_unique, sanitize)
+    processed INTEGER DEFAULT 0,
+	UNIQUE(smiles, model_name, scaled_radius)
 );
 
-CREATE INDEX IF NOT EXISTS smiles_index ON smiles (smiles, num_samples, scaled_radius, force_unique, sanitize);
+-- Duplicate table for staging smiles
+-- CREATE TABLE smiles_tmp LIKE smiles;
 
 CREATE TABLE IF NOT EXISTS smiles_samples (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,

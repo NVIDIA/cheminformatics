@@ -1,8 +1,0 @@
-flask-restplus==0.13.0
-grpcio==1.38.0
-scikit-learn
-pytest
-pandas
-rdkit-pypi
-tensorflow-gpu==1.15.5
-git+https://github.com/jrwnter/cddd.git@1.0

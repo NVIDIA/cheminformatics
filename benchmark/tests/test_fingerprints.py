@@ -1,7 +1,7 @@
 import logging
 import pandas as pd
 
-from cuchembench.utils.smiles import calc_morgan_fingerprints
+from chembench.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
 

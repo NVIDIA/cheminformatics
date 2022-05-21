@@ -168,11 +168,10 @@ class DatasetCacheGenerator():
                             FROM smiles
                             WHERE smiles_tmp.smiles = smiles.smiles
                                 AND smiles_tmp.model_name = smiles.model_name);
-
                     DROP TABLE smiles_tmp;
                     ''')
             else:
-                self.conn.executescript('''
+                self.conn.executescript(f'''
                     INSERT INTO smiles
                     (smiles, model_name, num_samples, scaled_radius, dataset_type)
                         SELECT *
@@ -183,6 +182,14 @@ class DatasetCacheGenerator():
                             WHERE smiles_tmp.smiles = smiles.smiles
                                 AND smiles_tmp.model_name = smiles.model_name
                                 AND smiles_tmp.scaled_radius = smiles.scaled_radius);
+
+                    UPDATE smiles
+                    SET num_samples = {num_requested},
+                        dataset_type = 'SAMPLE',
+                        scaled_radius = {radii}
+                    WHERE model_name = '{self.inferrer.__class__.__name__}'
+                        AND dataset_type = 'EMBEDDING'
+                        AND smiles in (select smiles from smiles_tmp);
 
                     DROP TABLE smiles_tmp;
                     ''')

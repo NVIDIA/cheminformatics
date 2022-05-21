@@ -5,7 +5,7 @@ import logging
 import sqlite3
 from contextlib import closing
 
-from cuchembench.utils.smiles import get_murcko_scaffold
+from chembench.utils.smiles import get_murcko_scaffold
 from dask import dataframe as dd
 from dask.distributed import LocalCluster, Client
 from rdkit import Chem
@@ -25,7 +25,7 @@ def canonicalize_smiles(smiles):
 
 def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
     logger.info(f'Loading data from {path}...')
-    db = f'sqlite:////data/db/{db_name}.sqlite3' 
+    db = f'sqlite:////data/db/{db_name}.sqlite3'
     with closing (LocalCluster(n_workers=n_workers,
                                threads_per_worker=threads_per_worker)) as cluster, cluster,\
         closing(Client(cluster, asynchronous=True)) as client:
@@ -39,7 +39,7 @@ def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
             zinc_data['smiles'] = canonical_zinc_data
 
         scaffolds = zinc_data['smiles'].apply(get_murcko_scaffold, meta=('smiles', 'object'))
-        zinc_data['scaffold'] = scaffolds  
+        zinc_data['scaffold'] = scaffolds
 
         zinc_data.to_sql('train_data', db)
 

@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS smiles_samples (
 	scaffold TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS smiles_samples_index ON smiles_samples (input_id, smiles, is_valid, is_generated);
+CREATE INDEX IF NOT EXISTS smiles_samples_index ON smiles_samples (input_id, smiles, scaffold, is_valid, is_generated);
 
 CREATE TABLE IF NOT EXISTS meta_data (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,

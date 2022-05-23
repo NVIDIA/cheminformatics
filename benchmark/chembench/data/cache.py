@@ -152,7 +152,8 @@ class DatasetCacheGenerator():
             dataset_df['smiles'] = sr_smiles
             dataset_df['model_name'] = np.full(shape=sr_smiles.shape[0], fill_value=self.inferrer.__class__.__name__)
             dataset_df['num_samples'] = np.full(shape=sr_smiles.shape[0], fill_value=num_requested)
-            dataset_df['scaled_radius'] = np.full(shape=sr_smiles.shape[0], fill_value=radii)
+            dataset_df['scaled_radius'] = np.full(shape=sr_smiles.shape[0],
+                                                  fill_value = 0 if dataset_type == 'EMBEDDING' else radii)
             dataset_df['dataset_type'] = np.full(shape=sr_smiles.shape[0], fill_value=dataset_type)
 
             dataset_df.to_sql('smiles_tmp', self.conn, index=False, if_exists='append')
@@ -168,6 +169,7 @@ class DatasetCacheGenerator():
                             FROM smiles
                             WHERE smiles_tmp.smiles = smiles.smiles
                                 AND smiles_tmp.model_name = smiles.model_name);
+
                     DROP TABLE smiles_tmp;
                     ''')
             else:

@@ -80,7 +80,7 @@ function version {
 function config() {
     local write_env=$1
 
-    CONT_NAME=${CUCHEM_CONT:=nvcr.io/nvidia/clara/benchmark:0.1.2}
+    IMG_NAME=${IMG_NAME:=nvcr.io/nvidia/clara/benchmark:0.1.2}
     PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
     DATA_PATH=${DATA_PATH:=$(pwd)/data}
     MODEL_PATH=${MODEL_PATH:=$(pwd)/models}
@@ -95,7 +95,7 @@ function config() {
 
 
     if [ $write_env -eq 1 ]; then
-        echo CONT_NAME=${CONT_NAME} > $LOCAL_ENV
+        echo IMG_NAME=${IMG_NAME} > $LOCAL_ENV
         echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
         echo MODEL_PATH=${MODEL_PATH} >> $LOCAL_ENV
         echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
@@ -126,7 +126,6 @@ WORKSPACE_DIR='/workspace'
 DOCKER_CMD="docker run \
     --network host \
     --gpus all \
-    --name ${CONT_NAME} \
     -p ${JUPYTER_PORT}:8888 \
     -v ${PROJECT_PATH}:${WORKSPACE_DIR} \
     -v ${DATA_PATH}:/data \
@@ -138,12 +137,12 @@ build() {
     local IMG_OPTION=$1
     set -e
 
-    IFS=':' read -ra CONT_NAME_BASENAME <<< ${CONT_NAME}
-    echo "Building ${CONT_NAME_BASENAME}..."
+    IFS=':' read -ra IMG_NAME_BASENAME <<< ${IMG_NAME}
+    echo "Building ${IMG_NAME_BASENAME}..."
     docker build --network host \
         --build-arg REPO_BRANCH=${REPO_BRANCH} \
-        -t ${CONT_NAME_BASENAME}:latest \
-        -t ${CONT_NAME} \
+        -t ${IMG_NAME_BASENAME}:latest \
+        -t ${IMG_NAME} \
         -f Dockerfile .
 
     set +e
@@ -160,26 +159,73 @@ push_container() {
 
 push() {
     docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-    push_container ${CONT_NAME}
+    push_container ${IMG_NAME}
     exit
 }
 
+
+run() {
+    DOCKER_CMD="${DOCKER_CMD} -v ${DATA_PATH}/logs/:/logs"
+    DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
+    DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH}"
+    DOCKER_CMD="${DOCKER_CMD} -d"
+    CMD="bash"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -a|--additional-args)
+                DOCKER_CMD="${DOCKER_CMD} $2"
+                shift
+                shift
+                ;;
+            -c|--cmd)
+                CMD=$2
+                shift
+                shift
+                ;;
+            *)
+                echo "Unknown option $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    ${DOCKER_CMD} ${IMG_NAME} $CMD
+}
+
+
 dev() {
-    local CONT=${CONT_NAME}
+    local DEV_IMG=${IMG_NAME}
 
     DOCKER_CMD="${DOCKER_CMD} -v ${DATA_PATH}/logs/:/logs"
     DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
     DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH}"
+    DOCKER_CMD="${DOCKER_CMD} --name ${CONT_NAME}"
 
-    if [ ! -z "$1" ]; then
-        DOCKER_CMD="${DOCKER_CMD} -d"
-        CMD="$1"
-    else
-        DOCKER_CMD="${DOCKER_CMD} --rm"
-        CMD='bash'
-    fi
-    set -x
-    ${DOCKER_CMD} -it ${CONT_NAME} ${CMD}
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -a|--additional-args)
+                DOCKER_CMD="${DOCKER_CMD} $2"
+                shift
+                shift
+                ;;
+            -i|--image)
+                DEV_IMG="$2"
+                shift
+                shift
+                ;;
+            -d)
+                DOCKER_CMD="${DOCKER_CMD} -d"
+                shift
+                ;;
+            *)
+                echo "Unknown option $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    ${DOCKER_CMD} -it --rm ${DEV_IMG} bash
 }
 
 
@@ -204,6 +250,9 @@ case $1 in
         $@
         ;;
     dev)
+        "$@"
+        ;;
+    run)
         "$@"
         ;;
     *)

@@ -1,5 +1,5 @@
 # Copyright 2022 NVIDIA Corporation
-FROM rapidsai/rapidsai-core-dev:22.04-cuda11.5-devel-ubuntu20.04-py3.8
+FROM nvcr.io/nvidian/clara-lifesciences/megamolbart_training_nemo:main
 ARG REPO_BRANCH=main
 
 RUN apt-get update \
@@ -8,9 +8,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ## Environment setup
-SHELL ["conda", "run", "-n", "rapids", "/bin/bash", "-c"]
+SHELL ["conda", "run", "-n", "base", "/bin/bash", "-c"]
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install -r /tmp/requirements.txt
+RUN pip install --upgrade numpy
 
 RUN mkdir -p /opt/nvidia && \
     git clone https://github.com/NVIDIA/cheminformatics.git \

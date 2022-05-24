@@ -92,35 +92,30 @@ class DatasetCacheGenerator():
                     [smiles_id])
         lock.release()
 
-    def _sample(self, ids, smiles, num_samples, scaled_radius, force_unique, sanitize, dataset_type = "SAMPLE"):
+    def _sample(self, ids, smis, num_samples, scaled_radius, dataset_type="SAMPLE"):
         if dataset_type == 'SAMPLE':
-            # import pdb; pdb.set_trace()
-            if len(smiles) == 1: # for CDDD and legacy
-                smiles = smiles[0]
-            results = self.inferrer.find_similars_smiles(smiles,
-                                                        num_requested=num_samples,
-                                                        scaled_radius=scaled_radius,
-                                                        force_unique=(force_unique == 1),
-                                                        sanitize=(sanitize == 1))
-            if isinstance(smiles, str):
+            results = self.inferrer.find_similars_smiles(smis,
+                                                         num_requested=num_samples,
+                                                         scaled_radius=scaled_radius)
+            if isinstance(smis, str):
                 results = [results]
         else:
             #TODO: Scaffolding for insert
-            if len(smiles) == 1: # for CDDD and legacy
-                smiles = smiles[0]
-                emb = self.inferrer.smiles_to_embedding(smiles)
+            if len(smis) == 1: # for CDDD and legacy
+                smis = smis[0]
+                emb = self.inferrer.smiles_to_embedding(smis)
                 # import pdb; pdb.set_trace()
                 result = pd.DataFrame()
-                result['SMILES'] = [smiles]
+                result['SMILES'] = [smis]
                 result['embeddings_dim'] = [emb.dim]
                 result['embeddings'] = [emb.embedding]
                 results = [result]
             else:
-                _, _, embedding_list = self.inferrer.smiles_to_embedding(smiles)
+                _, _, embedding_list = self.inferrer.smiles_to_embedding(smis)
                 results = []
-                for idx in range(len(smiles)):
+                for idx in range(len(smis)):
                     result = pd.DataFrame()
-                    result['SMILES'] = [smiles[idx]]
+                    result['SMILES'] = [smis[idx]]
                     result['embeddings'] = [embedding_list[idx].embedding]
                     result['embeddings_dim'] = [embedding_list[idx].dim]
                     results.append(result)
@@ -131,8 +126,6 @@ class DatasetCacheGenerator():
     def initialize_db(self,
                       dataset,
                       num_requested=10):
-        if not dataset.sample:
-            return
         log.info(f'Creating recs for dataset {dataset}...')
 
         dataset_type = dataset.type
@@ -147,10 +140,11 @@ class DatasetCacheGenerator():
         sr_smiles = df_file[dataset.smiles_column_name].drop_duplicates()
 
         radius = dataset.radius if hasattr(dataset, 'radius') else [0]
+        model_name = self.inferrer.__class__.__name__
         for radii in radius:
             dataset_df = pd.DataFrame()
             dataset_df['smiles'] = sr_smiles
-            dataset_df['model_name'] = np.full(shape=sr_smiles.shape[0], fill_value=self.inferrer.__class__.__name__)
+            dataset_df['model_name'] = np.full(shape=sr_smiles.shape[0], fill_value=model_name)
             dataset_df['num_samples'] = np.full(shape=sr_smiles.shape[0], fill_value=num_requested)
             dataset_df['scaled_radius'] = np.full(shape=sr_smiles.shape[0],
                                                   fill_value = 0 if dataset_type == 'EMBEDDING' else radii)
@@ -159,37 +153,36 @@ class DatasetCacheGenerator():
             dataset_df.to_sql('smiles_tmp', self.conn, index=False, if_exists='append')
 
             if dataset_type == 'EMBEDDING':
-                self.conn.executescript('''
-                    INSERT INTO smiles
-                    (smiles, model_name, num_samples, scaled_radius, dataset_type)
-                        SELECT *
-                        FROM smiles_tmp
-                        WHERE NOT EXISTS(
-                            SELECT smiles, model_name, num_samples, scaled_radius, dataset_type
-                            FROM smiles
-                            WHERE smiles_tmp.smiles = smiles.smiles
-                                AND smiles_tmp.model_name = smiles.model_name);
-
-                    DROP TABLE smiles_tmp;
-                    ''')
-            else:
                 self.conn.executescript(f'''
                     INSERT INTO smiles
                     (smiles, model_name, num_samples, scaled_radius, dataset_type)
                         SELECT *
                         FROM smiles_tmp
-                        WHERE NOT EXISTS(
-                            SELECT smiles, model_name, num_samples, scaled_radius, dataset_type
+                        WHERE smiles_tmp.smiles not in (
+                            SELECT smiles
                             FROM smiles
-                            WHERE smiles_tmp.smiles = smiles.smiles
-                                AND smiles_tmp.model_name = smiles.model_name
-                                AND smiles_tmp.scaled_radius = smiles.scaled_radius);
+                            WHERE model_name = '{model_name}');
+
+                    DROP TABLE smiles_tmp;
+                    ''')
+            else:
+                self.conn.executescript(f'''
+
+                    INSERT INTO smiles
+                    (smiles, model_name, num_samples, scaled_radius, dataset_type)
+                        SELECT *
+                        FROM smiles_tmp
+                        WHERE smiles_tmp.smiles not in (
+                            SELECT smiles
+                            FROM smiles
+                            WHERE model_name = '{model_name}'
+                                AND scaled_radius = {radii});
 
                     UPDATE smiles
                     SET num_samples = {num_requested},
                         dataset_type = 'SAMPLE',
                         scaled_radius = {radii}
-                    WHERE model_name = '{self.inferrer.__class__.__name__}'
+                    WHERE model_name = '{model_name}'
                         AND dataset_type = 'EMBEDDING'
                         AND smiles in (select smiles from smiles_tmp);
 
@@ -198,105 +191,40 @@ class DatasetCacheGenerator():
 
             del dataset_df
 
-    def generate_and_store(self,
-                           csv_data_files,
-                           num_requested=10,
-                           scaled_radius=1,
-                           force_unique=False,
-                           sanitize=True,
-                           concurrent_requests=4):
+    def sample(self, concurrent_requests=None):
 
-        new_sample_db = False
-        with closing(self.conn.cursor()) as cursor:
-            recs = cursor.execute('''
-                SELECT count(*) from smiles s
-                WHERE s.model_name = ?
-                    AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
-                ''',
-                [self.inferrer.__class__.__name__, scaled_radius, force_unique, sanitize]).fetchone()
-            if recs[0] == 0:
-                new_sample_db = True
+        recs = self.conn.execute('''
+            SELECT dataset_type, num_samples, scaled_radius, count(*)
+            FROM smiles
+            GROUP BY dataset_type, num_samples, scaled_radius
+            ORDER BY dataset_type DESC, scaled_radius
+            ''').fetchall()
 
-        if new_sample_db:
-            all_dataset_df = []
-            for spec_name in csv_data_files:
-                spec = csv_data_files[spec_name]
-                log.info(f'Reading {spec_name}...')
-                smiles_col_name = spec['col_name']
-                dataset_type = spec['dataset_type']
+        for rec in recs:
+            dataset_type = rec[0]
+            num_requested = rec[1]
+            scaled_radius = rec[2]
 
-                input_size = -1
-                if 'input_size' in spec:
-                    input_size = spec['input_size']
+            log.info(f'Processing {dataset_type} with {num_requested} samples and radius {scaled_radius} for {rec[3]} recs...')
 
-                # Input must be a CSV file or dataframe. Anything else will fail.
-                if isinstance(spec['dataset'], str):
-                    # If input dataset is a csv file
-                    if input_size > 0:
-                        file_df = pd.read_csv(spec['dataset'], nrows=input_size)
-                    else:
-                        file_df = pd.read_csv(spec['dataset'])
-                else:
-                    # If input dataset is a dataframe
-                    file_df = spec['dataset']
+            while True:
+                df = pd.read_sql_query('''
+                    SELECT id, smiles
+                    FROM smiles
+                    WHERE processed = 0 and dataset_type = ? LIMIT ?
+                    ''',
+                    self.conn, params = [dataset_type, self.batch_size])
+                if df.shape[0] == 0:
+                    break
 
-                dataset_df = pd.DataFrame()
-                dataset_df['smiles'] = file_df[smiles_col_name]
-                dataset_df['dataset_type'] = np.full(shape=dataset_df.shape[0], fill_value=dataset_type)
-                del file_df
-
-                all_dataset_df.append(dataset_df)
-
-            df = pd.DataFrame()
-            df = pd.concat(all_dataset_df).drop_duplicates()
-            df['model_name'] = np.full(shape=df.shape[0], fill_value=self.inferrer.__class__.__name__)
-            df['num_samples'] = np.full(shape=df.shape[0], fill_value=num_requested)
-            df['scaled_radius'] = np.full(shape=df.shape[0], fill_value=scaled_radius)
-            df['force_unique'] = np.full(shape=df.shape[0], fill_value=force_unique)
-            df['sanitize'] = np.full(shape=df.shape[0], fill_value=sanitize)
-            df.to_sql('smiles', self.conn, index=False, if_exists='append')
-            del df
-        else:
-            log.warn(f"There are pending records in the database.")
-            log.warn(f"Please rerun after this job to process {csv_data_files}.")
-
-        while True:
-            df = pd.read_sql_query('''
-                SELECT id, smiles
-                FROM smiles
-                WHERE processed = 0 AND scaled_radius = ? AND num_samples = ? AND dataset_type = 'SAMPLE' LIMIT ?
-                ''',
-                self.conn, params = [scaled_radius, num_requested, self.batch_size])
-            if df.shape[0] == 0:
-                break
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
-                futures = {executor.submit(self._sample, df['id'].tolist(), df['smiles'].tolist(), num_requested, scaled_radius, force_unique, sanitize)}
-                for future in concurrent.futures.as_completed(futures):
-                    # smiles = futures[future]
-                    try:
-                        future.result()
-                    except Exception as exc:
-                        log.warning(f'generated an exception: {exc}')
-                        log.exception(exc)
-        while True:
-            #TODO: fix SAMPLE only case --> make sepearete loop for EMBEDDING
-            df = pd.read_sql_query('''
-                SELECT id, smiles
-                FROM smiles
-                WHERE processed = 0 AND dataset_type = 'EMBEDDING' LIMIT ?
-                ''',
-                self.conn, params = [self.batch_size])
-            if df.shape[0] == 0:
-                break
-
-            with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
-                futures = {executor.submit(self._sample, df['id'].tolist(), df['smiles'].tolist(), num_requested, scaled_radius, force_unique, sanitize, dataset_type = "EMBEDDING")}
-                for future in concurrent.futures.as_completed(futures):
-                    # smiles = futures[future]
-                    try:
-                        future.result()
-                    except Exception as exc:
-                        log.exception(exc)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
+                    futures = {executor.submit(self._sample,
+                                               df['id'].tolist(),
+                                               df['smiles'].tolist(),
+                                               num_requested,
+                                               scaled_radius)}
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            future.result()
+                        except Exception as exc:
+                            log.exception(exc)

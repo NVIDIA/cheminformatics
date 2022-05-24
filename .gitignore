@@ -31,7 +31,7 @@ benchmark.csv
 outputs/
 **/*.onnx
 
-./data/
+data/
 models/
 cddd/
 logs

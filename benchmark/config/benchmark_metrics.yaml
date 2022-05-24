@@ -11,14 +11,10 @@ root:
   handlers: [console]
 
 model:
-  # Please change following properties when changing model.name
-  #   - sampling.concurrent_requests
-  #   - model.params.url (50052 for lb grpc)
-  # MegaMolBART Seq2Seq Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
-  name: MegaMolBARTLatent # MegaMolBART #CDDD
+  name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
   exp_name: mim_k1_salv # prcvr_k4 #seq2seq # mim_same_aug_k1 #
-  checkpoint_file: MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo
-  training_data: /data/db/zinc_train_test.sqlite3 #/rilango_data/data/db/cddd_train.sqlite3 /data/db/cddd_train.sqlite3 #
+  checkpoint_file: /models/megamolbart/Small_Span_Aug_2f63a83b_220424.nemo
+  training_data: /data/db/zinc_train_test.sqlite3
   batch_size: 500 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
   perceiver_average: False
   noise_mode: 2 # For LVM sampling selection default 0
@@ -38,7 +34,6 @@ metrics:
     datasets:
       - file: /workspace/benchmark/csv_data/benchmark_ZINC15_test_split.csv
         smiles_column_name: canonical_smiles
-        sample: True
         type: SAMPLE
         input_size: 20000
         radius:
@@ -87,7 +82,6 @@ metrics:
     datasets:
       - file: /workspace/benchmark/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
         smiles_column_name: canonical_smiles
-        sample: True
         type: EMBEDDING
         input_size: null
     enabled: True
@@ -100,17 +94,14 @@ metrics:
     datasets:
       - file: /workspace/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
         smiles_column_name: SMILES
-        sample: True
         type: EMBEDDING
         input_size: null
       - file: /workspace/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv
         smiles_column_name: SMILES
-        sample: True
         type: EMBEDDING
         input_size: null
       - file: /workspace/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv
         smiles_column_name: SMILES
-        sample: True
         type: EMBEDDING
         input_size: null
     enabled: True
@@ -122,7 +113,6 @@ metrics:
     datasets:
       - file: /workspace/benchmark/csv_data/benchmark_ExCAPE_Bioactivity.csv
         smiles_column_name: SMILES
-        sample: True
         type: EMBEDDING
         input_size: null
     enabled: True

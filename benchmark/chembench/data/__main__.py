@@ -7,7 +7,7 @@ from defusedxml import NotSupportedError
 from chembench.data.cache import DatasetCacheGenerator
 
 
-log = logging.getLogger('model benchmarking')
+log = logging.getLogger(__name__)
 
 
 @hydra.main(config_path=".",
@@ -16,7 +16,9 @@ def main(cfg):
     os.makedirs(cfg.output.path, exist_ok=True)
 
     inferrer = locate(cfg.model.name)()
-    ds_generator = DatasetCacheGenerator(inferrer, db_file=cfg.sampling.db,)
+    ds_generator = DatasetCacheGenerator(inferrer,
+                                         db_file=cfg.sampling.db,
+                                         batch_size=cfg.model.batch_size)
 
     for metric in  cfg.metrics:
         datasets = cfg.metrics[metric].datasets
@@ -32,7 +34,7 @@ def main(cfg):
             else:
                 raise NotSupportedError(f'Only {dataset} with file accepted')
 
-    # ds_generator.sample()
+    ds_generator.sample()
 
 if __name__ == '__main__':
     main()

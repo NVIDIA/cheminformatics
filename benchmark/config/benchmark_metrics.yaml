@@ -1,28 +1,16 @@
-formatters:
-  simple:
-    format: '%(asctime)s %(name)s [%(levelname)s]: %(message)s'
-handlers:
-  console:
-    class: logging.StreamHandler
-    formatter: simple
-    stream: ext://sys.stdout
-
-root:
-  handlers: [console]
-
 model:
   name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
   exp_name: mim_k1_salv # prcvr_k4 #seq2seq # mim_same_aug_k1 #
   checkpoint_file: /models/megamolbart/Small_Span_Aug_2f63a83b_220424.nemo
   training_data: /data/db/zinc_train_test.sqlite3
-  batch_size: 500 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
+  batch_size: 10 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
   perceiver_average: False
   noise_mode: 2 # For LVM sampling selection default 0
 
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/nemo_megamolbart.sqlite3
+  db: /data/db/${model.exp_name}.sqlite3
   concurrent_requests: 10
 
 output:
@@ -37,6 +25,7 @@ metrics:
         type: SAMPLE
         input_size: 20000
         radius:
+          - null
           - 0.7
           - 0.5
     enabled: True
@@ -120,3 +109,21 @@ metrics:
     n_splits: 20
     normalize_inputs: True
     return_predictions: True
+
+formatters:
+  simple:
+    format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: simple
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    formatter: simple
+    filename: /logs/benchmark.log
+root:
+  level: INFO
+  handlers: [console, file]
+
+disable_existing_loggers: false

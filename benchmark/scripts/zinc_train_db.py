@@ -46,6 +46,17 @@ def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
     with closing(sqlite3.connect(db, uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
         cur.execute('CREATE INDEX smiles_idx ON train_data(smiles)')
+        cur.execute('''
+                    CREATE TABLE IF NOT EXISTS scaffolds (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        scaffold TEXT NOT NULL,
+                        UNIQUE(scaffold)
+                    );
+                    ''')
+        cur.execute('''
+                    INSERT INTO scaffolds (scaffold)
+                        Select distinct scaffold from train_data;
+                    ''')
 
 
 def parse_args():

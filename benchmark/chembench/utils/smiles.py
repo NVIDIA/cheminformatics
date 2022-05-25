@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import AllChem, Scaffolds
+from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit import DataStructs
 
 
@@ -64,12 +65,12 @@ def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_in
     return fp
 
 def get_murcko_scaffold(smiles: str):
-    if smiles is None:
+    if not smiles:
         return 'NONE'
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return 'NONE'
-    return Scaffolds.MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smiles)
+    return MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smiles)
 
 def calc_fingerprint(smiles, radius = 2, nbits = 2048):
     mol = Chem.MolFromSmiles(smiles)
@@ -117,8 +118,6 @@ def validate_smiles(smiles: str,
         if mol:
             if canonicalize:
                 valid_smiles = Chem.MolToSmiles(mol, canonical=True)
-            else:
-                valid_smiles = smiles
 
             if return_fingerprint:
                 fp = AllChem.GetMorganFingerprintAsBitVect(mol, radius, nBits=nbits)

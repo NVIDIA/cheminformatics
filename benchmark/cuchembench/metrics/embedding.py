@@ -37,13 +37,6 @@ except ModuleNotFoundError as e:
     from cuchembench.utils.distance import tanimoto_calculate
     from sklearn.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = False
-# from sklearn.neural_network import MLPRegressor
-# logger.info('RAPIDS installation not found. Numpy and pandas will be used instead.')
-# import numpy as xpy
-# import pandas as xdf
-# from sklearn.metrics import pairwise_distances, mean_squared_error
-# from sklearn.preprocessing import StandardScaler
-# RAPIDS_AVAILABLE = False
 __all__ = ['NearestNeighborCorrelation', 'Modelability']
 
 
@@ -66,19 +59,11 @@ def get_model_dict():
         rf_estimator = RandomForestRegressor(criterion='mse', random_state=0)
     rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
-    # # @(dreidenbach) 2 Layer Network default MSE loss
-    # # No cupy version so had to manually force sklearn and use of numpy due to numpy conversion error
-    # nn_estimator = MLPRegressor(hidden_layer_sizes=(2048, 2048), learning_rate_init = 0.001)
-    # nn_param_dict = {'alpha': [0.0001, 0.001, 0.01]}
-
     return {'linear_regression': [lr_estimator, lr_param_dict],
             # 'elastic_net': [en_estimator, en_param_dict], # Removing Elastic Net for timing
             'support_vector_machine': [sv_estimator, sv_param_dict],
             'random_forest': [rf_estimator, rf_param_dict],
             }
-    # return {
-    #         'mlp': [nn_estimator, nn_param_dict]
-    #         }
 
 class BaseEmbeddingMetric():
     name = None
@@ -194,8 +179,8 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
         start_time = time.time()
         cache = Cache()
-        embeddings = None #cache.get_data('NN_embeddings')
-        assert(embeddings is None)
+        embeddings = cache.get_data('NN_embeddings')
+        # TODO: Possible revisit for performance reasons
         if embeddings is None:
             embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens) #zero_padded_vals=True
             logger.info(f'Embedding len and type {len(embeddings)}  {type(embeddings[0])}')
@@ -263,7 +248,7 @@ class Modelability(BaseEmbeddingMetric):
             logger.info(f"Grid search param {param}")
 
             # Generate CV folds
-            kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=1) #0
+            kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
             kfold_mse = []
 
             for train_idx, test_idx in kfold_gen.split(xdata, ydata):

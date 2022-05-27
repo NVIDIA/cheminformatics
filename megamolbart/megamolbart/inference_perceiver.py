@@ -147,8 +147,10 @@ class MegaMolBART():
         smiles_interp_list = []
         with torch.no_grad():
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-                futures = {executor.submit(self._inverse_transform_batch, memory, mem_pad_mask.clone(
-                ), k, sanitize): memory for memory in embeddings}
+                if type(mem_pad_mask) == list: # To handle database level batching of cheminformatics/benchmark/cuchembench/inference/megamolbart.py embedding_to_smiles(...)
+                    futures = {executor.submit(self._inverse_transform_batch, memory, mask.clone(), k, sanitize): memory for memory, mask in zip(embeddings, mem_pad_mask)}
+                else:
+                    futures = {executor.submit(self._inverse_transform_batch, memory, mem_pad_mask.clone(), k, sanitize): memory for memory in embeddings}
                 for future in concurrent.futures.as_completed(futures):
                     smiles = futures[future]
                     try:
@@ -185,7 +187,10 @@ class MegaMolBART():
 
         # dims: batch, tokens, embedding
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()
-        combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
+        if self.encoder_type == 'perceiver':
+            combined_mask = torch.zeros((embedding1.shape[0:2]), dtype=pad_mask1.dtype, device=pad_mask1.device).cuda()
+        else:
+            combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
         embeddings = [interpolated_emb]
         generated_mols = self.inverse_transform(embeddings,
                                       combined_mask, #[combined_mask]*num_interp,
@@ -217,7 +222,7 @@ class MegaMolBART():
         # emb = NxBxM
         num_molecules = embedding.shape[1]
         neighboring_embeddings = self.add_jitter(embedding, distance, num_requested)
-        # neigh = [NxBxM] * num_requested
+        # neighboring_embeddings = [NxBxM] * num_requested with each using the same pad mask
         generated_mols = self.inverse_transform(neighboring_embeddings,
                                                 pad_mask.bool().cuda(),
                                                 k=1, sanitize=sanitize)
@@ -585,6 +590,16 @@ class MegaMolBARTLatent(MegaMolBART):
 
         # dims: batch, tokens, embedding
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()
+
+        # # radial interpolation MIM only
+        # # print('[Interpolated Shape]', interpolated_emb.shape)
+        # interpolated_emb_2 = interpolated_emb.squeeze()
+        # r = interpolated_emb_2.norm(dim=-1)
+        # s = torch.linspace(r[0].item(), r[-1].item(), r.shape[0]).cuda()
+        # interpolated_emb = interpolated_emb_2 / r.unsqueeze(-1) * s.unsqueeze(-1)
+        # interpolated_emb = interpolated_emb.unsqueeze(0)
+
+
         combined_mask = torch.zeros((embedding1.shape[0:2]), dtype=pad_mask1.dtype, device=pad_mask1.device).cuda()
         embeddings = [interpolated_emb]
         generated_mols = self.inverse_transform(embeddings,

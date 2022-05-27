@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS smiles_samples (
 	is_generated INTEGER NOT NULL DEFAULT 1,
 	scaffold TEXT NOT NULL
 );
--- drop INDEX smiles_samples_index;
+
 CREATE INDEX IF NOT EXISTS smiles_samples_index ON smiles_samples (input_id, smiles, scaffold, is_valid, is_generated);
 
 CREATE TABLE IF NOT EXISTS meta_data (

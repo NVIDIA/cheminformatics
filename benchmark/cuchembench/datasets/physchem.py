@@ -22,10 +22,6 @@ PHYSCHEM_TABLE_LIST = ['chembl', 'lipophilicity',
 
 class ChEMBLApprovedDrugs(GenericCSVDataset):
     def __init__(self, **kwargs):
-        # logger.info(kwargs)
-        # super().__init__(data_filename='benchmark_ChEMBL_approved_drugs_physchem.csv',
-        #                  fp_filename='fingerprints_ChEMBL_approved_drugs_physchem.csv',
-        #                  **kwargs)
         properties_cols = ['max_phase_for_ind', 'mw_freebase',
                                 'alogp', 'hba', 'hbd', 'psa', 'rtb', 'ro3_pass', 'num_ro5_violations',
                                 'cx_logp', 'cx_logd', 'full_mwt', 'aromatic_rings', 'heavy_atoms',
@@ -40,9 +36,6 @@ class ChEMBLApprovedDrugs(GenericCSVDataset):
 
 class MoleculeNetLipophilicity(GenericCSVDataset):
     def __init__(self, **kwargs):
-        # super().__init__(data_filename='benchmark_MoleculeNet_Lipophilicity.csv',
-        #                  fp_filename='fingerprints_MoleculeNet_Lipophilicity.csv',
-        #                  **kwargs)
         super().__init__(data_filename='benchmark_MoleculeNet_Lipophilicity.csv', **kwargs)
         self.name = 'MoleculeNet Lipophilicity'
         self.table_name = 'lipophilicity'
@@ -54,9 +47,6 @@ class MoleculeNetLipophilicity(GenericCSVDataset):
 
 class MoleculeNetESOL(GenericCSVDataset):
     def __init__(self, **kwargs):
-        # super().__init__(data_filename='benchmark_MoleculeNet_ESOL.csv',
-        #                  fp_filename='fingerprints_MoleculeNet_ESOL.csv',
-        #                  **kwargs)
         super().__init__(data_filename='benchmark_MoleculeNet_ESOL.csv', **kwargs)
         self.name = 'MoleculeNet ESOL'
         self.table_name = 'esol'
@@ -68,9 +58,6 @@ class MoleculeNetESOL(GenericCSVDataset):
 
 class MoleculeNetFreeSolv(GenericCSVDataset):
     def __init__(self, **kwargs):
-        # super().__init__(data_filename='benchmark_MoleculeNet_FreeSolv.csv',
-        #                  fp_filename='fingerprints_MoleculeNet_FreeSolv.csv',
-        #                  **kwargs)
         super().__init__(data_filename='benchmark_MoleculeNet_FreeSolv.csv', **kwargs)
         self.name = 'MoleculeNet FreeSolv'
         self.table_name = 'freesolv'

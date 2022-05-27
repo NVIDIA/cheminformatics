@@ -23,7 +23,6 @@ class MegaMolBARTWrapper(metaclass=Singleton):
     def __init__(self, checkpoint_file = None) -> None:
         self.min_jitter_radius = 1
 
-        # TODO: make this configurable/resuable accross all modules.
         if checkpoint_file == None:
             checkpoint_file = 'Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo'
         files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
@@ -33,7 +32,6 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         dir = files[-1].absolute().parent.as_posix()
 
         from megamolbart.inference_perceiver import MegaMolBART
-        # this wrapper is not yet ready for MegaMolBARTLatent
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
         self.megamolbart = MegaMolBART(model_dir=os.path.join(dir, checkpoint_file))
@@ -54,9 +52,9 @@ class MegaMolBARTWrapper(metaclass=Singleton):
             mask = pad_mask[:, molecule].unsqueeze(1)
             elem = EmbeddingList(embedding=emb.flatten().tolist(), dim=dim, pad_mask=mask)
             storage.append(elem)
-        #TODO: fix how this storage is saved and used
         return embedding, pad_mask, storage
 
+    #TODO: Method is unused
     def embedding_to_smiles(self,
                             embedding,
                             pad_mask,
@@ -66,7 +64,6 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         Converts input embedding to SMILES.
         @param transform_spec: Input spec with embedding and mask.
         '''
-        #TODO: How is this used will determine the inputs
         import torch
         if storage:
             beaker = []
@@ -84,8 +81,8 @@ class MegaMolBARTWrapper(metaclass=Singleton):
             pad_mask = torch.cat(cabinet, dim=1)
 
         (_, num_molecules, _) = tuple(embedding.size())
-        embeddings = [embedding[:, i:i+batch_size,i] for i in range(0, num_molecules, batch_size)]
-        pad_masks =  [pad_mask[:, i:i+batch_size,i] for i in range(0, num_molecules, batch_size)]
+        embeddings = [embedding[:, i:i+batch_size, :] for i in range(0, num_molecules, batch_size)] # emb is seq X num_molecules X model_dim
+        pad_masks =  [pad_mask[:, i:i+batch_size] for i in range(0, num_molecules, batch_size)] # mask is seq x num_molecules
 
         # embeddings is a list of embeddings  SeqXBatchxModel
         generated_mols = self.megamolbart.inverse_transform(embeddings, pad_masks)
@@ -98,7 +95,6 @@ class MegaMolBARTWrapper(metaclass=Singleton):
                              scaled_radius=None,
                              force_unique=False,
                              sanitize=True):
-        #TODO: Must bubble up a product of a list of df instead of a single df
         generated_dfs = self.megamolbart.find_similars_smiles(
                 smiles,
                 num_requested=num_requested,
@@ -219,7 +215,6 @@ class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
 
     def __init__(self, checkpoint_file = None, noise_mode = 0) -> None:
         self.min_jitter_radius = 1
-        # TODO: make this configurable/resuable accross all modules.
         if checkpoint_file == None:
             checkpoint_file = 'Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo'
         files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
@@ -253,17 +248,3 @@ class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
             elem = EmbeddingList(embedding=emb.flatten().tolist(), dim=dim, pad_mask=mask)
             storage.append(elem)
         return embedding, pad_mask, storage
-
-    # # TODO: Fix this to match non LVM return
-    # def smiles_to_embedding(self,
-    #                         smiles: str,
-    #                         pad_length: int):
-    #     assert(1==0)
-    #     emb_info, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
-    #     embedding_, z, z_mean, z_logv = emb_info
-    #     dim = z_mean.shape
-    #     embedding = z_mean.flatten().tolist()
-    #     return EmbeddingList(embedding=embedding,
-    #                          dim=dim,
-    #                          pad_mask=pad_mask)
-

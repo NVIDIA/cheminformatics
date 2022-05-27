@@ -3,14 +3,16 @@
 from collections import defaultdict
 import logging
 import numpy as np
+import pickle
 import sqlite3
+import torch
 
 from contextlib import closing
 from cuchembench.utils.smiles import calc_similarity
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Validity', 'Unique', 'Novelty', 'NonIdenticality', 'EffectiveNovelty', 'ScaffoldUnique', 'ScaffoldNonIdenticalSimilarity']
+__all__ = ['Validity', 'Unique', 'Novelty', 'NonIdenticality', 'EffectiveNovelty', 'ScaffoldUnique', 'ScaffoldNonIdenticalSimilarity', 'ScaffoldNovelty', 'EffectiveScaffoldNovelty', 'Entropy']
 
 
 class BaseSampleMetric():
@@ -389,7 +391,7 @@ class ScaffoldNovelty(BaseSampleMetric):
 
     def __init__(self, inferrer, cfg):
         super().__init__(inferrer, cfg)
-        self.name = Novelty.name
+        self.name = ScaffoldNovelty.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
@@ -400,16 +402,22 @@ class ScaffoldNovelty(BaseSampleMetric):
     def compute_metrics(self, num_samples, radius):
         validity = Validity(self.inferrer, self.cfg)
         valid_molecules, self.total_molecules = validity.compute_metrics(num_samples, radius)
-        #TODO: do we need valid_scaffold when just the number is needed and its 1:1 --> guessing no
+        #TODO: do we need valid_scaffold when just the number is needed and its 1:1 --> guessing yes
         self.total_molecules = self.total_molecules//num_samples
-
+        # comma after FROM (SELECT count(distinct td.scaffold) scff_cnt 
+        #             FROM training_db.train_data td
+        #             ) as train_smiles , train_smiles.scff_cnt
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
                                      check_same_thread=False)) as conn:
             conn.execute('ATTACH ? AS training_db', [self.training_data])
             res = conn.execute('''
-                SELECT count(distinct ss.scaffold)
-                FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
+                SELECT count(distinct ss.scaffold), train_smiles.scff_cnt
+                FROM main.smiles s, main.smiles_samples ss, training_db.scaffolds td,
+                (SELECT count(distinct ss.scaffold) scff_cnt 
+                    FROM main.smiles_samples ss
+                    WHERE ss.is_generated = 1
+                    ) as train_smiles
                 WHERE ss.scaffold = td.scaffold
                     AND s.id = ss.input_id
                     AND s.model_name = ?
@@ -423,16 +431,17 @@ class ScaffoldNovelty(BaseSampleMetric):
                 ''',
                 [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
             rec = res.fetchone()
-            novel_molecules = valid_molecules - rec[0]
+            non_novel_scaffolds = rec[0]
+            td_scaffolds = rec[1]
 
-        return novel_molecules, valid_molecules
+        return td_scaffolds - non_novel_scaffolds, td_scaffolds
 
 class EffectiveScaffoldNovelty(BaseSampleMetric):
     name = 'effective_scaffold_novelty'
 
     def __init__(self, inferrer, cfg):
         super().__init__(inferrer, cfg)
-        self.name = EffectiveNovelty.name
+        self.name = EffectiveScaffoldNovelty.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
@@ -444,20 +453,20 @@ class EffectiveScaffoldNovelty(BaseSampleMetric):
         validity = Validity(self.inferrer, self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
-
+        # total molecules is 1:1 with total scaffolds
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
                                      check_same_thread=False)) as conn:
             conn.execute('ATTACH ? AS training_db', [self.training_data])
             res = conn.execute('''
                 SELECT SUM(CAST(a.smiles_cnt - case when b.recs is null then 0 else b.recs end as float) / ?)
-                FROM (SELECT ss.input_id, ss.smiles, ss.scaffold
-                        FROM smiles s, smiles_samples ss
-                        WHERE s.id = ss.input_id
-                            AND ss.is_generated = 0
-                        ) as input_smiles
-                    (SELECT s.id as id, count(distinct ss.scaffold) smiles_cnt
-                        FROM main.smiles s, main.smiles_samples ss
+                FROM (SELECT s.id as id, count(distinct ss.scaffold) smiles_cnt
+                        FROM main.smiles s, main.smiles_samples ss,
+                            (SELECT s2.id, ss2.input_id, ss2.smiles, ss2.scaffold
+                            FROM main.smiles s2, main.smiles_samples ss2
+                            WHERE s2.id = ss2.input_id
+                                AND ss2.is_generated = 0
+                            GROUP BY s2.id) as input_smiles
                         WHERE s.id = ss.input_id
                             AND s.smiles <> ss.smiles
                             AND input_smiles.scaffold <> ss.scaffold
@@ -473,7 +482,7 @@ class EffectiveScaffoldNovelty(BaseSampleMetric):
                         GROUP BY s.id) as a
                     LEFT OUTER JOIN
                     (SELECT s.id, count(distinct ss.scaffold) recs
-                    FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
+                    FROM main.smiles s, main.smiles_samples ss, training_db.scaffolds td
                     WHERE ss.scaffold == td.scaffold
                         AND s.id = ss.input_id
                         AND ss.is_valid = 1
@@ -490,3 +499,51 @@ class EffectiveScaffoldNovelty(BaseSampleMetric):
                 [num_samples, self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE',  self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
             rec = res.fetchone()
         return rec[0], self.total_molecules
+
+class Entropy(BaseSampleMetric):
+    name = 'entropy'
+
+    def __init__(self, inferrer, cfg):
+        super().__init__(inferrer, cfg)
+        self.name = Entropy.name
+
+    def variations(self, cfg, **kwargs):
+        radius_list = list(cfg.metric.entropy.radius)
+        radius_list = [float(x) for x in radius_list]
+        return {'radius': radius_list}
+
+    def compute_metrics(self, num_samples, radius):
+        with closing(sqlite3.connect(self.cfg.sampling.db,
+                                     uri=True,
+                                     check_same_thread=False)) as conn:
+            result = conn.execute('''
+                SELECT ss.embedding, ss.embedding_dim
+                FROM smiles s, smiles_samples ss
+                WHERE s.id = ss.input_id
+                    AND s.model_name = ?
+                    AND s.scaled_radius = ?
+                    AND s.force_unique = ?
+                    AND s.sanitize = ?
+                    AND ss.is_generated = 0
+                    AND s.processed = 1
+                    AND s.dataset_type = ?
+                GROUP BY ss.input_id;
+                ''',
+                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+
+            latent_space = []
+            for rec in result.fetchall():
+                dim = pickle.loads(rec[1])
+                latent_vector = torch.FloatTensor(list(pickle.loads(rec[0])))
+                latent_vector = torch.reshape(latent_vector, dim)
+                # logger.info(f'[ENTROPY Shape] {latent_vector.shape}')
+                latent_vector = latent_vector.mean(axis=0).tolist()
+                # logger.info(f'[ENTROPY Length] {len(latent_vector)}')
+                latent_space.append(latent_vector)
+        # # pip install . on NPEET which is from github.com/gregversteeg/NPEET
+        from npeet import entropy_estimators as ee
+        entropy = ee.entropy(latent_space)
+        x = np.asarray(latent_space)
+        logger.info(f'[ENTROPY] {entropy}')
+        logger.info(f'[Normalized ENTROPY] {ee.entropy(x / (x.std(0) + 1e-10))}')
+        return entropy, 1

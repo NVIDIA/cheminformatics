@@ -5,7 +5,8 @@ from numba.types import bool_, string, int64
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import AllChem, Scaffolds
+from rdkit.Chem import AllChem
+from rdkit.Chem.Scaffolds import MurckoScaffold
 from rdkit import DataStructs
 
 
@@ -69,7 +70,10 @@ def get_murcko_scaffold(smiles: str):
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return 'NONE'
-    return Scaffolds.MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smiles)
+    scaff =  MurckoScaffold.MurckoScaffoldSmilesFromSmiles(smiles)
+    if scaff == '':
+        return 'NONE'
+    return scaff
 
 def calc_fingerprint(smiles, radius = 2, nbits = 2048):
     mol = Chem.MolFromSmiles(smiles)

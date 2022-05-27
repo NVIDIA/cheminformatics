@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 import argparse
+import glob
 import sys
 import logging
 import sqlite3
@@ -23,14 +24,16 @@ def canonicalize_smiles(smiles):
     return cannonical_smiles
 
 
-def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
+def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True, construct_scaffold=True):
     logger.info(f'Loading data from {path}...')
+    paths = list(sorted(glob.glob(path + 'x0[0-6][0-9]*')) + sorted(glob.glob(path + 'x07[0-2]*')))
+    logger.info(f'Loading GLOB data from {paths}...')
     db = f'sqlite:////data/db/{db_name}.sqlite3' 
     with closing (LocalCluster(n_workers=n_workers,
                                threads_per_worker=threads_per_worker)) as cluster, cluster,\
         closing(Client(cluster, asynchronous=True)) as client:
 
-        zinc_data = dd.read_csv(path)
+        zinc_data = dd.read_csv(paths)
         # Canonicalize SMILES
         if canonicalize:
             canonical_zinc_data = zinc_data['smiles'].apply(canonicalize_smiles,
@@ -38,14 +41,26 @@ def upload(path, db_name, n_workers, threads_per_worker, canonicalize=True):
             zinc_data = zinc_data.drop('smiles', axis=1)
             zinc_data['smiles'] = canonical_zinc_data
 
-        scaffolds = zinc_data['smiles'].apply(get_murcko_scaffold, meta=('smiles', 'object'))
-        zinc_data['scaffold'] = scaffolds  
+        if construct_scaffold:
+            scaffolds = zinc_data['smiles'].apply(get_murcko_scaffold, meta=('smiles', 'object'))
+            zinc_data['scaffold'] = scaffolds  
 
         zinc_data.to_sql('train_data', db)
 
-    with closing(sqlite3.connect(db, uri=True)) as con, con, \
+    with closing(sqlite3.connect(f'/data/db/{db_name}.sqlite3', uri=True)) as con, con, \
                 closing(con.cursor()) as cur:
         cur.execute('CREATE INDEX smiles_idx ON train_data(smiles)')
+        cur.execute('''
+                    CREATE TABLE IF NOT EXISTS scaffolds (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        scaffold TEXT NOT NULL,
+                        UNIQUE(scaffold)
+                    );
+                    ''')
+        cur.execute('''
+                    INSERT INTO scaffolds (scaffold)
+                        Select distinct scaffold from train_data;
+                    ''')
 
 
 def parse_args():
@@ -53,14 +68,14 @@ def parse_args():
     parser.add_argument('-p', '--data_path',
                         dest='data_path',
                         type=str,
-                        default='/data/zinc_csv/train/*.csv',
+                        default='/data/zinc_csv/train/', #x0[00-72]*
                         help='Wildcard path to the CSV files containing training data')
     parser.add_argument('-d', '--db_name',
                         dest='db_name',
                         type=str,
                         required=False,
-                        default='zinc_train_1',
-                        choices=['cddd_train', 'zinc_train', 'zinc_train_1'],
+                        default='zinc_train_half',
+                        choices=['cddd_train', 'zinc_train', 'zinc_train_half'],
                         help='Database name')
     parser.add_argument('-w', '--workers',
                         dest='workers',
@@ -74,6 +89,10 @@ def parse_args():
                         )
     parser.add_argument('-n', '--no_canonicalize',
                         dest='canonicalize',
+                        action='store_false',
+                        )
+    parser.add_argument('-ns', '--no_scaffold',
+                        dest='construct_scaffold',
                         action='store_false',
                         )
 

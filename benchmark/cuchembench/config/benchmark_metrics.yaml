@@ -11,76 +11,83 @@ root:
   handlers: [console]
 
 model:
-  # Please change following properties when changing model.name
-  #   - sampling.concurrent_requests
-  #   - model.params.url (50052 for lb grpc)
-  # MegaMolBART Seq2Seq Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo
-  name: MegaMolBARTLatent # MegaMolBART #CDDD
-  exp_name: mim_k1_salv # prcvr_k4 #seq2seq # mim_same_aug_k1 #
-  checkpoint_file: MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo
-  training_data: /data/db/zinc_train_test.sqlite3 #/rilango_data/data/db/cddd_train.sqlite3 /data/db/cddd_train.sqlite3 # 
-  batch_size: 500 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
+  name: MegaMolBART #Latent #CDDD
+  exp_name: prcvr_k4 #vae_k4 #mim_k1_salv # prcvr_k4 #seq2seq # mim_same_aug_k1 #
+  checkpoint_file: Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo  # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo
+  training_data: /data/db/zinc_train_half.sqlite3 # /data/db/cddd_train.sqlite3 # 
+  batch_size: 100 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
   perceiver_average: False
-  noise_mode: 2 # For LVM sampling selection default 0
-
-  # name:  cuchembench.inference.GrpcMegaMolBARTWrapper
-  # training_data: /data/db/zinc_train.sqlite3
-  # params:
-  #   url: nginx:50052
+  noise_mode: 0 # For LVM sampling selection default 0 for MIM 2
 
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_mim_k1_embedding_new.sqlite3 # seq2seq_embedding.sqlite3 #
+  db: /data/db/embedding_cache_megamolbart_prcvr_k4_sampling_full_test.sqlite3 #embedding_cache_megamolbart_vae_k4_sampling_full.sqlite3
   concurrent_requests: 10
 
 output:
-#TODO: Change path for new models
-  path: /data/benchmark_output/mim #use unique names here seq2seq
+  path: /data/benchmark_output/prcvr_test
 
 metric:
   validity:
-    enabled: False
+    enabled: True
     input_size: 20000
     radius:
-      - 0.7
+      - 1.2 #1.2 #1.2 # 0.7
 
   unique:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   novelty:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   effective_novelty:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   non_identicality:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   scaffold_unique:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
   
   scaffold_non_identical_similarity:
-    enabled: False
+    enabled: True
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
     nbits: 2048
+
+  scaffold_novelty:
+    enabled: True
+    input_size: ${metric.validity.input_size}
+    remove_invalid: False
+    radius: ${metric.validity.radius}
+
+  effective_scaffold_novelty:
+    enabled: True
+    input_size: ${metric.validity.input_size}
+    remove_invalid: False
+    radius: ${metric.validity.radius}
+
+  entropy:
+    enabled: False
+    input_size: ${metric.validity.input_size}
+    radius: ${metric.validity.radius}
 
   nearest_neighbor_correlation:
     enabled: False
@@ -92,7 +99,7 @@ metric:
 
   modelability:
     physchem:
-      enabled: True
+      enabled: False
       input_size: -1
       n_splits: 20
       normalize_inputs: True

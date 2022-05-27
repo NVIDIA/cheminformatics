@@ -13,7 +13,6 @@ import pandas as pd
 
 import sys
 import numpy as np
-# sys.path.insert(0, '/workspace/code/NeMo_MegaMolBART')
 from collections import defaultdict
 import random
 import logging
@@ -55,17 +54,12 @@ class MegaMolBART():
             logger.debug(f'Scaled Radius {scaled_radius} Not being used')
             return self.min_jitter_radius
 
-    #TODO: why do we permute?
     def add_jitter(self, embedding, radius, cnt, shape=None):
-        # if shape is not None:
-        #     embedding = torch.reshape(embedding, (1, shape[0], shape[1]))\
-        #                      .to(embedding.device)
-
-        permuted_emb = embedding #.permute(1, 0, 2)
+        permuted_emb = embedding
         distorteds = []
         for _ in range(cnt):
             noise = torch.normal(0, radius, permuted_emb.shape).to(embedding.device)
-            distorted = (noise + permuted_emb)#.permute(1, 0, 2)
+            distorted = (noise + permuted_emb)
             distorteds.append(distorted)
 
         return distorteds
@@ -82,8 +76,6 @@ class MegaMolBART():
         model = MegaMolBARTModel.restore_from(checkpoint_path)
         model = model.cuda()
         model.eval()
-
-        # TODO: get version from model (self.megamolbart.model)
         return model, '0.1.0'
 
     def smiles2embedding(self, smiles, pad_length=None):
@@ -99,13 +91,11 @@ class MegaMolBART():
 
         if isinstance(smiles, str):
             smiles = [smiles]
-        # if pad_length:
-        #     assert pad_length >= len(smiles) + 2
 
         tokens = self.tokenizer.tokenize(smiles, pad=True)
 
-        # # Append to tokens and mask if appropriate
-        if pad_length:
+        # # Append to tokens and mask if appropriate. No Padding for Perceiver
+        if pad_length and self.encoder_type != 'perceiver':
             for i in range(len(tokens['original_tokens'])):
                 n_pad = pad_length - len(tokens['original_tokens'][i])
                 tokens['original_tokens'][i] += [self.tokenizer.pad_token] * n_pad
@@ -118,34 +108,6 @@ class MegaMolBART():
         embedding = self.model.model.encode(encode_input)
         torch.cuda.empty_cache()
         return embedding, pad_mask
-
-    # def _inverse_transform(self, memory, mem_pad_mask, batch_size, sanitize, k):
-    #     if self.encoder_type == "perceiver":
-    #         mem_pad_mask = torch.zeros((memory.shape[0:2]), dtype=mem_pad_mask.dtype, device=mem_pad_mask.device)
-    #     with torch.no_grad():
-    #         decode_fn = partial(self.model.model._decode_fn,
-    #                             mem_pad_mask=mem_pad_mask.type(torch.LongTensor).cuda(),
-    #                             memory=memory)
-
-    #         mol_strs, _ = self.model.sampler.beam_decode(decode_fn,
-    #                                                     batch_size=batch_size,
-    #                                                     device='cuda',
-    #                                                     k=k)
-            
-    #         mol_strs = sum(mol_strs, [])  # flatten list
-    #         g_smiles = None
-    #         for smiles in mol_strs:
-    #             g_smiles = smiles
-    #             if sanitize:
-    #                 mol = Chem.MolFromSmiles(g_smiles, sanitize=sanitize)
-    #                 if mol:
-    #                     g_smiles = Chem.MolToSmiles(mol)
-    #                     break
-    #             else:
-    #                 break
-
-    #         logger.debug(f'Sanitized SMILES {g_smiles} added...')
-    #         return g_smiles
 
     def _inverse_transform_batch(self, memory, mem_pad_mask, k=1, sanitize=True):
         mem_pad_mask = mem_pad_mask.clone()
@@ -165,7 +127,6 @@ class MegaMolBART():
             
             mol_strs = sum(mol_strs, [])  # flatten list
             g_smiles = None
-            #TODO: can add multithreading here for validity check
             for smiles in mol_strs:
                 g_smiles = smiles
                 if sanitize:
@@ -174,14 +135,20 @@ class MegaMolBART():
                         g_smiles = Chem.MolToSmiles(mol)
                 smiles_interp_list.append(g_smiles)
         return smiles_interp_list
+    
+    # Added this function for easier local working with the model
+    # TODO as the inverse_transform is used via the sql query for generation this function should take in 
+    # either any sized embedding or a list of embeddings and process them via an appropriate batch size
+    # z = model.smiles2embedding(smiles) out_smiles = model.embedding2smiles(z)
+    def embedding2smiles(self, embeddings, mem_pad_mask, k=1, sanitize=True):
+        return self.inverse_transform([embeddings], mem_pad_mask, k, sanitize)[0]
 
-    def inverse_transform(self, embeddings, mem_pad_masks, k=1, sanitize=True):
+    def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
         smiles_interp_list = []
-        # mem_pad_mask = mem_pad_mask.clone()
         with torch.no_grad():
             with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 futures = {executor.submit(self._inverse_transform_batch, memory, mem_pad_mask.clone(
-                ), k, sanitize): memory for memory, mem_pad_mask in zip(embeddings, mem_pad_masks)}
+                ), k, sanitize): memory for memory in embeddings}
                 for future in concurrent.futures.as_completed(futures):
                     smiles = futures[future]
                     try:
@@ -191,27 +158,6 @@ class MegaMolBART():
                         logger.info(f'{type(futures)}, {type(future)}')
                         logger.exception(exc)
         return smiles_interp_list
-    # def inverse_transform(self, embeddings, mem_pad_mask, k=1, sanitize=True):
-    #     mem_pad_mask = mem_pad_mask.clone()
-    #     smiles_interp_list = []
-
-    #     batch_size = 1
-    #     with torch.no_grad():
-    #         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-    #             futures = {executor.submit(self._inverse_transform,\
-    #                 memory, mem_pad_mask, batch_size, sanitize, k):\
-    #                     memory for memory in embeddings}
-
-    #             for future in concurrent.futures.as_completed(futures):
-    #                 smiles = futures[future]
-
-    #                 try:
-    #                     g_smiles = future.result()
-    #                     smiles_interp_list.append(g_smiles)
-    #                 except Exception as exc:
-    #                     logger.warning(f'{smiles.smiles} generated an exception: {exc}')
-
-    #     return smiles_interp_list
 
     def interpolate_molecules(self, smiles1, smiles2, num_interp, tokenizer, k=1, sanitize=True):
         """Interpolate between two molecules in embedding space.
@@ -233,7 +179,6 @@ class MegaMolBART():
 
         embedding2, pad_mask2 = self.smiles2embedding(smiles2,
                                                       pad_length=pad_length)
-        # print("XXX", embedding1.shape, embedding2.shape) # 55 x 1 x 512
         # skip first and last because they're the selected molecules
         scale = torch.linspace(0.0, 1.0, num_interp + 2)[1:-1]
         scale = scale.unsqueeze(0).unsqueeze(-1).cuda()
@@ -241,10 +186,9 @@ class MegaMolBART():
         # dims: batch, tokens, embedding
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()
         combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
-        # print("XXXX", interpolated_emb.shape, pad_mask1.shape, pad_mask2.shape, combined_mask.shape)
         embeddings = [interpolated_emb]
         generated_mols = self.inverse_transform(embeddings,
-                                      [combined_mask]*num_interp,
+                                      combined_mask, #[combined_mask]*num_interp,
                                       k=k,
                                       sanitize=sanitize)[0] # list of num_interp molecules
         embeddings = []
@@ -252,7 +196,7 @@ class MegaMolBART():
         for idx in range(num_interp):
             emb = interpolated_emb[:, idx, :]
             emb = emb.unsqueeze(1)
-            dims.append(tuple(emb.shape)) # 55 x 1 x 512
+            dims.append(tuple(emb.shape))
             embeddings.append(emb)
         generated_mols = [smiles1] + generated_mols + [smiles2]
         embeddings = [embedding1] + embeddings + [embedding2]
@@ -275,7 +219,7 @@ class MegaMolBART():
         neighboring_embeddings = self.add_jitter(embedding, distance, num_requested)
         # neigh = [NxBxM] * num_requested
         generated_mols = self.inverse_transform(neighboring_embeddings,
-                                                [pad_mask.bool().cuda()]*num_requested,
+                                                pad_mask.bool().cuda(),
                                                 k=1, sanitize=sanitize)
         # gens = [B] * num_requested
         # need to resize it to [num_requested] * B
@@ -297,9 +241,6 @@ class MegaMolBART():
             total_embeddings.append([embedding[:, smile_idx, :]] + gens)
 
         return total_molecules, total_embeddings, pad_mask
-        # generated_mols = [smiles] + generated_mols
-        # neighboring_embeddings = [embedding] + neighboring_embeddings
-        # return generated_mols, neighboring_embeddings, pad_mask
 
     def find_similars_smiles(self,
                              smiles: list,
@@ -319,7 +260,6 @@ class MegaMolBART():
         # Rest of the applications and libraries use RAPIDS and cuPY libraries.
         # For interoperability, we need to convert the embeddings to cupy.
         dfs = []
-        # TODO: Add multiprocessing for this
         for smile_idx in range(len(smiles)):
             embeddings = []
             dims = []
@@ -332,10 +272,7 @@ class MegaMolBART():
                                         'embeddings_dim': dims,
                                         'Generated': [True for i in range(len(generated_mols[smile_idx]))]})
             generated_df.iat[0, 3] = False
-            if force_unique:
-                inv_transform_funct = partial(self.inverse_transform, mem_pad_mask=pad_mask[:, smile_idx, :].unsqueeze(1))
-                #TODO: Does the compute smiles have to be further batched or no since we do it in the inner molecule loop?
-                generated_df = self.compute_unique_smiles(generated_df, inv_transform_funct,scaled_radius=scaled_radius)
+            # Removed Force Unique
             dfs.append(generated_df)
 
         return dfs
@@ -462,6 +399,8 @@ class MegaMolBART():
 
         return interp_df
 
+#TODO: This class will change once Perceiver is integrated into Nemo_MegaMolBart/dev
+# Only works with @(dreidenbach) local LVM implementation
 class MegaMolBARTLatent(MegaMolBART):
     def __init__(self, model_dir, noise_mode = 0):
         # super().__init__()
@@ -525,7 +464,7 @@ class MegaMolBARTLatent(MegaMolBART):
                 sample =(e * torch.exp(0.5 * z_logv)) + z_mean
                 distorteds.append(sample)
         elif self.noise_mode == 3:
-            # Latent Reconstruction
+            # Latent Reconstruction: No Noise
             for _ in range(cnt):
                 sample = z_mean
                 distorteds.append(sample)
@@ -541,24 +480,10 @@ class MegaMolBARTLatent(MegaMolBART):
         Returns
             embedding array and boolean mask
         """
-
-        # assert isinstance(smiles, str)
-        # TODO Make changes to base model
         if isinstance(smiles, str):
             smiles = [smiles]
-        # TODO: removing for now
-        # if pad_length:
-        #     assert pad_length >= len(smiles) + 2
-
         tokens = self.tokenizer.tokenize(smiles, mask = False, pad=True)
-
-        # Append to tokens and mask if appropriate
-        if pad_length:
-            for i in range(len(tokens['original_tokens'])):
-                n_pad = pad_length - len(tokens['original_tokens'][i])
-                tokens['original_tokens'][i] += [self.tokenizer.pad_token] * n_pad
-                tokens['masked_pad_masks'][i] += [1] * n_pad
-
+        # LVM never require padding
         token_ids = torch.tensor(self.tokenizer.convert_tokens_to_ids(tokens['original_tokens'])).cuda().T
         pad_mask = torch.tensor(tokens['masked_pad_masks']).bool().cuda().T
         encode_input = {"encoder_input": token_ids, "encoder_pad_mask": pad_mask}
@@ -614,7 +539,7 @@ class MegaMolBARTLatent(MegaMolBART):
         neighboring_embeddings = self.add_jitter(embedding_info, distance, num_requested)
         # neigh = [NxBxM] * num_requested
         generated_mols = self.inverse_transform(neighboring_embeddings,
-                                                [pad_mask.bool().cuda()]*num_requested,
+                                                pad_mask.bool().cuda(), #[pad_mask.bool().cuda()]*num_requested,
                                                 k=1, sanitize=sanitize)
         # gens = [B] * num_requested
         # need to resize it to [num_requested] * B
@@ -650,25 +575,20 @@ class MegaMolBARTLatent(MegaMolBART):
         Returns
             list of interpolated smiles molecules
         """
-        # add 2 for start / stop
-        pad_length = max(len(smiles1), len(smiles2)) + 2
-        embedding_info1, pad_mask1 = self.smiles2embedding(smiles1, pad_length=pad_length)
+        embedding_info1, pad_mask1 = self.smiles2embedding(smiles1)
         _, _, embedding1, _ = embedding_info1
-
-        embedding_info2, pad_mask2 = self.smiles2embedding(smiles2, pad_length=pad_length)
+        embedding_info2, pad_mask2 = self.smiles2embedding(smiles2)
         _, _, embedding2, _ = embedding_info2
-        # print("XXX", embedding1.shape, embedding2.shape) # 55 x 1 x 512
         # skip first and last because they're the selected molecules
         scale = torch.linspace(0.0, 1.0, num_interp + 2)[1:-1]
         scale = scale.unsqueeze(0).unsqueeze(-1).cuda()
 
         # dims: batch, tokens, embedding
         interpolated_emb = torch.lerp(embedding1, embedding2, scale).cuda()
-        combined_mask = (pad_mask1 & pad_mask2).bool().cuda()
-        # print("XXXX", interpolated_emb.shape, pad_mask1.shape, pad_mask2.shape, combined_mask.shape)
+        combined_mask = torch.zeros((embedding1.shape[0:2]), dtype=pad_mask1.dtype, device=pad_mask1.device).cuda()
         embeddings = [interpolated_emb]
         generated_mols = self.inverse_transform(embeddings,
-                                      [combined_mask]*num_interp,
+                                      combined_mask, #[combined_mask]*num_interp,
                                       k=k,
                                       sanitize=sanitize)[0] # list of num_interp molecules
         embeddings = []
@@ -676,7 +596,7 @@ class MegaMolBARTLatent(MegaMolBART):
         for idx in range(num_interp):
             emb = interpolated_emb[:, idx, :]
             emb = emb.unsqueeze(1)
-            dims.append(tuple(emb.shape)) # 55 x 1 x 512
+            dims.append(tuple(emb.shape))
             embeddings.append(emb)
         generated_mols = [smiles1] + generated_mols + [smiles2]
         embeddings = [embedding1] + embeddings + [embedding2]

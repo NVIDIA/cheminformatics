@@ -44,12 +44,10 @@ class MoleculeGenerator():
             ['smiles']).fetchone()
         if result[0] == 0:
             with closing(self.conn.cursor()) as cursor:
-                # @(dreidenbach) changed to my workspace path
                 sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
     
-    #TODO: update for scaffolds
     def _insert_generated_smiles(self,
                                  smiles_id,
                                  smiles_df):
@@ -167,14 +165,12 @@ class MoleculeGenerator():
             with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
                 futures = {executor.submit(self._sample, df['id'].tolist(), df['smiles'].tolist(), num_requested, scaled_radius, force_unique, sanitize)}
                 for future in concurrent.futures.as_completed(futures):
-                    # smiles = futures[future]
                     try:
                         future.result()
                     except Exception as exc:
                         log.warning(f'generated an exception: {exc}')
                         log.exception(exc)
         while True:
-            #TODO: fix SAMPLE only case --> make sepearete loop for EMBEDDING
             df = pd.read_sql_query('''
                 SELECT id, smiles
                 FROM smiles
@@ -187,7 +183,6 @@ class MoleculeGenerator():
             with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
                 futures = {executor.submit(self._sample, df['id'].tolist(), df['smiles'].tolist(), num_requested, scaled_radius, force_unique, sanitize, dataset_type = "EMBEDDING")}
                 for future in concurrent.futures.as_completed(futures):
-                    # smiles = futures[future]
                     try:
                         future.result()
                     except Exception as exc:
@@ -195,7 +190,6 @@ class MoleculeGenerator():
 
     def _sample(self, ids, smiles, num_samples, scaled_radius, force_unique, sanitize, dataset_type = "SAMPLE"):
         if dataset_type == 'SAMPLE':
-            # import pdb; pdb.set_trace()
             if len(smiles) == 1: # for CDDD and legacy
                 smiles = smiles[0]
             results = self.inferrer.find_similars_smiles(smiles,
@@ -206,11 +200,9 @@ class MoleculeGenerator():
             if isinstance(smiles, str):
                 results = [results]
         else:
-            #TODO: Scaffolding for insert
             if len(smiles) == 1: # for CDDD and legacy
                 smiles = smiles[0]
                 emb = self.inferrer.smiles_to_embedding(smiles)
-                # import pdb; pdb.set_trace()
                 result = pd.DataFrame()
                 result['SMILES'] = [smiles]
                 result['embeddings_dim'] = [emb.dim]

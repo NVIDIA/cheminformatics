@@ -25,6 +25,9 @@ from cuchembench.metrics import (Validity,
                               EffectiveNovelty,
                               ScaffoldUnique,
                               ScaffoldNonIdenticalSimilarity,
+                              ScaffoldNovelty,
+                              EffectiveScaffoldNovelty,
+                              Entropy,
                               NearestNeighborCorrelation,
                               Modelability)
 
@@ -83,7 +86,7 @@ def create_dataset(cfg):
     data_files = {}
     exp_name = cfg.model.exp_name
     sample_data_req = False
-    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty, ScaffoldUnique, ScaffoldNonIdenticalSimilarity]:
+    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty, ScaffoldUnique, ScaffoldNonIdenticalSimilarity, ScaffoldNovelty, Entropy]:
         name = sampling_metric.name
         sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
         radii.update(eval(f'cfg.metric.{name}.radius'))
@@ -91,8 +94,6 @@ def create_dataset(cfg):
         if metric_cfg.enabled:
             sample_data_req = True
 
-    #TODO: the path to dataset restricts the usage in dev mode only.
-    # @(dreidenbach) updated to my /workspace that mirrors my home dir
     if sample_data_req:
         data_files['benchmark_ZINC15_test_split'] =\
             {'col_name': 'canonical_smiles',
@@ -145,7 +146,6 @@ def main(cfg):
 
     max_seq_len = int(cfg.sampling.max_seq_len)
     exp_name = cfg.model.exp_name
-    # import pdb;pdb.set_trace()
     if cfg.model.name == 'MegaMolBART':
         from cuchembench.inference.megamolbart import MegaMolBARTWrapper
         inferrer = MegaMolBARTWrapper(checkpoint_file = cfg.model.checkpoint_file)
@@ -172,13 +172,13 @@ def main(cfg):
         log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
         inf_class = locate(cfg.model.name)
         inferrer = inf_class()
-    # log.info(f'ERROR: {type(inferrer)}')
+
     wait_for_megamolbart_service(inferrer)
     data_files, radii = create_dataset(cfg)
     # Metrics
     metric_list = []
 
-    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty, ScaffoldUnique, ScaffoldNonIdenticalSimilarity]:
+    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty, ScaffoldUnique, ScaffoldNonIdenticalSimilarity, ScaffoldNovelty, EffectiveScaffoldNovelty, Entropy]:
         name = sampling_metric.name
         metric_cfg = eval(f'cfg.metric.{name}')
         if metric_cfg.enabled:
@@ -189,8 +189,7 @@ def main(cfg):
         name = NearestNeighborCorrelation.name
         metric_cfg = cfg.metric.nearest_neighbor_correlation
         input_size = get_input_size(metric_cfg)
-        #TODO can change filename here to include the nbits
-        # smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len, data_filename=f'benchmark_ChEMBL_approved_drugs_physchem_{exp_name}.csv', fp_filename=f'fingerprints_ChEMBL_approved_drugs_physchem_{nbits}.csv')
+
         smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len, fp_filename=f'fingerprints_ChEMBL_approved_drugs_physchem_{nbits}.csv')
 
         smiles_dataset.load(data_len=input_size, nbits=nbits)
@@ -211,7 +210,7 @@ def main(cfg):
 
         for smiles_dataset in smiles_dataset_list:
             log.info(f'Loading {smiles_dataset.table_name}...')
-            #TODO pipe in finger print size. Should be piped through but double check
+
             smiles_dataset.load(data_len=input_size, columns=['SMILES'], nbits = nbits)
 
             metric_list.append(
@@ -313,7 +312,7 @@ def main(cfg):
                 else:
                     kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
 
-            if metric.name in ['validity', 'unique', 'novelty', 'non_identicality', 'effective_novelty', 'scaffold_unique', 'scaffold_non_identical_similarity']:
+            if metric.name in ['validity', 'unique', 'novelty', 'non_identicality', 'effective_novelty', 'scaffold_unique', 'scaffold_non_identical_similarity', 'scaffold_novelty', 'effective_scaffold_novelty', 'entropy']:
                 kwargs['num_samples'] = int(cfg.sampling.sample_size)
                 metric_cfg = eval('cfg.metric.' + metric.name)
                 kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)

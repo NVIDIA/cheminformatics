@@ -13,7 +13,7 @@ autopep8==1.5.4
 protobuf==3.14.0
 chembl_webresource_client==0.10.2
 matplotlib==3.3.4
-waitress==2.1.1
+waitress==2.1.2
 flask-restplus==0.13.0
 locust==1.4.3
 hydra-core==1.1.1

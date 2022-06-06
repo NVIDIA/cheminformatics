@@ -44,7 +44,7 @@ class GRPCLocust(User):
     @task
     @stopwatch('GRPC_Sample')
     def client_task(self):
-        with grpc.insecure_channel('192.167.100.2:50051') as channel:
+        with grpc.insecure_channel('127.0.0.1:50051') as channel:
             stub = generativesampler_pb2_grpc.GenerativeSamplerStub(channel)
 
             spec = generativesampler_pb2.GenerativeSpec(
@@ -53,4 +53,4 @@ class GRPCLocust(User):
                 radius=0.0001,
                 numRequested=10)
 
-            response = stub.FindSimilars(spec)
+            response = stub.SmilesToEmbedding(spec)

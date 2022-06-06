@@ -1,0 +1,13 @@
+name: MegaMolBART
+desc: MegaMolBART gRPC Service
+
+service:
+  port: 50051
+
+model:
+  model_path: /models/checkpoints_small_span_aug_noMP/MegaMolBART.nemo
+  parallel_size: 1
+
+  tokenizer:
+    vocab_path: /nemo/nemo_chem/vocab/megamolbart.vocab
+    model_path: ${model.model_path}

@@ -16,7 +16,11 @@
 import os
 import logging
 import pynvml as nv
+
 from subprocess import run, PIPE
+
+from nemo.core.config import hydra_runner
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('megamolbart')
 formatter = logging.Formatter('%(asctime)s %(name)s [%(levelname)s]: %(message)s')
@@ -36,7 +40,7 @@ def _set_cuda_device():
     result_lines = result.stdout.decode("utf-8")
     logger.info(f'Container info result: {result_lines}')
     if result.returncode != 0:
-        logger.error(f'Container info result: {result.stderr}')
+        logger.warning(f'Using default GPU device')
     else:
         container_id = int(result_lines.split('_')[-1])
         gpu_cnt = _fetch_gpu_counts()
@@ -49,11 +53,7 @@ def _set_cuda_device():
 _set_cuda_device()
 
 
-import sys
-import shutil
-import argparse
 import pathlib
-
 import grpc
 import generativesampler_pb2_grpc
 
@@ -67,40 +67,16 @@ class Launcher(object):
     benchmarking and testing) and with UI.
     """
 
-    def __init__(self):
-        parser = argparse.ArgumentParser(description='MegaMolBART gRPC Service')
-        parser.add_argument('-p', '--port',
-                            dest='port',
-                            type=int,
-                            default=50051,
-                            help='GRPC server Port')
-        parser.add_argument('-d', '--debug',
-                            dest='debug',
-                            action='store_true',
-                            default=False,
-                            help='Show debug messages')
+    def __init__(self, cfg):
+        logger.setLevel(logging.DEBUG)
 
-        parser.add_argument('-m', '--model_path',
-                            dest='model_path',
-                            default=None,
-                            help='Path to model content.')
-
-        args = parser.parse_args(sys.argv[1:])
-
-        if args.debug:
-            logger.setLevel(logging.DEBUG)
-
-        if args.model_path is None:
-            model_dir = self._fetch_model_path()
-        else:
-            model_dir = args.model_path
-        logger.info(f'Using checkpoint: {model_dir}')
+        logger.info(f'Using checkpoint: {cfg.model.model_path}')
 
         server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         generativesampler_pb2_grpc.add_GenerativeSamplerServicer_to_server(
-            GenerativeSampler(model_dir=model_dir),
+            GenerativeSampler(cfg),
             server)
-        server.add_insecure_port(f'[::]:{args.port}')
+        server.add_insecure_port(f'[::]:{cfg.service.port}')
         server.start()
         server.wait_for_termination()
 
@@ -108,22 +84,16 @@ class Launcher(object):
         """
         Fetch the model path from the model server.
         """
-        checkpoints = sorted(pathlib.Path(search_loc).glob('**/megamolbart_checkpoint.nemo'))
+        checkpoints = sorted(pathlib.Path(search_loc).glob('**/*.nemo'))
 
         if not checkpoints or len(checkpoints) == 0:
             logger.info(f'Model not found. Downloading...')
             self.download_megamolbart_model()
-            checkpoints = sorted(pathlib.Path(search_loc).glob('**/megamolbart_checkpoint.nemo'))
+            checkpoints = sorted(pathlib.Path(search_loc).glob('**/*.nemo'))
         logger.info(f'Found {len(checkpoints)} checkpoints in {search_loc}')
 
         checkpoint_dir = checkpoints[-1].absolute().parent.as_posix()
-
-        # TODO: This is a hack to place the vocab file where the model is expecting it.
-        vocab_path = '/workspace/nemo/nemo/collections/chem/vocab/'
-        os.makedirs(vocab_path, exist_ok=True)
-        shutil.copy(os.path.join(checkpoint_dir, 'bart_vocab.txt'),
-                    os.path.join(vocab_path, 'megamolbart_pretrain_vocab.txt'))
-        return checkpoint_dir
+        return checkpoint_dir, checkpoints[-1]
 
     def download_megamolbart_model(self):
         """
@@ -140,8 +110,9 @@ class Launcher(object):
                 raise Exception('Error downloading model')
 
 
-def main():
-    Launcher()
+@hydra_runner(config_path="../conf", config_name="default")
+def main(cfg):
+    Launcher(cfg)
 
 
 if __name__ == '__main__':

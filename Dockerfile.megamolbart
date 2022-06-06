@@ -1,5 +1,6 @@
 # Copyright 2020 NVIDIA Corporation
-FROM nvcr.io/nvidia/nemo:1.3.0
+FROM nvcr.io/nvidia/nemo:22.01
+# FROM nvcr.io/nvidia/nemo:1.3.0
 ARG GITHUB_ACCESS_TOKEN
 ARG GITHUB_BRANCH=main
 ARG NEMO_HOME=/opt/nemo
@@ -7,14 +8,16 @@ ARG CHEMINFO_HOME=/opt/nvidia/cheminfomatics
 
 RUN apt-get update \
     # && apt-get upgrade -y \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 docker.io\
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux libxrender1 docker.io sudo\
     && rm -rf /var/lib/apt/lists/*
 
 ## Environment setup
 COPY megamolbart/conda/env.yml /tmp/.
-RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
+# RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
 
 SHELL ["conda", "run", "-n", "base", "/bin/bash", "-c"]
+
+RUN pip install --upgrade rdkit-pypi==2021.9.5.1 nemo-toolkit[all]==1.7.2 numpy
 
 ## PySMILES -- requirements handled by conda environment
 RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
@@ -24,7 +27,7 @@ RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /
 RUN git clone https://${GITHUB_ACCESS_TOKEN}@github.com/clara-parabricks/NeMo_MegaMolBART.git \
     --branch ${GITHUB_BRANCH} /opt/NeMo_MegaMolBART \
     && cd /opt/NeMo_MegaMolBART \
-    && git checkout c218e4b9a22e6880fca9e7b130dea9b336af5afa \
+    && git checkout v0.2ea \
     && rm -rf ${NEMO_HOME} \
     && mv /opt/NeMo_MegaMolBART ${NEMO_HOME} \
     && ln -s ${NEMO_HOME}/nemo/collections/chem /opt/conda/lib/python3.8/site-packages/nemo/collections/chem
@@ -48,3 +51,105 @@ ENV PYTHONPATH ${CHEMINFO_HOME}/cuchemcommon/grpc/:${CHEMINFO_HOME}/common:$PYTH
 ENV CHEMINFO_HOME ${CHEMINFO_HOME}
 COPY megamolbart/ ${CHEMINFO_HOME}/megamolbart/
 CMD cd ${CHEMINFO_HOME}/megamolbart && python3 -m megamolbart
+
+
+
+
+
+
+
+
+
+
+# # Copyright 2020 NVIDIA Corporation
+# FROM nvcr.io/nvidia/nemo:22.01
+# # FROM rapidsai/rapidsai:22.04-cuda11.4-runtime-ubuntu20.04-py3.8
+# # FROM nvcr.io/nvidia/pytorch:22.04-py3
+
+# ARG GITHUB_ACCESS_TOKEN
+# ARG GITHUB_BRANCH=main
+# ARG CHEMINFO_HOME=/opt/nvidia/cheminfomatics
+
+# # RUN cd /tmp && apt-key del 7fa2af80 && \
+# #     wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-keyring_1.0-1_all.deb && \
+# # 	dpkg -i cuda-keyring_1.0-1_all.deb
+
+# # RUN sed -i '/developer\.download\.nvidia\.com\/compute\/cuda\/repos/d' /etc/apt/sources.list.d/*
+# # RUN sed -i '/developer\.download\.nvidia\.com\/compute\/machine-learning\/repos/d' /etc/apt/sources.list.d/*
+
+# RUN apt-get update \
+#     # && apt-get upgrade -y \
+#     && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+#         wget git unzip tmux libxrender1 docker.io build-essential sndfile-tools
+# # apt install software-properties-common
+
+# # RUN apt install -y nvidia-cuda-toolkit
+
+# # RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 80 \
+# #     --slave /usr/bin/g++ g++ /usr/bin/g++-8 \
+# #     --slave /usr/bin/gcov gcov /usr/bin/gcov-8
+# # Install CUDA 10.2 needed for APEX
+# # RUN cd /tmp wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/cuda-ubuntu1804.pin \
+# #     && mv cuda-ubuntu1804.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+# #     && wget https://developer.download.nvidia.com/compute/cuda/10.2/Prod/local_installers/cuda-repo-ubuntu1804-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb \
+# #     && dpkg -i cuda-repo-ubuntu1804-10-2-local-10.2.89-440.33.01_1.0-1_amd64.deb \
+# #     && apt-key add /var/cuda-repo-10-2-local-10.2.89-440.33.01/7fa2af80.pub \
+# #     && apt-get update \
+# #     && apt-get -y install cuda
+# # ENV CUDA_HOME /usr/local/cuda-10.2
+# # RUN apt install -y software-properties-common
+# # RUN wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin \
+# #     && mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600 \
+# #     && apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub \
+# #     && add-apt-repository "deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/ /" \
+# #     && apt-get update \
+# #     && apt-get -y install cuda
+# # ENV CUDA_HOME /usr/local/cuda-11.4
+
+# # RUN pip3 install torch torchvision torchaudio
+
+# # RUN cd /tmp && git clone https://github.com/NVIDIA/apex && \
+# #     cd apex && \
+# #     git checkout c8bcc98176ad8c3a0717082600c70c907891f9cb && \
+# #     pip install -v --disable-pip-version-check --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" --global-option="--fast_layer_norm" ./
+
+
+# RUN pip install --upgrade rdkit-pypi==2022.3.1.1 nemo-toolkit==1.7.2
+
+# SHELL ["conda", "run", "-n", "base", "/bin/bash", "-c"]
+# ## Environment setup
+# # COPY megamolbart/conda/env.yml /tmp/.
+# # RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
+
+# ## PySMILES -- requirements handled by conda environment
+# RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
+#     && cd /opt/pysmilesutils; pip install .
+
+# # NeMo_MegaMolBART
+# RUN git clone https://${GITHUB_ACCESS_TOKEN}@github.com/clara-parabricks/NeMo_MegaMolBART.git \
+#     --branch ${GITHUB_BRANCH} /opt/nemo \
+#     && cd /opt/nemo \
+#     && git checkout v0.2ea
+#     # && ln -s ${NEMO_HOME}/nemo_chem /opt/conda/envs/rapids/lib/python3.8/site-packages/nemo/collections/nemo_chem
+
+# RUN conda create -n rapids -c rapidsai -c nvidia -c conda-forge rapids=22.04
+# # RUN /opt/conda/bin/python -m pip install --upgrade pytorch_lightning
+
+# ## Copy and add generated code to PYTHONPATH
+# COPY common/ /tmp/common
+# RUN cd /tmp/common; pip install .
+
+# RUN mkdir -p ${CHEMINFO_HOME}/cuchemcommon/grpc
+# COPY common/cuchemcommon ${CHEMINFO_HOME}/cuchemcommon
+# COPY common/generated ${CHEMINFO_HOME}/cuchemcommon/grpc
+# COPY setup/env.sh ${CHEMINFO_HOME}/cuchemcommon/
+# COPY setup/launch ${CHEMINFO_HOME}/cuchemcommon/
+
+# # Comment this before production rollout
+# COPY ./models/ /models
+
+# ENV PYTHONPATH ${CHEMINFO_HOME}/cuchemcommon/grpc/:${CHEMINFO_HOME}/common:/opt/nemo:/opt/pysmilesutils:$PYTHONPATH
+# ENV CHEMINFO_HOME ${CHEMINFO_HOME}
+# COPY megamolbart/ ${CHEMINFO_HOME}/megamolbart/
+
+# CMD cd ${CHEMINFO_HOME}/megamolbart && python3 -m megamolbart

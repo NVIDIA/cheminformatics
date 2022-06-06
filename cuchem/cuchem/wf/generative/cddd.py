@@ -71,17 +71,23 @@ class Cddd(BaseGenerativeWorkflow):
                               forceUnique=force_unique,
                               sanitize=sanitize)
         result = self.stub.FindSimilars(spec)
-        generatedSmiles = list(result.generatedSmiles)
+        gsmis = list(result.generatedSmiles)
         embeddings = []
         dims = []
-        for embedding in result.embeddings:
-            embeddings.append(list(embedding.embedding))
-            dims.append(embedding.dim)
+        smis = []
+        for i in range(len(gsmis)):
+            smi = gsmis[i]
+            if smi in smis:
+                continue
 
-        generated_df = pd.DataFrame({'SMILES': generatedSmiles,
+            smis.append(smi)
+            embeddings.append(list(result.embeddings[i].embedding))
+            dims.append(result.embeddings[i].dim)
+
+        generated_df = pd.DataFrame({'SMILES': smis,
                                      'embeddings': embeddings,
                                      'embeddings_dim': dims,
-                                     'Generated': [True for i in range(len(generatedSmiles))]})
+                                     'Generated': [True for i in range(len(smis))]})
         generated_df['Generated'].iat[0] = False
 
         return generated_df
@@ -100,7 +106,7 @@ class Cddd(BaseGenerativeWorkflow):
                               sanitize=sanitize)
 
         result = self.stub.Interpolate(spec)
-        result = list(result.generatedSmiles)
+        result = list(set(result.generatedSmiles))
 
         generated_df = pd.DataFrame({'SMILES': result,
                                      'Generated': [True for i in range(len(result))]})

@@ -18,7 +18,7 @@ hydra-core==1.1.1
 locust==1.4.3
 dask
 dask_ml
-distributed==2021.10.0
+distributed
 plotly==4.9.0
 pytest==6.2.2
 umap-learn==0.5.1

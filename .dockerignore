@@ -27,3 +27,5 @@ portal
 megamolbart/models
 
 outputs/
+./.vscode-server
+# ./models

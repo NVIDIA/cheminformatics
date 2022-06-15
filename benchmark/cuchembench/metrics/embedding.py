@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 try:
     import cupy as xpy
     import cudf as xdf
-    from cuml.metrics import pairwise_distances, mean_squared_error
+    from cuml.metrics import pairwise_distances, mean_squared_error, r2_score
     from cuml.linear_model import LinearRegression, ElasticNet
     from cuml.svm import SVR
     from cuml.ensemble import RandomForestRegressor
@@ -37,7 +37,6 @@ except ModuleNotFoundError as e:
     from cuchembench.utils.distance import tanimoto_calculate
     from sklearn.preprocessing import StandardScaler
     RAPIDS_AVAILABLE = False
-
 __all__ = ['NearestNeighborCorrelation', 'Modelability']
 
 
@@ -61,9 +60,9 @@ def get_model_dict():
     rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
     return {'linear_regression': [lr_estimator, lr_param_dict],
-            'elastic_net': [en_estimator, en_param_dict],
+            # 'elastic_net': [en_estimator, en_param_dict], # Removing Elastic Net for timing
             'support_vector_machine': [sv_estimator, sv_param_dict],
-            'random_forest': [rf_estimator, rf_param_dict]
+            'random_forest': [rf_estimator, rf_param_dict],
             }
 
 class BaseEmbeddingMetric():
@@ -176,15 +175,14 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         corr = spearmanr(fingerprints_dist, embeddings_dist, top_k=top_k)
         return corr
 
-    def calculate(self, top_k=None, **kwargs):
+    def calculate(self, top_k=None, average_tokens = False, **kwargs):
 
         start_time = time.time()
         cache = Cache()
         embeddings = cache.get_data('NN_embeddings')
-
+        # TODO: Possible revisit for performance reasons
         if embeddings is None:
-            embeddings = self.encode_many(zero_padded_vals=True,
-                                          average_tokens=False)
+            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens) #zero_padded_vals=True
             logger.info(f'Embedding len and type {len(embeddings)}  {type(embeddings[0])}')
             embeddings = xpy.vstack(embeddings)
             fingerprints = xpy.asarray(self.fingerprint_dataset)
@@ -278,6 +276,7 @@ class Modelability(BaseEmbeddingMetric):
 
                 # NOTE: convert to negative MSE and maximize metric if SKLearn GridSearch is ever used
                 mse = mean_squared_error(ypred_unxform, ytest_unxform).item()
+                # r2 = r2_score(ypred_unxform, ytest_unxform).item()
                 kfold_mse.append(mse)
 
             avg_mse = np.nanmean(np.array(kfold_mse))
@@ -393,13 +392,14 @@ class Modelability(BaseEmbeddingMetric):
                     embeddings.append(embedding)
         return embeddings
 
-    def calculate(self, estimator, param_dict, **kwargs):
-
+    def calculate(self, estimator, param_dict, average_tokens, **kwargs):
         logger.info(f'Processing {self.label}...')
         cache = Cache()
-        embeddings = cache.get_data(f'Modelability_{self.label}_embeddings')
+        embeddings = None #cache.get_data(f'Modelability_{self.label}_embeddings') Caching with this label is unaccurate for benchmarking multiple models
+        assert(embeddings is None)
         if embeddings is None:
-            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=True)
+            logger.info(f'Grabbing Fresh Embeddings with average_tokens = {average_tokens}')
+            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens)
             embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
             fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
 

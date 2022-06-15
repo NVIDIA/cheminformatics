@@ -20,18 +20,18 @@ logger = logging.getLogger(__name__)
 
 class MegaMolBARTWrapper(metaclass=Singleton):
 
-    def __init__(self) -> None:
+    def __init__(self, checkpoint_file = None) -> None:
         self.min_jitter_radius = 1
 
-        # TODO: make this configurable/resuable accross all modules.
-        checkpoint_file = 'megamolbart_checkpoint.nemo'
+        if checkpoint_file == None:
+            checkpoint_file = 'Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo'
         files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
         if len(files) == 0:
             raise ValueError(f'Checkpoint file "{checkpoint_file}"" in "/models".')
 
         dir = files[-1].absolute().parent.as_posix()
 
-        from megamolbart.inference import MegaMolBART
+        from megamolbart.inference_perceiver import MegaMolBART
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
         self.megamolbart = MegaMolBART(model_path=os.path.join(dir, checkpoint_file))
@@ -41,51 +41,67 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         return True
 
     def smiles_to_embedding(self,
-                            smiles: str,
-                            pad_length: int):
+                            smiles: list,
+                            pad_length: int = None):
 
-        embedding, pad_mask = self.megamolbart.smiles2embedding(smiles,
-                                                                pad_length=pad_length)
-        dim = embedding.shape
-        embedding = embedding.flatten().tolist()
-        return EmbeddingList(embedding=embedding,
-                             dim=dim,
-                             pad_mask=pad_mask)
+        embedding, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
+        storage = []
+        for molecule in range(len(smiles)):
+            emb = embedding[:, molecule, :].unsqueeze(1)
+            dim = emb.shape
+            mask = pad_mask[:, molecule].unsqueeze(1)
+            elem = EmbeddingList(embedding=emb.flatten().tolist(), dim=dim, pad_mask=mask)
+            storage.append(elem)
+        return embedding, pad_mask, storage
 
+    #TODO: Method is unused
     def embedding_to_smiles(self,
                             embedding,
-                            dim: int,
-                            pad_mask):
+                            pad_mask,
+                            storage = None,
+                            batch_size = 100):
         '''
         Converts input embedding to SMILES.
         @param transform_spec: Input spec with embedding and mask.
         '''
         import torch
+        if storage:
+            beaker = []
+            cabinet = []
+            for emb in storage:
+            #Rebuild bulk embedding
+                embedding = torch.FloatTensor(list(emb.embedding))
+                pad_mask = torch.BoolTensor(list(emb.pad_mask))
+                dim = tuple(emb.dim)
+                embedding = torch.reshape(embedding, dim).cuda()
+                pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
+                beaker.append(embedding)
+                cabinet.append(pad_mask)
+            embedding = torch.cat(beaker, dim=1)
+            pad_mask = torch.cat(cabinet, dim=1)
 
-        embedding = torch.FloatTensor(list(embedding))
-        pad_mask = torch.BoolTensor(list(pad_mask))
-        dim = tuple(dim)
+        (_, num_molecules, _) = tuple(embedding.size())
+        embeddings = [embedding[:, i:i+batch_size, :] for i in range(0, num_molecules, batch_size)] # emb is seq X num_molecules X model_dim
+        pad_masks =  [pad_mask[:, i:i+batch_size] for i in range(0, num_molecules, batch_size)] # mask is seq x num_molecules
 
-        embedding = torch.reshape(embedding, dim).cuda()
-        pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
-
-        generated_mols = self.megamolbart.embedding2smiles(embedding, pad_mask)
-        return SmilesList(generatedSmiles=generated_mols)
+        # embeddings is a list of embeddings  SeqXBatchxModel
+        generated_mols = self.megamolbart.inverse_transform(embeddings, pad_masks)
+        #generated_moles is a list of num_molecules
+        return [SmilesList(generatedSmiles=generated_mols[molecule]) for molecule in range(num_molecules)]
 
     def find_similars_smiles(self,
-                             smiles: str,
+                             smiles: list,
                              num_requested: int = 10,
                              scaled_radius=None,
                              force_unique=False,
                              sanitize=True):
-
-        generated_df = self.megamolbart.find_similars_smiles(
+        generated_dfs = self.megamolbart.find_similars_smiles(
                 smiles,
                 num_requested=num_requested,
                 scaled_radius=scaled_radius,
                 sanitize=sanitize,
                 force_unique=force_unique)
-        return generated_df
+        return generated_dfs
 
     def interpolate_smiles(self,
                            smiles: List,
@@ -122,7 +138,7 @@ class GrpcMegaMolBARTWrapper():
 
     def smiles_to_embedding(self,
                             smiles: str,
-                            padding: int,
+                            padding: int = None,
                             scaled_radius=None,
                             num_requested: int = 10,
                             sanitize=True):
@@ -194,3 +210,41 @@ class GrpcMegaMolBARTWrapper():
         generated_df.iat[0, 1] = False
         generated_df.iat[-1, 1] = False
         return generated_df
+
+class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
+
+    def __init__(self, checkpoint_file = None, noise_mode = 0) -> None:
+        self.min_jitter_radius = 1
+        if checkpoint_file == None:
+            checkpoint_file = 'Base_Small_Span_Aug_Half_Draco_nodes_4_gpus_16.nemo'
+        files = sorted(pathlib.Path('/models').glob(f'**/{checkpoint_file}'))
+        if len(files) == 0:
+            raise ValueError(f'Checkpoint file "{checkpoint_file}"" in "/models".')
+
+        dir = files[-1].absolute().parent.as_posix()
+
+        from megamolbart.inference_perceiver import MegaMolBARTLatent
+        # this wrapper is not yet ready for MegaMolBARTLatent
+
+        logger.info(f'Loading model from {dir}/{checkpoint_file}')
+        self.megamolbart = MegaMolBARTLatent(model_dir=os.path.join(dir, checkpoint_file), noise_mode = noise_mode)
+        logger.info(f'Loaded Version {self.megamolbart.version}')
+
+    def is_ready(self, timeout: int = 10) -> bool:
+        return True
+
+    def smiles_to_embedding(self,
+                            smiles: list,
+                            pad_length: int = None):
+
+        emb_info, pad_mask = self.megamolbart.smiles2embedding(smiles, pad_length=pad_length)
+        _, _, z_mean, z_logv = emb_info
+        embedding = z_mean
+        storage = []
+        for molecule in range(len(smiles)):
+            emb = embedding[:, molecule, :].unsqueeze(1)
+            dim = emb.shape
+            mask = pad_mask[:, molecule].unsqueeze(1)
+            elem = EmbeddingList(embedding=emb.flatten().tolist(), dim=dim, pad_mask=mask)
+            storage.append(elem)
+        return embedding, pad_mask, storage

@@ -72,6 +72,7 @@ elif [ -e /opt/nvidia/cheminfomatics/cuchem/startdash.py ]; then
     # When inside container in prod mode
     CHEMINFO_DIR="/opt/nvidia/cheminfomatics"
 fi
+echo TEST_$CHEMINFO_DIR
 PYTHONPATH_CUCHEM="${CHEMINFO_DIR}/cuchem:${CHEMINFO_DIR}/common:${CHEMINFO_DIR}/common/generated/"
 
 build() {
@@ -193,18 +194,16 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     elif [[ ${CONTAINER_OPTION} -eq 2 ]]; then
         DOCKER_CMD="${DOCKER_CMD} --name chem_dev_2"
-        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/models/megamolbart_v0.1/:/models/megamolbart/"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -v /home/rilango/Projects/github/NeMo_MegaMolBART/:/nemo"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace/megamolbart/"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/megamolbart:/workspace/benchmark:/nemo:/opt/pysmilesutils"
+        DOCKER_CMD="${DOCKER_CMD} -w /workspace"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace:/workspace/megamolbart:/workspace/benchmark:/workspace/cuchemcommon/grpc:/workspace/common:/nemo_megamolbart"
         CONT=${MEGAMOLBART_CONT}
     elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
         DOCKER_CMD="${DOCKER_CMD} --name chem_dev_3"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/cddd"
+        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/cddd:/workspace/benchmark"
         CONT=${CDDD_CONT}
     else
         echo "${RED}${BOLD}Invalid container option${RESET}"

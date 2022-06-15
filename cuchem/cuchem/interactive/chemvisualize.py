@@ -514,10 +514,10 @@ class ChemVisualization(metaclass=Singleton):
                 customdata = cdf['id']
 
                 if self.cluster_wf.is_gpu_enabled():
-                    x_data = x_data.to_array()
-                    y_data = y_data.to_array()
-                    cluster = cluster.to_array()
-                    customdata = customdata.to_array()
+                    x_data = x_data.to_numpy()
+                    y_data = y_data.to_numpy()
+                    cluster = cluster.to_numpy()
+                    customdata = customdata.to_numpy()
                     df_size = cupy.asnumpy(df_size)
                     df_shape = cupy.asnumpy(df_shape)
 
@@ -659,9 +659,13 @@ class ChemVisualization(metaclass=Singleton):
 
         return html.Div([
             html.Div(className='row', children=[
-                dcc.Graph(id='main-figure', figure=fig,
-                          className='nine columns',
-                          style={'verticalAlign': 'text-top'}),
+                html.Div([
+                dcc.Loading(
+                    id="loading-main_fig",
+                    type="default",
+                    children=dcc.Graph(id='main-figure', figure=fig),
+                    style={'verticalAlign': 'text-top', 'width': '100%'}
+                )], className='nine columns'),
 
                 html.Div([
                     dcc.Markdown("""**Molecule(s) of Interest**"""),
@@ -786,7 +790,11 @@ class ChemVisualization(metaclass=Singleton):
             ]),
 
             html.Div(className='row', children=[
-                html.Div(id='section_generated_molecules', children=[
+                dcc.Loading(
+                    id="loading_generated_molecules",
+                    type="default",
+                    fullscreen=True,
+                    children=html.Div(id='section_generated_molecules', children=[
                         html.Div(className='row', children=[
                             html.A('Export to SDF',
                                 id='download-link',
@@ -800,7 +808,10 @@ class ChemVisualization(metaclass=Singleton):
                                 style={'color': 'red', 'fontWeight': 'bold', 'marginLeft': 12, 'fontSize': '150%'}),
                     ], style={'marginLeft': 0, 'marginBottom': 18, }),
                     html.Div(id='table_generated_molecules', children=[], style={'width': '100%'})
-                ], style={'display': 'none', 'width': '100%'}),
+                    ], style={'display': 'none', 'width': '100%'}),
+                    className='nine columns',
+                    style={'verticalAlign': 'text-top'}
+                ),
 
                 html.Div(id='section_selected_molecules', children=[
                     html.Div(className='row', children=[
@@ -827,7 +838,13 @@ class ChemVisualization(metaclass=Singleton):
                             style={'verticalAlign': 'text-bottom', 'text-align': 'right'}
                         ),
                     ], style={'margin': 12}),
-                    html.Div(id='tb_selected_molecules', children=[], style={'width': '100%'})
+                    dcc.Loading(
+                        id="loading_mol_prop_tables",
+                        type="default",
+                        children=html.Div(id='tb_selected_molecules', children=[], style={'width': '100%'}),
+                        className='nine columns',
+                        style={'verticalAlign': 'text-top'}
+                    ),
                 ], style={'display': 'none', 'width': '100%'}),
             ], style={'margin': 12}),
 

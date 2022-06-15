@@ -34,7 +34,7 @@ class MegaMolBARTWrapper(metaclass=Singleton):
         from megamolbart.inference_perceiver import MegaMolBART
 
         logger.info(f'Loading model from {dir}/{checkpoint_file}')
-        self.megamolbart = MegaMolBART(model_dir=os.path.join(dir, checkpoint_file))
+        self.megamolbart = MegaMolBART(model_path=os.path.join(dir, checkpoint_file))
         logger.info(f'Loaded Version {self.megamolbart.version}')
 
     def is_ready(self, timeout: int = 10) -> bool:

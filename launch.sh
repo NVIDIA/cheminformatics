@@ -186,18 +186,21 @@ dev() {
     local CONT=${CUCHEM_CONT}
 
     if [[ ${CONTAINER_OPTION} -eq 1 ]]; then
+        DOCKER_CMD="${DOCKER_CMD} --name chem_dev_1"
         DOCKER_CMD="${DOCKER_CMD} --privileged"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
     elif [[ ${CONTAINER_OPTION} -eq 2 ]]; then
+        DOCKER_CMD="${DOCKER_CMD} --name chem_dev_2"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace:/workspace/megamolbart:/workspace/benchmark:/workspace/cuchemcommon/grpc:/workspace/common:/nemo_megamolbart"
         CONT=${MEGAMOLBART_CONT}
     elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
+        DOCKER_CMD="${DOCKER_CMD} --name chem_dev_3"
         DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
         DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
         DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/cddd:/workspace/benchmark"
@@ -214,8 +217,13 @@ dev() {
         DOCKER_CMD="${DOCKER_CMD} --rm"
         CMD='bash'
     fi
-    set -x
-    ${DOCKER_CMD} -it ${CONT} ${CMD}
+        # -u $(id -u):$(id -u)\
+        # -v /etc/passwd:/etc/passwd:ro \
+        # -v /etc/group:/etc/group:ro \
+        # -v /etc/shadow:/etc/shadow:ro \
+
+    ${DOCKER_CMD} \
+        -it ${CONT} ${CMD}
 }
 
 

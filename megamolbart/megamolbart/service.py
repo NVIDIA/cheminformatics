@@ -10,62 +10,58 @@ from cuchemcommon.utils import Singleton
 logger = logging.getLogger(__name__)
 
 
-class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler, metaclass=Singleton):
+class GenerativeSampler(generativesampler_pb2_grpc.GenerativeSampler,
+                        metaclass=Singleton):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, cfg, *args, **kwargs):
         torch.set_grad_enabled(False)
 
-        model_dir = kwargs['model_dir'] if 'model_dir' in kwargs else None
-        self.megamolbart = MegaMolBART(model_dir=model_dir + '/megamolbart_checkpoint.nemo')
-
+        self.megamolbart = MegaMolBART(cfg)
         logger.info(f'Loaded Version {self.megamolbart.version}')
 
-    # TODO update to accept batched input if similes2embedding does
-    # TODO how to handle length overrun for batch processing --> see also MegaMolBART.load_model in inference.py
+    # TODO: Add the ability to process multiple smiles
     def SmilesToEmbedding(self, spec, context):
-
+        '''
+        Converts input SMILES to embedding.
+        @param spec: Transform spec with embedding.
+        '''
         smile_str = ''.join(spec.smiles)
-
-        embedding, pad_mask = self.megamolbart.smiles2embedding(smile_str,
-                                                                pad_length=spec.padding)
-        dim = embedding.shape
-        embedding = embedding.flatten().tolist()
-        return EmbeddingList(embedding=embedding,
-                             dim=dim,
-                             pad_mask=pad_mask)
+        tokens, hidden_states, pad_masks = self.megamolbart.smiles2embedding(smile_str)
+        return EmbeddingList(embedding=hidden_states.flatten().tolist(),
+                             dim=hidden_states.shape,
+                             tokens=tokens.flatten().tolist(),
+                             pad_mask=pad_masks.flatten().tolist())
 
     def EmbeddingToSmiles(self, embedding_spec, context):
         '''
         Converts input embedding to SMILES.
         @param transform_spec: Input spec with embedding and mask.
         '''
-        embedding = torch.FloatTensor(list(embedding_spec.embedding))
-        pad_mask = torch.BoolTensor(list(embedding_spec.pad_mask))
+        hidden_states = torch.FloatTensor(list(embedding_spec.embedding))
+        pad_masks = torch.BoolTensor(list(embedding_spec.pad_mask))
+        tokens = torch.IntTensor(list(embedding_spec.tokens))
         dim = tuple(embedding_spec.dim)
 
-        embedding = torch.reshape(embedding, dim).cuda()
-        pad_mask = torch.reshape(pad_mask, (dim[0], 1)).cuda()
+        hidden_states = torch.reshape(hidden_states, dim).cuda()
+        pad_masks = torch.reshape(pad_masks, (dim[0], dim[1])).cuda()
+        tokens = torch.reshape(tokens, (dim[0], dim[1])).cuda()
 
-        generated_mols = self.megamolbart.inverse_transform([embedding], pad_mask)
+        generated_mols = self.megamolbart.embedding2smiles(tokens, hidden_states, pad_masks)
         return SmilesList(generatedSmiles=generated_mols)
 
     def FindSimilars(self, spec, context):
-
         smile_str = ''.join(spec.smiles)
-
-        generated_df = self.megamolbart.find_similars_smiles(
-                smile_str,
-                num_requested=spec.numRequested,
-                scaled_radius=spec.radius,
-                sanitize=spec.sanitize,
-                pad_length=spec.padding,
-                force_unique=False)
-
+        generated_df = self.megamolbart.find_similars_smiles(smile_str,
+                                                             num_requested=spec.numRequested,
+                                                             scaled_radius=spec.radius,
+                                                             sanitize=spec.sanitize,
+                                                             pad_length=spec.padding,
+                                                             force_unique=False)
         embeddings = []
 
         for _, row in generated_df.iterrows():
             embeddings.append(EmbeddingList(embedding=row.embeddings,
-                                           dim=row.embeddings_dim))
+                                            dim=row.embeddings_dim))
 
         return SmilesList(generatedSmiles=generated_df['SMILES'],
                           embeddings=embeddings)

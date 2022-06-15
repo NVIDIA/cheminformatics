@@ -28,12 +28,15 @@ class GenericCSVDataset():
             pathlib.Path(__file__).parent.parent.absolute(), 'csv_data', data_filename)
         assert os.path.exists(self.prop_data_path)
 
+        # prop_data = pd.DataFrame(columns=properties_cols)
+        # prop_data.to_csv(self.prop_data_path, index=False)
+        # #TODO cols must be passed in
         fp_data_path = os.path.join(
             pathlib.Path(__file__).parent.parent.absolute(), 'csv_data', fp_filename)
-        if not os.path.exists(fp_data_path):
-            logger.info(f'Fingerprint path {fp_data_path} does not exist, generating temporary fingerprints file.')
-            temp_dir = '/tmp' #tempfile.TemporaryDirectory().name
-            fp_data_path = os.path.join(temp_dir, self.fp_filename)
+        # if not os.path.exists(fp_data_path):
+        #     logger.info(f'Fingerprint path {fp_data_path} does not exist, generating temporary fingerprints file.')
+        #     temp_dir = '/tmp' #tempfile.TemporaryDirectory().name
+        #     fp_data_path = os.path.join(temp_dir, self.fp_filename)
 
         self.fp_data_path = fp_data_path
 
@@ -50,8 +53,8 @@ class GenericCSVDataset():
         self.properties = None
         self.fingerprints = None
 
-    def _generate_fingerprints(self, data, columns):
-        fp = calc_morgan_fingerprints(data, smiles_col=columns[0])
+    def _generate_fingerprints(self, data, columns, nbits = 512):
+        fp = calc_morgan_fingerprints(data, smiles_col=columns[0], nbits = nbits)
         # fp = fp.to_pandas()
         fp.columns = fp.columns.astype(np.int64) # TODO may not be needed since formatting fixed
         for col in fp.columns: # TODO why are these floats
@@ -72,7 +75,8 @@ class GenericCSVDataset():
                   columns,
                   length_column=None,
                   return_remaining=True,
-                  data_len=None):
+                  data_len=None,
+                  nbits = 512):
         columns = [columns] if not isinstance(columns, list) else columns
         data = pd.read_csv(self.prop_data_path)
 
@@ -108,7 +112,8 @@ class GenericCSVDataset():
         if generate_fingerprints_file:
             # Generate here so that column names are consistent with inputs
             logger.info(f'Creating temporary fingerprints file {self.fp_data_path} for {data.shape} input size.')
-            self._generate_fingerprints(data, columns)
+            # TODO
+            self._generate_fingerprints(data, columns, nbits)
 
         cleaned_data = data[columns]
         if return_remaining:
@@ -122,11 +127,12 @@ class GenericCSVDataset():
     def load(self,
              columns=['canonical_smiles'],
              length_column='length',
-             data_len=None):
+             data_len=None,
+             nbits = 512):
 
         # Load physchem properties
         logger.info(f'Loading data from {self.prop_data_path}')
-        self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len)
+        self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len, nbits = nbits)
 
         if self.smiles_col is not None:
             self.smiles = self.smiles.rename(columns={self.smiles_col: 'canonical_smiles'})
@@ -146,7 +152,7 @@ class GenericCSVDataset():
         if self.index_col:
             self.fingerprints = self.fingerprints.set_index(self.index_col).sort_index()
 
-        assert len(self.fingerprints.columns) == 512, AssertionError(f'Fingerprint dataframe appears to contain incorrect number of column(s)')
+        assert len(self.fingerprints.columns) == nbits, AssertionError(f'Fingerprint dataframe appears to contain incorrect number of column(s)')
         try:
             self.fingerprints.columns.astype(int)
         except:

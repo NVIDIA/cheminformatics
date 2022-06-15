@@ -28,18 +28,5 @@ done
 
 source ${SOURCE_ROOT}/.env
 
-export CUCHEM_UI_START_CMD="python3 -m cuchembench --config-dir ${CONFIG_DIR}"
-
-export WORKSPACE=/workspace
-export MEGAMOLBART_PATH=/workspace/megamolbart
-export NGINX_CONFIG=${PROJECT_PATH}/setup/config/nginx.conf
-export PYTHONPATH_CUCHEM="${WORKSPACE}/common:${WORKSPACE}/common/generated"
-export PYTHONPATH_CUCHEM="${PYTHONPATH_CUCHEM}:${WORKSPACE}/benchmark:${WORKSPACE}/cuchem:"
-
-export PYTHONPATH_MEGAMOLBART="${WORKSPACE}/common:${WORKSPACE}/common/generated:${WORKSPACE}/megamolbart"
-export PYTHONPATH_MEGAMOLBART="${PYTHONPATH_MEGAMOLBART}:${WORKSPACE}/benchmark:${WORKSPACE}/cuchem:"
-
-docker-compose \
-  -f ${SOURCE_ROOT}/setup/docker_compose.yml \
-  --project-directory ${SOURCE_ROOT} \
-  ${ACTION}
+echo ${PYTHONPATH}
+python3 -m cuchembench --config-dir ${CONFIG_DIR}

@@ -22,24 +22,21 @@ PHYSCHEM_TABLE_LIST = ['chembl', 'lipophilicity',
 
 class ChEMBLApprovedDrugs(GenericCSVDataset):
     def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_ChEMBL_approved_drugs_physchem.csv',
-                         fp_filename='fingerprints_ChEMBL_approved_drugs_physchem.csv',
-                         **kwargs)
-        self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
-        self.table_name = 'chembl'
-        self.index_col = 'index'
-        self.properties_cols = ['max_phase_for_ind', 'mw_freebase',
+        properties_cols = ['max_phase_for_ind', 'mw_freebase',
                                 'alogp', 'hba', 'hbd', 'psa', 'rtb', 'ro3_pass', 'num_ro5_violations',
                                 'cx_logp', 'cx_logd', 'full_mwt', 'aromatic_rings', 'heavy_atoms',
                                 'qed_weighted', 'mw_monoisotopic', 'hba_lipinski', 'hbd_lipinski',
                                 'num_lipinski_ro5_violations']
+        super().__init__(data_filename='benchmark_ChEMBL_approved_drugs_physchem.csv', **kwargs) # @(dreidenbach) kwargs now contains both names as we use them as inputs for exp_name specificity
+        self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
+        self.table_name = 'chembl'
+        self.index_col = 'index'
+        self.properties_cols = properties_cols
 
 
 class MoleculeNetLipophilicity(GenericCSVDataset):
     def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_MoleculeNet_Lipophilicity.csv',
-                         fp_filename='fingerprints_MoleculeNet_Lipophilicity.csv',
-                         **kwargs)
+        super().__init__(data_filename='benchmark_MoleculeNet_Lipophilicity.csv', **kwargs)
         self.name = 'MoleculeNet Lipophilicity'
         self.table_name = 'lipophilicity'
         self.index_col = 'index'
@@ -50,9 +47,7 @@ class MoleculeNetLipophilicity(GenericCSVDataset):
 
 class MoleculeNetESOL(GenericCSVDataset):
     def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_MoleculeNet_ESOL.csv',
-                         fp_filename='fingerprints_MoleculeNet_ESOL.csv',
-                         **kwargs)
+        super().__init__(data_filename='benchmark_MoleculeNet_ESOL.csv', **kwargs)
         self.name = 'MoleculeNet ESOL'
         self.table_name = 'esol'
         self.index_col = 'index'
@@ -63,9 +58,7 @@ class MoleculeNetESOL(GenericCSVDataset):
 
 class MoleculeNetFreeSolv(GenericCSVDataset):
     def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_MoleculeNet_FreeSolv.csv',
-                         fp_filename='fingerprints_MoleculeNet_FreeSolv.csv',
-                         **kwargs)
+        super().__init__(data_filename='benchmark_MoleculeNet_FreeSolv.csv', **kwargs)
         self.name = 'MoleculeNet FreeSolv'
         self.table_name = 'freesolv'
         self.index_col = 'index'

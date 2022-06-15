@@ -21,10 +21,11 @@ CREATE TABLE IF NOT EXISTS smiles_samples (
 	embedding_dim TEXT NOT NULL,
 	finger_print TEXT NOT NULL,
 	is_valid INTEGER NOT NULL DEFAULT 1,
-	is_generated INTEGER NOT NULL DEFAULT 1
+	is_generated INTEGER NOT NULL DEFAULT 1,
+	scaffold TEXT NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS smiles_samples_index ON smiles_samples (input_id, smiles, is_valid, is_generated);
+CREATE INDEX IF NOT EXISTS smiles_samples_index ON smiles_samples (input_id, smiles, scaffold, is_valid, is_generated);
 
 CREATE TABLE IF NOT EXISTS meta_data (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,

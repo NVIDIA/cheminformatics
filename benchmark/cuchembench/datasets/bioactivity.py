@@ -18,7 +18,7 @@ BIOACTIVITY_TABLE_LIST = ['excape_activity', 'excape_fp']
 class ExCAPEDataset(GenericCSVDataset):
     def __init__(self, **kwargs):
         super().__init__(data_filename='benchmark_ExCAPE_Bioactivity.csv',
-                         fp_filename='fingerprints_ExCAPE_Bioactivity.csv',
+                        #  fp_filename='fingerprints_ExCAPE_Bioactivity.csv',
                          **kwargs)
         self.name = 'ExCAPE'
         self.table_name = 'excape'
@@ -36,9 +36,10 @@ class ExCAPEDataset(GenericCSVDataset):
     def load(self,
              columns=['canonical_smiles'],
              length_column='length',
-             data_len=None):
+             data_len=None,
+             nbits = 512):
 
-        super().load(columns, length_column, data_len)
+        super().load(columns, length_column, data_len, nbits)
         self.smiles = self.smiles.rename(columns={'Gene_Symbol': 'gene'}).set_index('gene', append=True)
 
 #### Deprecated ####

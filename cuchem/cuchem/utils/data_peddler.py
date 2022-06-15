@@ -24,9 +24,10 @@ def download_cddd_models():
     else:
         shutil.rmtree(os.path.join(target_dir, 'default_model'), ignore_errors=True)
 
-    download_script = '/opt/cddd/download_default_model.sh'
+    # download_script = '/opt/cddd/download_default_model.sh'
+    download_script = '/workspace/cddd/download_default_model.sh'
     if not os.path.exists(download_script):
-        download_script = '/tmp/download_default_model.sh'
+        download_script = '/workspace/cddd/download_default_model.sh'
         run(['bash', '-c',
              'wget --quiet -O %s %s && chmod +x %s' % (download_script, CDDD_MODEL_SCRIPT, download_script)])
 

@@ -21,7 +21,7 @@ import numpy as np
 import multiprocessing as mp
 import pathlib
 
-from cuchembench.utils.smiles import calc_morgan_fingerprints
+from chembench.utils.smiles import calc_morgan_fingerprints
 
 from rdkit.Chem.Crippen import MolLogP
 from rdkit.Chem.Descriptors import ExactMolWt

@@ -1,4 +1,0 @@
-dask[complete]
-sqlalchemy==1.4.23
-seaborn
-numpy

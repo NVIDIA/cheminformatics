@@ -1,4 +1,0 @@
-name,value,radius,num_samples,iteration,run_time,data_size
-novelty,0.37505,0.01,10,610000,24704.006846,10000
-novelty,0.36019,0.1,10,610000,27008.315369,10000
-novelty,0.00276,0.5,10,610000,27199.695458,10000

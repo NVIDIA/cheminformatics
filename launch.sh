@@ -12,6 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+BLACK=`tput setaf 0`
+RED=`tput setaf 1`
+GREEN=`tput setaf 2`
+YELLOW=`tput setaf 3`
+BLUE=`tput setaf 4`
+MAGENTA=`tput setaf 5`
+CYAN=`tput setaf 6`
+WHITE=`tput setaf 7`
+
+BOLD=`tput bold`
+RESET=`tput sgr0`
 
 LOCAL_ENV=.env
 
@@ -46,95 +57,94 @@ More Information
 Note: This script looks for a file called $LOCAL_ENV in the
 current directory. This file should define the following environment
 variables:
-    CUCHEM_CONT
+    CONT_NAME
         container image, prepended with registry. e.g.,
-        cheminformatics_demo:latest
-    MEGAMOLBART_CONT
-        container image for MegaMolBART service, prepended with registry.
-    MEGAMOLBART_MODEL
-        MegaMolBART model and the version to use.
-    CONTENT_PATH
-        path to repository. e.g.,
+        benchmark:latest
+    PROJECT_PATH
+        path to source code. e.g.,
         /home/user/projects/cheminformatics
+    MODEL_PATH
+        path to location of all models. e.g.,
+        /home/user/projects/cheminformatics/models
     DATA_PATH
         path to data directory. e.g.,
-        /scratch/data/cheminformatics
+        /scratch/data/cheminformatics/data
 
 EOF
 }
 
-source setup/env.sh
-CHEMINFO_DIR='/workspace'
-if [ -e /workspace/cuchem/startdash.py ]; then
-    # When inside container in dev/test mode
-    CHEMINFO_DIR='/workspace'
-elif [ -e /opt/nvidia/cheminfomatics/cuchem/startdash.py ]; then
-    # When inside container in prod mode
-    CHEMINFO_DIR="/opt/nvidia/cheminfomatics"
+function version {
+    echo "$@" | awk -F. '{ printf("%03d%03d%03d\n", $1,$2,$3); }';
+}
+
+function config() {
+    local write_env=$1
+
+    IMG_NAME=${IMG_NAME:=nvcr.io/nvidia/clara/benchmark:0.1.2}
+    PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
+    DATA_PATH=${DATA_PATH:=$(pwd)/data}
+    MODEL_PATH=${MODEL_PATH:=$(pwd)/models}
+    JUPYTER_PORT=${JUPYTER_PORT:=8888}
+
+    PYTHONPATH=${PYTHONPATH:='./benchmark'}
+    REPO_BRANCH=${REPO_BRANCH:=master}
+
+    REGISTRY=${REGISTRY:=nvcr.io}
+    REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
+    REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=NotSet}
+
+
+    if [ $write_env -eq 1 ]; then
+        echo IMG_NAME=${IMG_NAME} > $LOCAL_ENV
+        echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
+        echo MODEL_PATH=${MODEL_PATH} >> $LOCAL_ENV
+        echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
+        echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
+
+        echo PYTHONPATH=${PYTHONPATH} >> $LOCAL_ENV
+        echo REPO_BRANCH=${REPO_BRANCH} >> $LOCAL_ENV
+
+        echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
+        echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
+        echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
+
+    fi
+}
+
+if [ -e ./${LOCAL_ENV} ]
+then
+    echo -e "sourcing environment from ./${LOCAL_ENV}"
+    . ./${LOCAL_ENV}
+    config 0
+else
+    echo -e "${YELLOW}Writing deafults to ${LOCAL_ENV}${RESET}"
+    config 1
 fi
-echo TEST_$CHEMINFO_DIR
-PYTHONPATH_CUCHEM="${CHEMINFO_DIR}/cuchem:${CHEMINFO_DIR}/common:${CHEMINFO_DIR}/common/generated/"
+
+CONT_NAME='chem_benchmark'
+WORKSPACE_DIR='/workspace'
+DOCKER_CMD="docker run \
+    --network host \
+    --gpus all \
+    -p ${JUPYTER_PORT}:8888 \
+    -v ${PROJECT_PATH}:${WORKSPACE_DIR} \
+    -v ${DATA_PATH}:/data \
+    -v ${MODEL_PATH}:/models \
+    -e HOME=/workspace"
+
 
 build() {
     local IMG_OPTION=$1
     set -e
-    DATE=$(date +%y%m%d)
-
-    local built=false
-    if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "1" ]]; then
-        IFS=':' read -ra CUCHEM_CONT_BASENAME <<< ${CUCHEM_CONT}
-        echo "Building ${CUCHEM_CONT_BASENAME}..."
-        docker build --network host \
-            -t ${CUCHEM_CONT_BASENAME}:latest \
-            -t ${CUCHEM_CONT} \
-            -f Dockerfile.cuchem .
-        built=true
-    fi
-
-    if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "2" ]]; then
-        IFS=':' read -ra MEGAMOLBART_CONT_BASENAME <<< ${MEGAMOLBART_CONT}
-        echo "Building ${MEGAMOLBART_CONT_BASENAME}..."
-        docker build --network host \
-            --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
-            -t ${MEGAMOLBART_CONT_BASENAME}:latest \
-            -t ${MEGAMOLBART_CONT} \
-            -f Dockerfile.megamolbart .
-        built=true
-    fi
-
-    if [[ -z "${IMG_OPTION}" || "${IMG_OPTION}" == "3" ]]; then
-        IFS=':' read -ra CDDD_CONT_BASENAME <<< ${CDDD_CONT}
-        echo "Building ${CDDD_CONT_BASENAME}..."
-        docker build --network host \
-            -t ${CDDD_CONT_BASENAME}:latest \
-            -t ${CDDD_CONT} \
-            -f Dockerfile.cddd .
-        built=true
-    fi
-
-    if [[ ${built} == false ]]; then
-        echo "${RED}${BOLD}Invalid build option: ${IMG_OPTION}${RESET}"
-        exit 1
-    fi
+    IFS=':' read -ra IMG_NAME_BASENAME <<< ${IMG_NAME}
+    echo "Building ${IMG_NAME_BASENAME}..."
+    docker build --network host \
+        --build-arg REPO_BRANCH=${REPO_BRANCH} \
+        -t ${IMG_NAME_BASENAME}:latest \
+        -t ${IMG_NAME} \
+        -f Dockerfile .
 
     set +e
-}
-
-
-check_docker_registry() {
-    if [ -z ${REGISTRY_ACCESS_TOKEN} ]; then
-        echo "${RED}Please ensure 'REGISTRY_ACCESS_TOKEN' in $LOCAL_ENV is correct and rerun this script. Please set NGC API key to REGISTRY_ACCESS_TOKEN.${RESET}"
-        exit 1
-    else
-        echo "${YELLOW}Attempting docker login to ${REGISTRY}.${RESET}"
-    fi
-
-    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-    if [[ $? -ne 0 ]]; then
-        echo "${RED}Docker login failed. Please setup ngc('ngc config set'). "
-        echo "Please also check network settings and ensure 'REGISTRY_ACCESS_TOKEN' is $LOCAL_ENV is correct.${RESET}"
-        exit 1
-    fi
 }
 
 
@@ -147,161 +157,82 @@ push_container() {
 
 
 push() {
-    local PUSH_OPTION=$1
-    local pushed=false
-
-    if [[ -z "${PUSH_OPTION}" || "${PUSH_OPTION}" == "1" ]]; then
-        docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-        push_container ${CUCHEM_CONT}
-        pushed=true
-    fi
-
-    if [[ -z "${PUSH_OPTION}" || "${PUSH_OPTION}" == "2" ]]; then
-        docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-        push_container ${MEGAMOLBART_CONT}
-        pushed=true
-    fi
-
-    if [[ -z "${PUSH_OPTION}" || "${PUSH_OPTION}" == "3" ]]; then
-        push_container ${CDDD_CONT}
-        pushed=true
-    fi
-
-    if [[ ${pushed} == false ]]; then
-        echo "${RED}${BOLD}Invalid push option: ${IMG_OPTION}${RESET}"
-        exit 1
-    fi
-
+    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+    push_container ${IMG_NAME}
     exit
 }
 
 
-setup() {
-    download_model
-    dbSetup "${DATA_PATH}"
+run() {
+    DOCKER_CMD="${DOCKER_CMD} -v ${DATA_PATH}/logs/:/logs"
+    DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
+    DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH}"
+    DOCKER_CMD="${DOCKER_CMD} -d"
+    CMD="bash"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -a|--additional-args)
+                DOCKER_CMD="${DOCKER_CMD} $2"
+                shift
+                shift
+                ;;
+            -c|--cmd)
+                CMD=$2
+                shift
+                shift
+                ;;
+            *)
+                echo "Unknown option $1"
+                exit 1
+                ;;
+        esac
+    done
+
+    ${DOCKER_CMD} ${IMG_NAME} $CMD
 }
+
 
 dev() {
-    local CONTAINER_OPTION=$1
-    local CONT=${CUCHEM_CONT}
+    local DEV_IMG=${IMG_NAME}
 
-    if [[ ${CONTAINER_OPTION} -eq 1 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} --name chem_dev_1"
-        DOCKER_CMD="${DOCKER_CMD} --privileged"
-        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
-        DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/benchmark"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace/cuchem/"
-    elif [[ ${CONTAINER_OPTION} -eq 2 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} --name chem_dev_2"
-        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
-        DOCKER_CMD="${DOCKER_CMD} -v /var/run/docker.sock:/var/run/docker.sock"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace:/workspace/megamolbart:/workspace/benchmark:/workspace/cuchemcommon/grpc:/workspace/common:/nemo_megamolbart"
-        CONT=${MEGAMOLBART_CONT}
-    elif [[ ${CONTAINER_OPTION} -eq 3 ]]; then
-        DOCKER_CMD="${DOCKER_CMD} --name chem_dev_3"
-        DOCKER_CMD="${DOCKER_CMD} -v ${CONTENT_PATH}/logs/:/logs"
-        DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
-        DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH_CUCHEM}:/workspace/cddd:/workspace/benchmark"
-        CONT=${CDDD_CONT}
-    else
-        echo "${RED}${BOLD}Invalid container option${RESET}"
-        exit 1
-    fi
+    DOCKER_CMD="${DOCKER_CMD} -v ${DATA_PATH}/logs/:/logs"
+    DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
+    DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH}"
+    DOCKER_CMD="${DOCKER_CMD} --name ${CONT_NAME}"
 
-    if [ ! -z "$2" ]; then
-        DOCKER_CMD="${DOCKER_CMD} -d"
-        CMD="$2"
-    else
-        DOCKER_CMD="${DOCKER_CMD} --rm"
-        CMD='bash'
-    fi
-        # -u $(id -u):$(id -u)\
-        # -v /etc/passwd:/etc/passwd:ro \
-        # -v /etc/group:/etc/group:ro \
-        # -v /etc/shadow:/etc/shadow:ro \
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -a|--additional-args)
+                DOCKER_CMD="${DOCKER_CMD} $2"
+                shift
+                shift
+                ;;
+            -i|--image)
+                DEV_IMG="$2"
+                shift
+                shift
+                ;;
+            -d)
+                DOCKER_CMD="${DOCKER_CMD} -d"
+                shift
+                ;;
+            *)
+                echo "Unknown option $1"
+                exit 1
+                ;;
+        esac
+    done
 
-    ${DOCKER_CMD} \
-        -it ${CONT} ${CMD}
+    ${DOCKER_CMD} -it --rm ${DEV_IMG} bash
 }
 
 
-start() {
-    validate_docker
-
-    if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-        PYTHONPATH=${PYTHONPATH_CUCHEM}
-        dbSetup "${DATA_MOUNT_PATH}"
-        cd ${CHEMINFO_DIR}/cuchem/; python3 startdash.py analyze $@
-    else
-        # run a container and start dash inside container.
-        setup
-        set -x
-        export CUCHEM_UI_START_CMD="./launch.sh start $@"
-        export UID=$(id -u)
-        export GID=$(id -g)
-
-        # Working directory for the individual containers.
-        echo "Starting containers ${MEGAMOLBART_CONT} and ${CUCHEM_CONT}..."
-        export WORKING_DIR_CUCHEMUI=/workspace
-        export WORKING_DIR_MEGAMOLBART=/workspace/megamolbart
-        export WORKING_DIR_CDDD=/workspace
-        export PYTHONPATH_MEGAMOLBART="${CHEMINFO_DIR}/common:/${CHEMINFO_DIR}/common/generated/"
-        export NGINX_CONFIG=${PROJECT_PATH}/setup/config/nginx.conf
-
-        docker-compose --env-file .env  \
-                -f setup/docker_compose.yml \
-                --project-directory . \
-                up
-    fi
-}
-
-
-stop() {
-    docker-compose --env-file .env  \
-        -f setup/docker_compose.yml \
-        --project-directory . \
-        down
-}
-
-
-cache() {
-    if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-        # Executed within container or a managed env.
-        dbSetup "${DATA_MOUNT_PATH}"
-        python3 ./cuchem/startdash.py cache $@
-    else
-        dbSetup "${DATA_PATH}"
-        # run a container and start dash inside container.
-        ${DOCKER_CMD} -v /var/log:/logs -it ${CUCHEM_CONT} ./launch.sh cache $@
-    fi
-}
-
-
-test() {
-    dbSetup "${DATA_PATH}"
-    # run a container and start dash inside container.
-    if [[ -d "/opt/nvidia/cheminfomatics" ]]; then
-        pytest tests
-    else
-        ${DOCKER_CMD} -w /workspace/cuchem \
-            -e PYTHONPATH="${PYTHONPATH_CUCHEM}" \
-            ${CUCHEM_CONT}  \
-            pytest tests
-    fi
-}
-
-
-jupyter() {
-    ${DOCKER_CMD} -it ${CUCHEM_CONT} jupyter-lab --no-browser \
-        --port=8888 \
-        --ip=0.0.0.0 \
-        --allow-root \
-        --notebook-dir=/workspace \
-        --NotebookApp.password='' \
-        --NotebookApp.token='' \
-        --NotebookApp.password_required=False
+attach() {
+    DOCKER_CMD="docker exec"
+    CONTAINER_ID=$(docker ps | grep ${CONT_NAME} | cut -d' ' -f1)
+    ${DOCKER_CMD} -it ${CONTAINER_ID} /bin/bash
+    exit
 }
 
 
@@ -314,25 +245,14 @@ case $1 in
         ;;
     push)
         ;&
-    pull)
-        ;&
-    setup)
-        ;&
+    attach)
+        $@
+        ;;
     dev)
         "$@"
         ;;
-    test)
-        ;&
-    start)
+    run)
         "$@"
-        ;;
-    stop)
-        ;&
-    cache)
-        "$@"
-        ;;
-    jupyter)
-        $1
         ;;
     *)
         usage

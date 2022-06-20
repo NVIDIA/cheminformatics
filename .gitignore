@@ -1,9 +1,7 @@
-.cheminf_local_environment
 .local
 .config
 .bash_history
 .cache
-.chembl_ws_client__0.10.2.sqlite
 .ipynb_checkpoints
 .ipython
 .jupyter
@@ -33,6 +31,7 @@ benchmark.csv
 outputs/
 **/*.onnx
 
-./data/
-./models/
-./cddd/
+data/
+models/
+cddd/
+logs

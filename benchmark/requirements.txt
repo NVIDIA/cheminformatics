@@ -1,8 +1,0 @@
-rdkit-pypi==2020.9.5.2
-sqlalchemy==1.4.23
-seaborn==0.11.2
-pytorch-lightning==1.1.0
-hydra-core
-grpcio
-numba
-sklearn

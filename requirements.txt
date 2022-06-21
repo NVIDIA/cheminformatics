@@ -4,3 +4,5 @@ hydra-core
 grpcio
 numba
 sklearn
+ijson
+einops

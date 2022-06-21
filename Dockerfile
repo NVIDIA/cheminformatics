@@ -1,5 +1,5 @@
 # Copyright 2022 NVIDIA Corporation
-FROM nvcr.io/nvidian/clara-lifesciences/megamolbart_training_nemo:main
+FROM gitlab-master.nvidia.com/mlivne/nemo_containers:megamolbart_training_nemo_latest
 ARG REPO_BRANCH=main
 
 RUN apt-get update \

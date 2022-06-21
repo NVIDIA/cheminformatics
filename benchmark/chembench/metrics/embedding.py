@@ -69,9 +69,8 @@ class BaseEmbeddingMetric():
     name = None
 
     """Base class for metrics based on embedding datasets"""
-    def __init__(self, inferrer, cfg, dataset):
+    def __init__(self, cfg, dataset):
         self.name = self.__class__.__name__
-        self.inferrer = inferrer
         self.cfg = cfg
 
         self.dataset = dataset
@@ -86,6 +85,9 @@ class BaseEmbeddingMetric():
     def __len__(self):
         return len(self.dataset.smiles)
 
+    def is_prediction():
+        return False
+
     def variations(self):
         return NotImplemented
 
@@ -95,15 +97,12 @@ class BaseEmbeddingMetric():
                 SELECT ss.embedding, ss.embedding_dim
                 FROM smiles s, smiles_samples ss
                 WHERE s.id = ss.input_id
-                    AND s.model_name = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
                     AND ss.is_generated = 0
                     AND s.processed = 1
                     AND s.smiles = ?
                 LIMIT 1
                 ''',
-                [self.inferrer.__class__.__name__,  0, 1, smiles]).fetchone()
+                [smiles]).fetchone()
 
         embedding = pickle.loads(result[0])
         embedding_dim = pickle.loads(result[1])
@@ -213,12 +212,12 @@ class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, name, inferrer, cfg, dataset, label,
+    def __init__(self, name, cfg, dataset, label,
                  n_splits=4,
                  return_predictions=False,
                  normalize_inputs=False,
                  data_file=None):
-        super().__init__(inferrer, cfg, dataset)
+        super().__init__(cfg, dataset)
         self.name = name
         self.model_dict = get_model_dict()
         self.n_splits = n_splits
@@ -357,14 +356,10 @@ class Modelability(BaseEmbeddingMetric):
                     SELECT ss.embedding, ss.embedding_dim, s.smiles
                     FROM smiles s, smiles_samples ss, {tmp_table} tmp
                     WHERE s.id = ss.input_id
-                        AND s.model_name = ?
-                        AND s.force_unique = ?
-                        AND s.sanitize = ?
                         AND ss.is_generated = 0
                         AND s.processed = 1
                         AND s.smiles = tmp.smiles
-                    ''',
-                    [self.inferrer.__class__.__name__,  0, 1])
+                    ''')
             embeddings = []
             while True:
                 recs = cursor.fetchmany(1000)

@@ -27,9 +27,7 @@ class BaseSampleMetric():
 
     """Base class for metrics based on sampling for a single SMILES string"""
     def __init__(self,
-                 inferrer,
                  cfg):
-        self.inferrer = inferrer
         self.cfg = cfg
         self.total_molecules = 0
 
@@ -38,6 +36,9 @@ class BaseSampleMetric():
 
     def _calculate_metric(self, metric_array, num_array):
         return np.nanmean(metric_array / num_array)
+
+    def is_prediction(self):
+        return False
 
     def variations(self):
         return NotImplemented
@@ -61,12 +62,12 @@ class BaseSampleMetric():
 class Validity(BaseSampleMetric):
     name = 'validity'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = Validity.name
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.validity.radius)
+        radius_list = list(cfg.metrics.validity.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
@@ -78,16 +79,13 @@ class Validity(BaseSampleMetric):
                 SELECT ss.is_valid, count(*)
                 FROM smiles s, smiles_samples ss
                 WHERE s.id = ss.input_id
-                    AND s.model_name = ?
                     AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
                     AND ss.is_generated = 1
                     AND s.processed = 1
                     AND s.dataset_type = ?
                 GROUP BY ss.is_valid;
                 ''',
-                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [radius, 'SAMPLE'])
 
             valid_molecules = 0
             total_molecules = 0
@@ -102,17 +100,17 @@ class Validity(BaseSampleMetric):
 class Unique(BaseSampleMetric):
     name = 'unique'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = Unique.name
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.unique.radius)
+        radius_list = list(cfg.metrics.unique.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
                                      check_same_thread=False)) as conn:
@@ -122,17 +120,14 @@ class Unique(BaseSampleMetric):
                     SELECT CAST(count(DISTINCT ss.smiles) as float) / CAST(count(ss.smiles) as float) ratio
                     FROM smiles s, smiles_samples ss
                     WHERE s.id = ss.input_id
-                        AND s.model_name = ?
                         AND s.scaled_radius = ?
-                        AND s.force_unique = ?
-                        AND s.sanitize = ?
                         AND ss.is_valid = 1
                         AND ss.is_generated = 1
                         AND s.processed = 1
                         AND s.dataset_type = ?
                     GROUP BY s.id
                 )''',
-                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [radius, 'SAMPLE'])
 
             rec = unique_result.fetchone()
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
@@ -142,17 +137,17 @@ class Unique(BaseSampleMetric):
 class ScaffoldUnique(BaseSampleMetric):
     name = 'scaffold_unique'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = ScaffoldUnique.name
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.scaffold_unique.radius)
+        radius_list = list(cfg.metrics.scaffold_unique.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
                                      check_same_thread=False)) as conn:
@@ -162,17 +157,14 @@ class ScaffoldUnique(BaseSampleMetric):
                     SELECT CAST(count(DISTINCT ss.scaffold) as float) / CAST(count(ss.scaffold) as float) ratio
                 FROM smiles s, smiles_samples ss
                 WHERE s.id = ss.input_id
-                    AND s.model_name = ?
                     AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
                     AND ss.is_valid = 1
                     AND ss.is_generated = 1
                     AND s.processed = 1
                     AND s.dataset_type = ?
                 GROUP BY s.id
                 )''',
-                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [radius, 'SAMPLE'])
 
             rec = unique_result.fetchone()
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
@@ -183,18 +175,18 @@ class ScaffoldUnique(BaseSampleMetric):
 class Novelty(BaseSampleMetric):
     name = 'novelty'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = Novelty.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.novelty.radius)
+        radius_list = list(cfg.metrics.novelty.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         valid_molecules, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -207,16 +199,13 @@ class Novelty(BaseSampleMetric):
                 FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
                 WHERE ss.smiles = td.smiles
                     AND s.id = ss.input_id
-                    AND s.model_name = ?
                     AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
                     AND ss.is_valid = 1
                     AND ss.is_generated = 1
                     AND s.processed = 1
                     AND s.dataset_type = ?
                 ''',
-                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [radius, 'SAMPLE'])
             rec = res.fetchone()
             novel_molecules = valid_molecules - rec[0]
 
@@ -225,18 +214,18 @@ class Novelty(BaseSampleMetric):
 class NonIdenticality(BaseSampleMetric):
     name = 'non_identicality'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = NonIdenticality.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.non_identicality.radius)
+        radius_list = list(cfg.metrics.non_identicality.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -252,10 +241,7 @@ class NonIdenticality(BaseSampleMetric):
                 FROM smiles s2, smiles_samples ss2
                 WHERE s2.id = ss2.input_id
                     AND s2.smiles = ss2.smiles
-                    AND s2.model_name = ?
                     AND s2.scaled_radius = ?
-                    AND s2.force_unique = 0
-                    AND s2.sanitize = 1
                     AND ss2.is_valid = 1
                     AND ss2.is_generated = 1
                     AND s2.processed = 1
@@ -263,17 +249,14 @@ class NonIdenticality(BaseSampleMetric):
                 GROUP BY s2.id) as identical_smiles
                 WHERE s.id = ss.input_id
                     AND identical_smiles.id = s.id
-                    AND s.model_name = ?
                     AND s.scaled_radius = ?
-                    AND s.force_unique = 0
-                    AND s.sanitize = 1
                     AND ss.is_valid = 1
                     AND ss.is_generated = 1
                     AND s.processed = 1
                     AND s.dataset_type = 'SAMPLE'
                 GROUP BY s.id
                 )''',
-                [self.inferrer.__class__.__name__, radius, self.inferrer.__class__.__name__, radius])
+                [radius, radius])
             rec = res.fetchone()
         # logger.info(f'{rec}, {rec[0]}, {self.total_molecules}, {(self.total_molecules - rec[0])/self.total_molecules}, {(rec[0])/self.total_molecules}')
         identical = rec[0] if rec[0] is not None else 0
@@ -283,19 +266,19 @@ class NonIdenticality(BaseSampleMetric):
 class ScaffoldNonIdenticalSimilarity(BaseSampleMetric):
     name = 'scaffold_non_identical_similarity'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = ScaffoldNonIdenticalSimilarity.name
         self.training_data = cfg.model.training_data
-        self.nbits = cfg.metric.scaffold_non_identical_similarity.nbits
+        self.nbits = cfg.metrics.scaffold_non_identical_similarity.nbits
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.scaffold_non_identical_similarity.radius)
+        radius_list = list(cfg.metrics.scaffold_non_identical_similarity.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -315,17 +298,14 @@ class ScaffoldNonIdenticalSimilarity(BaseSampleMetric):
                     AND ss.is_generated = 1
                     AND s.smiles <> ss.smiles
                     AND input_smiles.input_id = ss.input_id
-                    AND s.model_name = ?
                     AND s.scaled_radius = ?
-                    AND s.force_unique = 0
-                    AND s.sanitize = 1
                     AND ss.is_valid = 1
                     AND ss.is_generated = 1
                     AND s.processed = 1
                     AND s.dataset_type = 'SAMPLE'
                 ORDER BY s.id
                 ''',
-                [self.inferrer.__class__.__name__, radius])
+                [radius])
             recs = res.fetchall()
         scaffolds = defaultdict(list)
         for rec in recs:
@@ -339,18 +319,18 @@ class ScaffoldNonIdenticalSimilarity(BaseSampleMetric):
 class EffectiveNovelty(BaseSampleMetric):
     name = 'effective_novelty'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = EffectiveNovelty.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.effective_novelty.radius)
+        radius_list = list(cfg.metrics.effective_novelty.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -367,10 +347,7 @@ class EffectiveNovelty(BaseSampleMetric):
                             AND ss.is_valid = 1
                             AND ss.is_generated = 1
                             AND s.processed = 1
-                            AND s.model_name = ?
                             AND s.scaled_radius = ?
-                            AND s.force_unique = ?
-                            AND s.sanitize = ?
                             AND s.dataset_type = ?
                         GROUP BY s.id) as a
                     LEFT OUTER JOIN
@@ -381,33 +358,30 @@ class EffectiveNovelty(BaseSampleMetric):
                         AND ss.is_valid = 1
                         AND ss.is_generated = 1
                         AND s.processed = 1
-                        AND s.model_name = ?
                         AND s.scaled_radius = ?
-                        AND s.force_unique = ?
-                        AND s.sanitize = ?
                         AND s.dataset_type = ?
                     GROUP BY s.id) as b
                 ON a.id = b.id
                 ''',
-                [num_samples, self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE',  self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [num_samples, radius, 'SAMPLE', radius, 'SAMPLE'])
             rec = res.fetchone()
         return rec[0], self.total_molecules
 
 class ScaffoldNovelty(BaseSampleMetric):
     name = 'scaffold_novelty'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = ScaffoldNovelty.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.scaffold_novelty.radius)
+        radius_list = list(cfg.metrics.scaffold_novelty.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         valid_molecules, self.total_molecules = validity.compute_metrics(num_samples, radius)
         #TODO: do we need valid_scaffold when just the number is needed and its 1:1 --> guessing yes
         self.total_molecules = self.total_molecules//num_samples
@@ -427,16 +401,13 @@ class ScaffoldNovelty(BaseSampleMetric):
                     ) as train_smiles
                 WHERE ss.scaffold = td.scaffold
                     AND s.id = ss.input_id
-                    AND s.model_name = ?
                     AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
                     AND ss.is_valid = 1
                     AND ss.is_generated = 1
                     AND s.processed = 1
                     AND s.dataset_type = ?
                 ''',
-                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [radius, 'SAMPLE'])
             rec = res.fetchone()
             non_novel_scaffolds = rec[0]
             td_scaffolds = rec[1]
@@ -446,18 +417,18 @@ class ScaffoldNovelty(BaseSampleMetric):
 class EffectiveScaffoldNovelty(BaseSampleMetric):
     name = 'effective_scaffold_novelty'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = EffectiveScaffoldNovelty.name
         self.training_data = cfg.model.training_data
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.effective_scaffold_novelty.radius)
+        radius_list = list(cfg.metrics.effective_scaffold_novelty.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.inferrer, self.cfg)
+        validity = Validity(self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
         # total molecules is 1:1 with total scaffolds
@@ -481,10 +452,7 @@ class EffectiveScaffoldNovelty(BaseSampleMetric):
                             AND ss.is_valid = 1
                             AND ss.is_generated = 1
                             AND s.processed = 1
-                            AND s.model_name = ?
                             AND s.scaled_radius = ?
-                            AND s.force_unique = ?
-                            AND s.sanitize = ?
                             AND s.dataset_type = ?
                         GROUP BY s.id) as a
                     LEFT OUTER JOIN
@@ -495,27 +463,24 @@ class EffectiveScaffoldNovelty(BaseSampleMetric):
                         AND ss.is_valid = 1
                         AND ss.is_generated = 1
                         AND s.processed = 1
-                        AND s.model_name = ?
                         AND s.scaled_radius = ?
-                        AND s.force_unique = ?
-                        AND s.sanitize = ?
                         AND s.dataset_type = ?
                     GROUP BY s.id) as b
                 ON a.id = b.id
                 ''',
-                [num_samples, self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE',  self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [num_samples, radius, 'SAMPLE',  radius, 'SAMPLE'])
             rec = res.fetchone()
         return rec[0], self.total_molecules
 
 class Entropy(BaseSampleMetric):
     name = 'entropy'
 
-    def __init__(self, inferrer, cfg):
-        super().__init__(inferrer, cfg)
+    def __init__(self, cfg):
+        super().__init__(cfg)
         self.name = Entropy.name
 
     def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metric.entropy.radius)
+        radius_list = list(cfg.metrics.entropy.radius)
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
@@ -527,16 +492,13 @@ class Entropy(BaseSampleMetric):
                 SELECT ss.embedding, ss.embedding_dim
                 FROM smiles s, smiles_samples ss
                 WHERE s.id = ss.input_id
-                    AND s.model_name = ?
                     AND s.scaled_radius = ?
-                    AND s.force_unique = ?
-                    AND s.sanitize = ?
                     AND ss.is_generated = 0
                     AND s.processed = 1
                     AND s.dataset_type = ?
                 GROUP BY ss.input_id;
                 ''',
-                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+                [radius, 'SAMPLE'])
 
             latent_space = []
             for rec in result.fetchall():

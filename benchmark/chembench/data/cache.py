@@ -40,18 +40,18 @@ class DatasetCacheGenerator():
         if result[0] == 0:
             with closing(self.conn.cursor()) as cursor:
                 # @(dreidenbach) changed to my workspace path
-                sql_file = open("/workspace/benchmark/scripts/generated_smiles_db.sql")
+                sql_file = open("/workspace/cheminformatics/benchmark/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
 
-    def _insert_sample(self, smi_id, g_smi, hidden_state, cursor, generated):
+    def _insert_sample(self, smi_id, g_smi, emb, cursor, generated):
         smi, is_valid, fp = validate_smiles(g_smi,
                                             return_fingerprint=True,
                                             nbits=self.nbits)
         gscaffold = get_murcko_scaffold(smi)
 
-        dim = pickle.dumps(list(hidden_state.shape))
-        hidden_state = pickle.dumps(hidden_state)
+        dim = pickle.dumps(list(emb.shape))
+        emb = pickle.dumps(emb)
         fp = pickle.dumps(fp)
         cursor.execute(
             '''
@@ -60,54 +60,55 @@ class DatasetCacheGenerator():
                                        finger_print, is_generated, scaffold)
             VALUES(?, ?, ?, ?, ?, ?, ?, ?)
             ''',
-            [smi_id, smi, sqlite3.Binary(hidden_state),
-            sqlite3.Binary(dim), is_valid, fp, generated, gscaffold])
+            [smi_id, smi, sqlite3.Binary(emb), sqlite3.Binary(dim),
+            is_valid, fp, generated, gscaffold])
 
     def _insert_generated_smis(self,
                                smi_id,
                                smi,
-                               hidden,
+                               emb,
                                g_smis=None,
-                               g_hiddens=None):
+                               g_embs=None):
         log.info(f'Inserting samples for {smi_id}...')
         lock.acquire(blocking=True, timeout=-1)
         with self.conn as conn:
             with closing(conn.cursor()) as cursor:
-                self._insert_sample(smi_id, smi, hidden, cursor, False)
+                self._insert_sample(smi_id, smi, emb, cursor, False)
 
                 if g_smis:
                     for i in range(len(g_smis)):
-                        self._insert_sample(smi_id, g_smis[i], g_hiddens[i], cursor, True)
+                        self._insert_sample(smi_id, g_smis[i], g_embs[i], cursor, True)
 
                 cursor.execute('UPDATE smiles set processed = 1 WHERE id = ?', [smi_id])
 
         lock.release()
 
     def _sample(self, ids, smis, num_samples, scaled_radius, dataset_type):
+        embs = self.inferrer.smis_to_embedding(smis)
         if dataset_type == 'SAMPLE':
-            g_smis, g_hiddens, _, hiddens = self.inferrer.sample(smis,
-                                                                 num_samples=num_samples,
-                                                                 scaled_radius=scaled_radius,
-                                                                 return_input_hiddens=True)
+            g_smis, g_embs = self.inferrer.sample(smis,
+                                                  return_embedding=True,
+                                                  num_samples=num_samples,
+                                                  sampling_kwarg={"scaled_radius": scaled_radius})
             for i in range(len(ids)):
                 start_idx = i * num_samples
                 end_idx = start_idx + num_samples
                 self._insert_generated_smis(ids[i],
                                             smis[i],
-                                            hiddens[i],
+                                            embs[i],
                                             g_smis=g_smis[start_idx: end_idx],
-                                            g_hiddens=g_hiddens[start_idx: end_idx])
+                                            g_embs=g_embs[start_idx: end_idx])
         else:
-            _, hiddens, _ = self.inferrer.smis_to_hidden(smis)
             for i in range(len(ids)):
                 self._insert_generated_smis(ids[i],
                                             smis[i],
-                                            hiddens[i],
+                                            embs[i],
                                             g_smis=None,
-                                            g_hiddens=None)
+                                            g_embs=None)
 
     def initialize_db(self,
                       dataset,
+                      radius,
                       num_requested=10):
         log.info(f'Creating recs for dataset {dataset}...')
 
@@ -122,7 +123,6 @@ class DatasetCacheGenerator():
             df_file = pd.read_csv(dataset.file)
         sr_smiles = df_file[dataset.smiles_column_name].drop_duplicates()
 
-        radius = dataset.radius if hasattr(dataset, 'radius') else [0]
         for radii in radius:
             dataset_df = pd.DataFrame()
             dataset_df['smiles'] = sr_smiles
@@ -213,4 +213,5 @@ class DatasetCacheGenerator():
                         try:
                             future.result()
                         except Exception as exc:
-                            log.exception(exc)
+                            # log.exception(exc)
+                            raise exc

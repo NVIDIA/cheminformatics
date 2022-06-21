@@ -1,79 +1,91 @@
+version: 1
+exp_name: mim_k1_salv
 model:
   name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
-  exp_name: mim_k1_salv # prcvr_k4 #seq2seq # mim_same_aug_k1 #
   checkpoint_file: /models/megamolbart/Small_Span_Aug_2f63a83b_220424.nemo
-  training_data: /data/db/zinc_train_test.sqlite3
-  batch_size: 10 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
+  training_data: /data/db/zinc_train.sqlite3
+  batch_size: 100 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
   perceiver_average: False
   noise_mode: 2 # For LVM sampling selection default 0
+  average_tokens: True
 
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/${model.exp_name}.sqlite3
+  db: /data/db/${exp_name}.sqlite3
   concurrent_requests: 10
+  radius:
+    - 0.1
+    - 0.3
+    - 0.5
+    - 0.7
+    - 0.9
+    - 1.1
+    - 1.3
+    - 1.5
+    - 1.7
+    - 1.9
+    - 2.1
+    - 2.3
+    - 2.5
 
 output:
-#TODO: Change path for new models
-  path: /data/benchmark_output/mim #use unique names here seq2seq
+  path: /data/benchmark_output/mim
 
 metrics:
   validity:
+    impl: chembench.metrics.Validity
     datasets:
-      - file: /workspace/benchmark/csv_data/benchmark_ZINC15_test_split.csv
+      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ZINC15_test_split.csv
         smiles_column_name: canonical_smiles
         type: SAMPLE
-        input_size: 20000
-        radius:
-          - null
-          - 0.7
-          - 0.5
+        input_size: 1000
     enabled: True
 
   unique:
+    impl: chembench.metrics.Unique
     datasets: ${metrics.validity.datasets}
     enabled: True
     remove_invalid: False
-    radius: ${metrics.validity.radius}
 
   novelty:
+    impl: chembench.metrics.Novelty
     datasets: ${metrics.validity.datasets}
     enabled: True
     remove_invalid: False
-    radius: ${metrics.validity.radius}
 
   effective_novelty:
+    impl: chembench.metrics.EffectiveNovelty
     datasets: ${metrics.validity.datasets}
     enabled: True
     remove_invalid: False
-    radius: ${metrics.validity.radius}
 
   non_identicality:
+    impl: chembench.metrics.NonIdenticality
     datasets: ${metrics.validity.datasets}
     enabled: True
     remove_invalid: False
-    radius: ${metrics.validity.radius}
 
   scaffold_unique:
+    impl: chembench.metrics.ScaffoldUnique
     datasets: ${metrics.validity.datasets}
     enabled: True
     remove_invalid: False
-    radius: ${metrics.validity.radius}
 
   scaffold_non_identical_similarity:
+    impl: chembench.metrics.ScaffoldNonIdenticalSimilarity
     datasets: ${metrics.validity.datasets}
     enabled: True
     remove_invalid: False
-    radius: ${metrics.validity.radius}
     nbits: 2048
 
   nearest_neighbor_correlation:
     datasets:
-      - file: /workspace/benchmark/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
+      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
         smiles_column_name: canonical_smiles
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     top_k:
       - 50
       - 100
@@ -81,49 +93,51 @@ metrics:
 
   physchem:
     datasets:
-      - file: /workspace/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
+      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
         smiles_column_name: SMILES
         type: EMBEDDING
         input_size: null
-      - file: /workspace/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv
+      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv
         smiles_column_name: SMILES
         type: EMBEDDING
         input_size: null
-      - file: /workspace/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv
+      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv
         smiles_column_name: SMILES
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     n_splits: 20
     normalize_inputs: True
     return_predictions: True
 
   bioactivity:
     datasets:
-      - file: /workspace/benchmark/csv_data/benchmark_ExCAPE_Bioactivity.csv
+      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ExCAPE_Bioactivity.csv
         smiles_column_name: SMILES
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     gene_cnt: -1
     n_splits: 20
     normalize_inputs: True
     return_predictions: True
 
-formatters:
-  simple:
-    format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
-handlers:
-  console:
-    class: logging.StreamHandler
-    formatter: simple
-    stream: ext://sys.stdout
-  file:
-    class: logging.FileHandler
-    formatter: simple
-    filename: /logs/benchmark.log
-root:
-  level: INFO
-  handlers: [console, file]
-
-disable_existing_loggers: false
+hydra:
+  job_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: simple
+        stream: ext://sys.stdout
+      file:
+        class: logging.FileHandler
+        formatter: simple
+        filename: /data/logs/benchmark.log
+    root:
+      level: INFO
+      handlers: [console, file]
+    disable_existing_loggers: false

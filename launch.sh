@@ -73,9 +73,6 @@ variables:
 EOF
 }
 
-function version {
-    echo "$@" | awk -F. '{ printf("%03d%03d%03d\n", $1,$2,$3); }';
-}
 
 function config() {
     local write_env=$1
@@ -86,7 +83,6 @@ function config() {
     MODEL_PATH=${MODEL_PATH:=$(pwd)/models}
     JUPYTER_PORT=${JUPYTER_PORT:=8888}
 
-    PYTHONPATH=${PYTHONPATH:='./benchmark'}
     REPO_BRANCH=${REPO_BRANCH:=master}
 
     REGISTRY=${REGISTRY:=nvcr.io}
@@ -101,7 +97,6 @@ function config() {
         echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
         echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
 
-        echo PYTHONPATH=${PYTHONPATH} >> $LOCAL_ENV
         echo REPO_BRANCH=${REPO_BRANCH} >> $LOCAL_ENV
 
         echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
@@ -127,7 +122,6 @@ DOCKER_CMD="docker run \
     --network host \
     --gpus all \
     -p ${JUPYTER_PORT}:8888 \
-    -v ${PROJECT_PATH}:${WORKSPACE_DIR} \
     -v ${DATA_PATH}:/data \
     -v ${MODEL_PATH}:/models \
     -e HOME=/workspace"
@@ -148,58 +142,39 @@ build() {
 }
 
 
-push_container() {
-    local container_name=($(echo $1 | tr ":" "\n"))
+push() {
+    local container_name=($(echo ${IMG_NAME} | tr ":" "\n"))
+
+    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
     docker push ${container_name[0]}:latest
     docker tag ${container_name[0]}:latest ${container_name[0]}:${container_name[1]}
     docker push ${container_name[0]}:${container_name[1]}
-}
-
-
-push() {
-    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
-    push_container ${IMG_NAME}
     exit
-}
-
-
-run() {
-    DOCKER_CMD="${DOCKER_CMD} -v ${DATA_PATH}/logs/:/logs"
-    DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
-    DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH}"
-    DOCKER_CMD="${DOCKER_CMD} -d"
-    CMD="bash"
-
-    while [[ $# -gt 0 ]]; do
-        case $1 in
-            -a|--additional-args)
-                DOCKER_CMD="${DOCKER_CMD} $2"
-                shift
-                shift
-                ;;
-            -c|--cmd)
-                CMD=$2
-                shift
-                shift
-                ;;
-            *)
-                echo "Unknown option $1"
-                exit 1
-                ;;
-        esac
-    done
-
-    ${DOCKER_CMD} ${IMG_NAME} $CMD
 }
 
 
 dev() {
     local DEV_IMG=${IMG_NAME}
+    local CMD="bash"
 
-    DOCKER_CMD="${DOCKER_CMD} -v ${DATA_PATH}/logs/:/logs"
-    DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
-    DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH}"
     DOCKER_CMD="${DOCKER_CMD} --name ${CONT_NAME}"
+    DOCKER_CMD="${DOCKER_CMD} -w /workspace/"
+    DOCKER_CMD="${DOCKER_CMD} -v ${DATA_PATH}/logs/:/logs"
+    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}:${WORKSPACE_DIR}/cheminformatics"
+    PYTHONPATH="${PYTHONPATH}:${WORKSPACE_DIR}/cheminformatics/benchmark"
+
+    if [ ! -z "${NEMO_SOURCE_PATH}" ];
+    then
+        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_SOURCE_PATH}:${WORKSPACE_DIR}/nemo"
+        PYTHONPATH="${PYTHONPATH}:${WORKSPACE_DIR}/nemo"
+    fi
+
+    if [ ! -z "${NEMO_CHEM_SOURCE_PATH}" ];
+    then
+        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_CHEM_SOURCE_PATH}:${WORKSPACE_DIR}/nemo_chem"
+        PYTHONPATH="${PYTHONPATH}:${WORKSPACE_DIR}/nemo_chem"
+    fi
+    DOCKER_CMD="${DOCKER_CMD} -e PYTHONPATH=${PYTHONPATH}"
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -217,6 +192,11 @@ dev() {
                 DOCKER_CMD="${DOCKER_CMD} -d"
                 shift
                 ;;
+            -c|--cmd)
+                CMD=$2
+                shift
+                shift
+                ;;
             *)
                 echo "Unknown option $1"
                 exit 1
@@ -224,7 +204,7 @@ dev() {
         esac
     done
 
-    ${DOCKER_CMD} -it --rm ${DEV_IMG} bash
+    ${DOCKER_CMD} -it --rm ${DEV_IMG} ${CMD}
 }
 
 
@@ -249,9 +229,6 @@ case $1 in
         $@
         ;;
     dev)
-        "$@"
-        ;;
-    run)
         "$@"
         ;;
     *)

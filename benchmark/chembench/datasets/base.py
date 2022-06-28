@@ -3,7 +3,6 @@ import pathlib
 import logging
 import pandas as pd
 import numpy as np
-import tempfile
 from chembench.utils.smiles import calc_morgan_fingerprints
 
 logger = logging.getLogger(__name__)
@@ -24,27 +23,18 @@ class GenericCSVDataset():
         self.data_filename = data_filename
         self.fp_filename = fp_filename
 
-        self.prop_data_path = os.path.join(
-            pathlib.Path(__file__).parent.parent.absolute(), 'csv_data', data_filename)
+        data_folder = pathlib.Path(__file__).parent.parent.parent.absolute()
+
+        self.prop_data_path = os.path.join(data_folder, 'csv_data', data_filename)
         assert os.path.exists(self.prop_data_path)
 
-        # prop_data = pd.DataFrame(columns=properties_cols)
-        # prop_data.to_csv(self.prop_data_path, index=False)
-        # #TODO cols must be passed in
-        fp_data_path = os.path.join(
-            pathlib.Path(__file__).parent.parent.absolute(), 'csv_data', fp_filename)
-        # if not os.path.exists(fp_data_path):
-        #     logger.info(f'Fingerprint path {fp_data_path} does not exist, generating temporary fingerprints file.')
-        #     temp_dir = '/tmp' #tempfile.TemporaryDirectory().name
-        #     fp_data_path = os.path.join(temp_dir, self.fp_filename)
-
-        self.fp_data_path = fp_data_path
+        self.fp_data_path = os.path.join(data_folder, 'csv_data', fp_filename)
 
         # Metadata - Physchem: Many of these are set in the base classes
         self.max_seq_len = max_seq_len
         self.index_col = index_col
         self.index_selection = index_selection
-        self.properties_cols = properties_cols # TODO most of these should be passed during load
+        self.properties_cols = properties_cols # Tother_dataODO most of these should be passed during load
         self.orig_property_name = None
         self.smiles_col = None
 
@@ -132,8 +122,10 @@ class GenericCSVDataset():
 
         # Load physchem properties
         logger.info(f'Loading data from {self.prop_data_path}')
-        self.smiles, self.properties = self._load_csv(columns, length_column, data_len=data_len, nbits = nbits)
-
+        self.smiles, self.properties = self._load_csv(columns,
+                                                      length_column,
+                                                      data_len=data_len,
+                                                      nbits=nbits)
         if self.smiles_col is not None:
             self.smiles = self.smiles.rename(columns={self.smiles_col: 'canonical_smiles'})
 

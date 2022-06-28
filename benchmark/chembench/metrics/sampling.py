@@ -1,4 +1,3 @@
-from collections import defaultdict
 import logging
 import numpy as np
 import pickle
@@ -6,6 +5,9 @@ import sqlite3
 import torch
 
 from contextlib import closing
+from collections import defaultdict
+
+from chembench.metrics import BaseMetric
 from chembench.utils.smiles import calc_similarity
 
 logger = logging.getLogger(__name__)
@@ -22,54 +24,11 @@ __all__ = ['Validity',
            'Entropy']
 
 
-class BaseSampleMetric():
-    name = None
-
-    """Base class for metrics based on sampling for a single SMILES string"""
-    def __init__(self,
-                 cfg):
-        self.cfg = cfg
-        self.total_molecules = 0
-
-    def __len__(self):
-        return self.total_molecules
-
-    def _calculate_metric(self, metric_array, num_array):
-        return np.nanmean(metric_array / num_array)
-
-    def is_prediction(self):
-        return False
-
-    def variations(self):
-        return NotImplemented
-
-    def compute_metrics(self, num_samples, radius):
-        return NotImplemented
-
-
-    def calculate(self, radius, num_samples, **kwargs):
-        metric_array, num_array = self.compute_metrics(num_samples, radius)
-        metric = self._calculate_metric(metric_array, num_array)
-
-        return {'name': self.name,
-                'value': metric,
-                'radius': radius,
-                'num_samples': num_samples}
-
-    def cleanup(self):
-        pass
-
-class Validity(BaseSampleMetric):
+class Validity(BaseMetric):
     name = 'validity'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = Validity.name
-
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.validity.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
 
     def compute_metrics(self, num_samples, radius):
         with closing(sqlite3.connect(self.cfg.sampling.db,
@@ -97,20 +56,14 @@ class Validity(BaseSampleMetric):
         return valid_molecules, total_molecules
 
 
-class Unique(BaseSampleMetric):
+class Unique(BaseMetric):
     name = 'unique'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = Unique.name
-
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.unique.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
                                      check_same_thread=False)) as conn:
@@ -134,20 +87,15 @@ class Unique(BaseSampleMetric):
         self.total_molecules = self.total_molecules//num_samples
         return rec[0], self.total_molecules
 
-class ScaffoldUnique(BaseSampleMetric):
+
+class ScaffoldUnique(BaseMetric):
     name = 'scaffold_unique'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = ScaffoldUnique.name
-
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.scaffold_unique.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
 
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
                                      check_same_thread=False)) as conn:
@@ -172,21 +120,15 @@ class ScaffoldUnique(BaseSampleMetric):
         return rec[0], self.total_molecules
 
 
-class Novelty(BaseSampleMetric):
+class Novelty(BaseMetric):
     name = 'novelty'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = Novelty.name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
         self.training_data = cfg.model.training_data
 
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.novelty.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
-
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         valid_molecules, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -211,21 +153,16 @@ class Novelty(BaseSampleMetric):
 
         return novel_molecules, valid_molecules
 
-class NonIdenticality(BaseSampleMetric):
+
+class NonIdenticality(BaseMetric):
     name = 'non_identicality'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = NonIdenticality.name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
         self.training_data = cfg.model.training_data
 
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.non_identicality.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
-
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -262,23 +199,18 @@ class NonIdenticality(BaseSampleMetric):
         identical = rec[0] if rec[0] is not None else 0
         return self.total_molecules - identical, self.total_molecules
 
+
 #TODO: duplicate this for entire molecules
-class ScaffoldNonIdenticalSimilarity(BaseSampleMetric):
+class ScaffoldNonIdenticalSimilarity(BaseMetric):
     name = 'scaffold_non_identical_similarity'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = ScaffoldNonIdenticalSimilarity.name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
         self.training_data = cfg.model.training_data
         self.nbits = cfg.metrics.scaffold_non_identical_similarity.nbits
 
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.scaffold_non_identical_similarity.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
-
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -316,21 +248,16 @@ class ScaffoldNonIdenticalSimilarity(BaseSampleMetric):
             sims.append(calc_similarity(v, nbits=self.nbits))
         return np.mean(sims), 1
 
-class EffectiveNovelty(BaseSampleMetric):
+
+class EffectiveNovelty(BaseMetric):
     name = 'effective_novelty'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = EffectiveNovelty.name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
         self.training_data = cfg.model.training_data
 
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.effective_novelty.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
-
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
 
@@ -365,23 +292,19 @@ class EffectiveNovelty(BaseSampleMetric):
                 ''',
                 [num_samples, radius, 'SAMPLE', radius, 'SAMPLE'])
             rec = res.fetchone()
-        return rec[0], self.total_molecules
+        recs = 0 if rec[0] is None else rec[0]
+        return recs, self.total_molecules
 
-class ScaffoldNovelty(BaseSampleMetric):
+
+class ScaffoldNovelty(BaseMetric):
     name = 'scaffold_novelty'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = ScaffoldNovelty.name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
         self.training_data = cfg.model.training_data
 
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.scaffold_novelty.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
-
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         valid_molecules, self.total_molecules = validity.compute_metrics(num_samples, radius)
         #TODO: do we need valid_scaffold when just the number is needed and its 1:1 --> guessing yes
         self.total_molecules = self.total_molecules//num_samples
@@ -414,21 +337,16 @@ class ScaffoldNovelty(BaseSampleMetric):
 
         return td_scaffolds - non_novel_scaffolds, td_scaffolds
 
-class EffectiveScaffoldNovelty(BaseSampleMetric):
+
+class EffectiveScaffoldNovelty(BaseMetric):
     name = 'effective_scaffold_novelty'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = EffectiveScaffoldNovelty.name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
         self.training_data = cfg.model.training_data
 
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.effective_scaffold_novelty.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
-
     def compute_metrics(self, num_samples, radius):
-        validity = Validity(self.cfg)
+        validity = Validity(self.name, self.metric_spec, self.cfg)
         _, self.total_molecules = validity.compute_metrics(num_samples, radius)
         self.total_molecules = self.total_molecules//num_samples
         # total molecules is 1:1 with total scaffolds
@@ -472,17 +390,12 @@ class EffectiveScaffoldNovelty(BaseSampleMetric):
             rec = res.fetchone()
         return rec[0], self.total_molecules
 
-class Entropy(BaseSampleMetric):
+
+class Entropy(BaseMetric):
     name = 'entropy'
 
-    def __init__(self, cfg):
-        super().__init__(cfg)
-        self.name = Entropy.name
-
-    def variations(self, cfg, **kwargs):
-        radius_list = list(cfg.metrics.entropy.radius)
-        radius_list = [float(x) for x in radius_list]
-        return {'radius': radius_list}
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
 
     def compute_metrics(self, num_samples, radius):
         with closing(sqlite3.connect(self.cfg.sampling.db,

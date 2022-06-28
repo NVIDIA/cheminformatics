@@ -16,8 +16,9 @@ def convert_runtime(time_):
 
 
 def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
-    """Save CSV for metrics"""
-
+    '''
+    Saves metrics into a CSV file.
+    '''
     metric_df = pd.concat(metric_list, axis=1).T
     file_path = os.path.join(output_dir, f'{mode_name}')
 
@@ -52,36 +53,42 @@ def main(cfg):
                                          db_file=cfg.sampling.db,
                                          batch_size=cfg.model.batch_size)
 
+    # Initialize database with smiles in all datasets
     radius = cfg.sampling.radius
-    for metric in  cfg.metrics:
-        datasets = cfg.metrics[metric].datasets
-        num_requested = cfg.sampling.sample_size
+    # for metric in  cfg.metrics:
+    #     datasets = cfg.metrics[metric].datasets
+    #     num_requested = cfg.sampling.sample_size
 
-        if not cfg.metrics[metric].enabled:
-            continue
+    #     if not cfg.metrics[metric].enabled:
+    #         continue
 
-        for dataset in datasets:
-            if hasattr(dataset, 'file'):
-                ds_generator.initialize_db(dataset,
-                                           radius,
-                                           num_requested=num_requested)
-            else:
-                raise NotSupportedError(f'Only {dataset} with file accepted')
-    ds_generator.sample()
+    #     for dataset in datasets:
+    #         if hasattr(dataset, 'file'):
+    #             ds_generator.initialize_db(dataset,
+    #                                        radius,
+    #                                        num_requested=num_requested)
+    #         else:
+    #             raise NotSupportedError(f'Only {dataset} with file accepted')
+
+    # # Fetch samples and embeddings and update database.
+    # ds_generator.sample()
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-
     for metric_name in  cfg.metrics:
-        for radii in radius:
-            metric = cfg.metrics[metric_name]
-            if not metric.enabled:
-                continue
+        metric = cfg.metrics[metric_name]
+        if not metric.enabled:
+            continue
+        impl = locate(metric.impl)(metric_name, metric, cfg)
 
-            impl = locate(metric.impl)(cfg)
-            kwargs = {'radius', radii,
-                      'num_sample', cfg.sampling.sample_size}
+        variations = impl.variations()
+        for variation in variations:
+            # kwargs = {'radius': radii,
+            #           'num_samples': cfg.sampling.sample_size,
+            #           'average_tokens': cfg.model.average_tokens,
+            #           'param_dict': None,
+            #           'estimator': None}
             start_time = datetime.now()
-            result = impl.calculate(radii, cfg.sampling.sample_size)
+            result = impl.calculate(**variation)
             run_time = convert_runtime(datetime.now() - start_time)
 
             result['inferrer'] = cfg.model.name
@@ -93,8 +100,8 @@ def main(cfg):
             # Updates to irregularly used arguments
             key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
             for key in key_list:
-                if key in kwargs:
-                    result[key] = kwargs[key]
+                if key in variation:
+                    result[key] = variation[key]
 
             return_predictions = impl.is_prediction()
             save_metric_results(f'{cfg.model.name}_{cfg.exp_name}',
@@ -102,7 +109,7 @@ def main(cfg):
                                 cfg.output.path,
                                 return_predictions=return_predictions)
 
-            # metric.cleanup()
+        impl.cleanup()
 
 if __name__ == '__main__':
     main()

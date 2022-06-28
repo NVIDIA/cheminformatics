@@ -82,11 +82,6 @@ def main(cfg):
 
         variations = impl.variations()
         for variation in variations:
-            # kwargs = {'radius': radii,
-            #           'num_samples': cfg.sampling.sample_size,
-            #           'average_tokens': cfg.model.average_tokens,
-            #           'param_dict': None,
-            #           'estimator': None}
             start_time = datetime.now()
             result = impl.calculate(**variation)
             run_time = convert_runtime(datetime.now() - start_time)
@@ -104,7 +99,7 @@ def main(cfg):
                     result[key] = variation[key]
 
             return_predictions = impl.is_prediction()
-            save_metric_results(f'{cfg.model.name}_{cfg.exp_name}',
+            save_metric_results(f'{cfg.model.display_name}-{cfg.exp_name}-{metric_name}',
                                 [pd.Series(result)],
                                 cfg.output.path,
                                 return_predictions=return_predictions)

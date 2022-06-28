@@ -30,7 +30,7 @@ benchmark.csv
 .env
 outputs/
 **/*.onnx
-
+benchmark/csv_data/fp_*
 data/
 models/
 cddd/

@@ -311,12 +311,13 @@ class Modelability(BaseEmbeddingMetric):
         logger.info(f'Processing {self.label}...')
         cache = Cache()
         embeddings = None #cache.get_data(f'Modelability_{self.label}_embeddings') Caching with this label is unaccurate for benchmarking multiple models
-        assert(embeddings is None)
         if embeddings is None:
             logger.info(f'Grabbing Fresh Embeddings with average_tokens = {average_tokens}')
-            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens)
+            embeddings = self.encode_many(zero_padded_vals=False,
+                                          average_tokens=average_tokens)
             embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
-            fingerprints = xpy.asarray(self.fingerprint_dataset.values, dtype=xpy.float32)
+            fingerprints = xpy.asarray(self.fingerprint_dataset.values,
+                                       dtype=xpy.float32)
 
             cache.set_data(f'Modelability_{self.label}_embeddings', embeddings)
             cache.set_data(f'Modelability_{self.label}_fingerprints', fingerprints)

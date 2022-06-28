@@ -5,7 +5,6 @@ import pandas as pd
 
 from datetime import datetime
 from pydoc import locate
-from defusedxml import NotSupportedError
 from chembench.data.cache import DatasetCacheGenerator
 
 log = logging.getLogger(__name__)

@@ -9,9 +9,9 @@ class BaseMetric():
         self.name = metric_name
         self.metric_spec = metric_spec
         self.cfg = cfg
-        self.dataset = metric_spec.datasets[0]
-        self.label = self.dataset['label']
-        self.data_file = self.dataset['file']
+        self.dataset_spec = metric_spec.datasets[0]
+        self.label = self.dataset_spec['label']
+        self.data_file = self.dataset_spec['file']
         self.total_molecules = 0
 
     def __len__(self):

@@ -38,7 +38,7 @@ metrics:
     impl: chembench.metrics.Validity
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ZINC15_test_split.csv
-        smiles_column_name: canonical_smiles
+        smis_col: canonical_smiles
         type: SAMPLE
         input_size: 1000
         label: sample_ds
@@ -85,6 +85,7 @@ metrics:
     impl: chembench.metrics.NearestNeighborCorrelation
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
+        impl: chembench.datasets.base.GenericCSVDataset
         properties_cols:
           - max_phase_for_ind
           - mw_freebase
@@ -105,7 +106,7 @@ metrics:
           - hba_lipinski
           - hbd_lipinski
           - num_lipinski_ro5_violations
-        smiles_column_name: canonical_smiles
+        smis_col: canonical_smiles
         type: EMBEDDING
         input_size: null
         label: chembl
@@ -119,9 +120,10 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
+        impl: chembench.datasets.base.GenericCSVDataset
         label: lipophilicity
         index_col: index
-        smiles_column_name: SMILES
+        smis_col: SMILES
         properties_cols:
           - logD
         orig_property_name:
@@ -138,9 +140,10 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv
+        impl: chembench.datasets.base.GenericCSVDataset
         label: esol
         index_col: index
-        smiles_column_name: SMILES
+        smis_col: SMILES
         properties_cols:
           - 'log_solubility_(mol_per_L)'
         orig_property_name:
@@ -157,9 +160,10 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv
+        impl: chembench.datasets.base.GenericCSVDataset
         label: freesolv
         index_col: index
-        smiles_column_name: SMILES
+        smis_col: SMILES
         properties_cols:
           - hydration_free_energy
         orig_property_name:
@@ -176,14 +180,20 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ExCAPE_Bioactivity.csv
+        impl: chembench.datasets.ExCAPEDataset
         label: excape
         index_col: index
-        smiles_column_name: SMILES
+        smis_col: SMILES
+        load_cols:
+          - SMILES
+          - Gene_Symbol
         properties_cols:
           - pXC50
         orig_property_name:
           - null
         type: EMBEDDING
+        variations:
+          group_by: 'gene'
         input_size: null
     enabled: True
     gene_cnt: -1

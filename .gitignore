@@ -35,3 +35,4 @@ data/
 models/
 cddd/
 logs
+*.code-workspace

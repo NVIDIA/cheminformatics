@@ -1,42 +1,28 @@
-#!/usr/bin/env python3
-
-import logging
+import os
 import time
+import logging
 import numpy as np
-import pandas as pd
 import pickle
 import sqlite3
-from contextlib import closing
 from sklearn.model_selection import ParameterGrid, KFold
 
 from chembench.data.memcache import Cache
+from chembench.datasets.base import GenericCSVDataset
+from chembench.metrics import BaseMetric
+
+import cupy as xpy
+from cuml.metrics import pairwise_distances, mean_squared_error, r2_score
+from cuml.linear_model import LinearRegression, ElasticNet
+from cuml.svm import SVR
+from cuml.ensemble import RandomForestRegressor
+from chembench.utils.metrics import spearmanr
+from chembench.utils.distance import tanimoto_calculate
+from cuml.experimental.preprocessing import StandardScaler
+RAPIDS_AVAILABLE = True
+
 
 logger = logging.getLogger(__name__)
 
-try:
-    import cupy as xpy
-    import cudf as xdf
-    from cuml.metrics import pairwise_distances, mean_squared_error, r2_score
-    from cuml.linear_model import LinearRegression, ElasticNet
-    from cuml.svm import SVR
-    from cuml.ensemble import RandomForestRegressor
-    from chembench.utils.metrics import spearmanr
-    from chembench.utils.distance import tanimoto_calculate
-    from cuml.experimental.preprocessing import StandardScaler
-    RAPIDS_AVAILABLE = True
-    logger.info('RAPIDS installation found. Using cupy and cudf where possible.')
-except ModuleNotFoundError as e:
-    logger.info('RAPIDS installation not found. Numpy and pandas will be used instead.')
-    import numpy as xpy
-    import pandas as xdf
-    from sklearn.metrics import pairwise_distances, mean_squared_error
-    from sklearn.linear_model import LinearRegression, ElasticNet
-    from sklearn.svm import SVR
-    from sklearn.ensemble import RandomForestRegressor
-    from scipy.stats import spearmanr
-    from chembench.utils.distance import tanimoto_calculate
-    from sklearn.preprocessing import StandardScaler
-    RAPIDS_AVAILABLE = False
 __all__ = ['NearestNeighborCorrelation', 'Modelability']
 
 
@@ -65,31 +51,39 @@ def get_model_dict():
             'random_forest': [rf_estimator, rf_param_dict],
             }
 
-class BaseEmbeddingMetric():
+class BaseEmbeddingMetric(BaseMetric):
     name = None
 
     """Base class for metrics based on embedding datasets"""
-    def __init__(self, cfg, dataset):
-        self.name = self.__class__.__name__
-        self.cfg = cfg
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
 
-        self.dataset = dataset
-        self.smiles_dataset = dataset.smiles
-        self.fingerprint_dataset = dataset.fingerprints
-        self.smiles_properties = dataset.properties
+        fp_filename = f'fp_{os.path.splitext(os.path.basename(self.data_file))[0]}_{metric_spec["nbits"]}.csv'
+
+        self.csv_dataset = GenericCSVDataset(data_filename=self.data_file,
+                                        fp_filename=fp_filename)
+        self.csv_dataset.index_col = self.dataset['index_col']
+        self.csv_dataset.smis_col = self.dataset['smiles_column_name']
+        self.csv_dataset.properties_cols = self.dataset['properties_cols']
+        self.csv_dataset.orig_property_name = self.dataset['orig_property_name']
+
+        self.csv_dataset.load(columns=self.csv_dataset.smis_col,
+                         data_len=self.dataset.input_size,
+                         nbits=metric_spec['nbits'])
+
+        self.smiles_dataset = self.csv_dataset.smiles
+        self.fingerprint_dataset = self.csv_dataset.fingerprints
+        self.smiles_properties = self.csv_dataset.properties
 
         self.conn = sqlite3.connect(self.cfg.sampling.db,
                                     uri=True,
                                     check_same_thread=False)
 
     def __len__(self):
-        return len(self.dataset.smiles)
+        return len(self.csv_dataset.smiles)
 
-    def is_prediction():
-        return False
-
-    def variations(self):
-        return NotImplemented
+    def is_prediction(self):
+        return True
 
     def _find_embedding(self, smiles):
         # Check db for results from a previous run
@@ -135,10 +129,10 @@ class BaseEmbeddingMetric():
         # Calculate pairwise distances for embeddings
 
         if not max_seq_len:
-            max_seq_len = self.dataset.max_seq_len
+            max_seq_len = self.cfg.sampling.max_seq_len
 
         embeddings = []
-        for smiles in self.smiles_dataset['canonical_smiles']:
+        for smiles in self.smiles_dataset[self.csv_dataset.smis_col]:
             embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_seq_len=max_seq_len)
             embeddings.append(embedding)
 
@@ -147,17 +141,13 @@ class BaseEmbeddingMetric():
     def calculate(self):
         raise NotImplementedError
 
-    def cleanup(self):
-        pass
-
 
 class NearestNeighborCorrelation(BaseEmbeddingMetric):
     """Sperman's Rho for correlation of pairwise Tanimoto distances vs Euclidean distance from embeddings"""
     name = 'nearest neighbor correlation'
 
-    def __init__(self, inferrer, cfg, smiles_dataset):
-        super().__init__(inferrer, cfg, smiles_dataset)
-        self.name = NearestNeighborCorrelation.name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
 
     def variations(self, cfg, **kwargs):
         top_k_list = list(cfg.metric.nearest_neighbor_correlation.top_k)
@@ -212,28 +202,24 @@ class Modelability(BaseEmbeddingMetric):
     """Ability to model molecular properties from embeddings vs Morgan Fingerprints"""
     name = 'modelability'
 
-    def __init__(self, name, cfg, dataset, label,
-                 n_splits=4,
-                 return_predictions=False,
-                 normalize_inputs=False,
-                 data_file=None):
-        super().__init__(cfg, dataset)
-        self.name = name
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
+        # self.name = name
         self.model_dict = get_model_dict()
-        self.n_splits = n_splits
-        self.return_predictions = return_predictions
-        self.label = label
-        self.data_file = data_file
+        self.n_splits = metric_spec['n_splits']
+        self.return_predictions = metric_spec['return_predictions']
 
-        if normalize_inputs:
+        if metric_spec['normalize_inputs']:
             self.norm_data, self.norm_prop = StandardScaler(), StandardScaler()
         else:
             self.norm_data, self.norm_prop = None, None
 
     def variations(self, model_dict=None, **kwargs):
-        if model_dict:
-            self.model_dict = model_dict
-        return {'model': list(self.model_dict.keys())}
+        kwargs = [{'model': k,
+                   'average_tokens': self.cfg.model.average_tokens,
+                   'estimator': self.model_dict[k][0],
+                   'param_dict': self.model_dict[k][1]} for k in self.model_dict.keys()]
+        return kwargs
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata):
         """Perform grid search with cross validation and return score"""
@@ -317,77 +303,11 @@ class Modelability(BaseEmbeddingMetric):
                                    'embedding_pred': embedding_pred} }
         return results
 
-    def encode_bulk(self, zero_padded_vals=True, average_tokens=False):
-        tmp_table = self.name.replace('-', '_')
-        tmp_table += '_' + self.label
+    def calculate(self, **kwargs):
+        estimator = kwargs['estimator']
+        param_dict = kwargs['param_dict']
+        average_tokens = kwargs['average_tokens']
 
-        # Create temp table if not already created
-        result = self.conn.execute('''
-                SELECT count(*) FROM sqlite_master WHERE type='table' AND name=?
-                ''',
-                [tmp_table]).fetchone()
-        if result[0] == 0:
-            logger.info(f'Creating temporary table {tmp_table} for bulk encoding...')
-            self.conn.execute(f'''
-                    CREATE TABLE {tmp_table} (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        smiles TEXT NULL,
-                        UNIQUE(smiles)
-                    )
-                    ''')
-            self.conn.execute(f'''
-                CREATE INDEX IF NOT EXISTS {tmp_table}_smiles_index
-                    ON {tmp_table} (smiles);
-                ''')
-
-        # Insert data into temp table if not already inserted
-        result = self.conn.execute(f'SELECT count(*) FROM {tmp_table}').fetchone()
-        if result[0] == 0:
-            dataset_df = pd.DataFrame()
-            dataset_df['smiles'] = self.smiles_dataset['canonical_smiles']
-            dataset_df = dataset_df.drop_duplicates()
-            dataset_df.to_sql(tmp_table, self.conn, index=False, if_exists='append')
-
-            result = self.conn.execute(f'SELECT count(*) FROM {tmp_table}').fetchone()
-        logger.info(f'{result[0]} SMILES to encode')
-
-        with closing(self.conn.cursor()) as cursor:
-            cursor.execute(f'''
-                    SELECT ss.embedding, ss.embedding_dim, s.smiles
-                    FROM smiles s, smiles_samples ss, {tmp_table} tmp
-                    WHERE s.id = ss.input_id
-                        AND ss.is_generated = 0
-                        AND s.processed = 1
-                        AND s.smiles = tmp.smiles
-                    ''')
-            embeddings = []
-            while True:
-                recs = cursor.fetchmany(1000)
-
-                if not recs:
-                    break
-                for rec in recs:
-                    dim = pickle.loads(rec[1])
-                    embedding = pickle.loads(rec[0])
-                    embedding = xpy.array(embedding).reshape(dim).squeeze()
-
-                    smiles = rec[2]
-
-                    if zero_padded_vals:
-                        if dim == 2:
-                            embedding[len(smiles):, :] = 0.0
-                        else:
-                            embedding[len(smiles):] = 0.0
-
-                    if average_tokens:
-                        embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
-                    else:
-                        embedding = embedding.flatten()
-
-                    embeddings.append(embedding)
-        return embeddings
-
-    def calculate(self, estimator, param_dict, average_tokens, **kwargs):
         logger.info(f'Processing {self.label}...')
         cache = Cache()
         embeddings = None #cache.get_data(f'Modelability_{self.label}_embeddings') Caching with this label is unaccurate for benchmarking multiple models

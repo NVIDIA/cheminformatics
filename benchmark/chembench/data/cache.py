@@ -213,5 +213,4 @@ class DatasetCacheGenerator():
                         try:
                             future.result()
                         except Exception as exc:
-                            # log.exception(exc)
                             raise exc

@@ -30,7 +30,7 @@ sampling:
     - 2.5
 
 output:
-  path: /data/benchmark_output/mim
+  path: /data/benchmark_output/nemo
 
 metrics:
   validity:
@@ -40,82 +40,133 @@ metrics:
         smiles_column_name: canonical_smiles
         type: SAMPLE
         input_size: 1000
-    enabled: True
+        label: sample_ds
+    enabled: False
 
   unique:
     impl: chembench.metrics.Unique
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: False
     remove_invalid: False
 
   novelty:
     impl: chembench.metrics.Novelty
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: False
     remove_invalid: False
 
   effective_novelty:
     impl: chembench.metrics.EffectiveNovelty
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: False
     remove_invalid: False
 
   non_identicality:
     impl: chembench.metrics.NonIdenticality
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: False
     remove_invalid: False
 
   scaffold_unique:
     impl: chembench.metrics.ScaffoldUnique
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: False
     remove_invalid: False
 
   scaffold_non_identical_similarity:
     impl: chembench.metrics.ScaffoldNonIdenticalSimilarity
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: False
     remove_invalid: False
     nbits: 2048
 
   nearest_neighbor_correlation:
+    impl: chembench.metrics.NearestNeighborCorrelation
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
+        properties_cols:
+          - max_phase_for_ind
+          - mw_freebase
+          - alogp
+          - hba
+          - hbd
+          - psa
+          - rtb
+          - ro3_pass
+          - num_ro5_violations
+          - cx_logp
+          - cx_logd
+          - full_mwt
+          - aromatic_rings
+          - heavy_atoms
+          - qed_weighted
+          - mw_monoisotopic
+          - hba_lipinski
+          - hbd_lipinski
+          - num_lipinski_ro5_violations
         smiles_column_name: canonical_smiles
         type: EMBEDDING
         input_size: null
+        label: chembl
     enabled: False
     top_k:
       - 50
       - 100
       - 500
 
-  physchem:
+  physchem_lipophilicity:
+    impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
+        index_col: index
         smiles_column_name: SMILES
+        properties_cols:
+          - logD
+        orig_property_name:
+          - exp
         type: EMBEDDING
         input_size: null
+        label: lipophilicity
+    enabled: True
+    n_splits: 20
+    nbits: 512
+    normalize_inputs: True
+    return_predictions: True
+
+  physchem_esol:
+    impl: chembench.metrics.Modelability
+    datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv
         smiles_column_name: SMILES
         type: EMBEDDING
         input_size: null
+        label: esol
+    enabled: False
+    n_splits: 20
+    normalize_inputs: True
+    return_predictions: True
+
+  physchem_freesolv:
+    impl: chembench.metrics.Modelability
+    datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv
         smiles_column_name: SMILES
         type: EMBEDDING
         input_size: null
+        label: freesolv
     enabled: False
     n_splits: 20
     normalize_inputs: True
     return_predictions: True
 
   bioactivity:
+    impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ExCAPE_Bioactivity.csv
         smiles_column_name: SMILES
         type: EMBEDDING
         input_size: null
+        label: excape
     enabled: False
     gene_cnt: -1
     n_splits: 20

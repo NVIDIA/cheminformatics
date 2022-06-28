@@ -2,6 +2,7 @@ version: 1
 exp_name: mim_k1_salv
 model:
   name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
+  display_name: nemo_chem
   checkpoint_file: /models/megamolbart/Small_Span_Aug_2f63a83b_220424.nemo
   training_data: /data/db/zinc_train.sqlite3
   batch_size: 100 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
@@ -118,6 +119,7 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
+        label: lipophilicity
         index_col: index
         smiles_column_name: SMILES
         properties_cols:
@@ -126,8 +128,7 @@ metrics:
           - exp
         type: EMBEDDING
         input_size: null
-        label: lipophilicity
-    enabled: True
+    enabled: False
     n_splits: 20
     nbits: 512
     normalize_inputs: True
@@ -137,12 +138,18 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv
+        label: esol
+        index_col: index
         smiles_column_name: SMILES
+        properties_cols:
+          - 'log_solubility_(mol_per_L)'
+        orig_property_name:
+          - measured log solubility in mols per litre
         type: EMBEDDING
         input_size: null
-        label: esol
     enabled: False
     n_splits: 20
+    nbits: 512
     normalize_inputs: True
     return_predictions: True
 
@@ -150,12 +157,18 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv
+        label: freesolv
+        index_col: index
         smiles_column_name: SMILES
+        properties_cols:
+          - hydration_free_energy
+        orig_property_name:
+          - y
         type: EMBEDDING
         input_size: null
-        label: freesolv
     enabled: False
     n_splits: 20
+    nbits: 512
     normalize_inputs: True
     return_predictions: True
 
@@ -163,13 +176,19 @@ metrics:
     impl: chembench.metrics.Modelability
     datasets:
       - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ExCAPE_Bioactivity.csv
+        label: excape
+        index_col: index
         smiles_column_name: SMILES
+        properties_cols:
+          - pXC50
+        orig_property_name:
+          - null
         type: EMBEDDING
         input_size: null
-        label: excape
-    enabled: False
+    enabled: True
     gene_cnt: -1
     n_splits: 20
+    nbits: 512
     normalize_inputs: True
     return_predictions: True
 

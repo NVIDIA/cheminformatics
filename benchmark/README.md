@@ -19,7 +19,7 @@ python3 -m chembench.data --config-dir /workspace/cheminformatics/benchmark/conf
 
 ```
 # For benchmarking MegaMolBART
-./launch.sh dev 2 "python3 -m cuchembench --config-dir /workspace/benchmark/scripts/"
+./launch.sh dev "python3 -m chembench --config-dir /workspace/benchmark/scripts/"
 ```
 <hr>
 <br>

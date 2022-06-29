@@ -356,12 +356,13 @@ class Modelability(BaseEmbeddingMetric):
                                           average_tokens=average_tokens)
             embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
 
-
             if 'fingerprints' in kwargs:
                 fingerprints = kwargs['fingerprints']
+                fingerprints = xpy.asarray(fingerprints.values,
+                                           dtype=xpy.float32)
             else:
                 fingerprints = xpy.asarray(self.fingerprint_dataset.values,
-                                        dtype=xpy.float32)
+                                           dtype=xpy.float32)
 
             cache.set_data(f'Modelability_{self.label}_embeddings', embeddings)
             cache.set_data(f'Modelability_{self.label}_fingerprints', fingerprints)

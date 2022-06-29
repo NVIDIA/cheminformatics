@@ -9,18 +9,16 @@ from pydoc import locate
 from sklearn.model_selection import ParameterGrid, KFold
 
 from chembench.data.memcache import Cache
-from chembench.datasets.base import GenericCSVDataset
 from chembench.metrics import BaseMetric
 
 import cupy as xpy
-from cuml.metrics import pairwise_distances, mean_squared_error, r2_score
+from cuml.metrics import pairwise_distances, mean_squared_error
 from cuml.linear_model import LinearRegression, ElasticNet
 from cuml.svm import SVR
 from cuml.ensemble import RandomForestRegressor
 from chembench.utils.metrics import spearmanr
 from chembench.utils.distance import tanimoto_calculate
 from cuml.experimental.preprocessing import StandardScaler
-RAPIDS_AVAILABLE = True
 
 
 logger = logging.getLogger(__name__)
@@ -29,22 +27,23 @@ __all__ = ['NearestNeighborCorrelation', 'Modelability']
 
 
 def get_model_dict():
-    lr_estimator = LinearRegression(normalize=False) # Normalization done by StandardScaler
-    lr_param_dict = {'normalize': [False]}
+    # Normalization done by StandardScaler
+    lr_estimator = LinearRegression(normalize=True)
+    lr_param_dict = {'normalize': [True]}
 
-    en_estimator = ElasticNet(normalize=False)
+    en_estimator = ElasticNet(normalize=True)
     en_param_dict = {'alpha': [0.001, 0.01, 0.1, 1.0, 10.0, 100],
                      'l1_ratio': [0.0, 0.2, 0.5, 0.7, 1.0]}
 
-    sv_estimator = SVR(kernel='rbf') # cache_size=4096.0 -- did not seem to improve runtime
+    # cache_size=4096.0 -- did not seem to improve runtime
+    sv_estimator = SVR(kernel='rbf')
     sv_param_dict = {'C': [1.75, 5.0, 7.5, 10.0, 20.0],
                      'gamma': [0.0001, 0.001, 0.01, 0.1, 1.0],
                      'epsilon': [0.001, 0.01, 0.1, 0.3],
                      'degree': [3, 5, 7, 9]}
-    if RAPIDS_AVAILABLE:
-        rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0) # n_streams=12 -- did not seem to improve runtime
-    else:
-        rf_estimator = RandomForestRegressor(criterion='mse', random_state=0)
+
+    # n_streams=12 -- did not seem to improve runtime
+    rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0)
     rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
     return {'linear_regression': [lr_estimator, lr_param_dict],
@@ -63,8 +62,8 @@ class BaseEmbeddingMetric(BaseMetric):
         fp_filename = f'fp_{os.path.splitext(os.path.basename(self.data_file))[0]}_{metric_spec["nbits"]}.csv'
 
         self.dataset = locate(self.dataset_spec.impl)(data_filename=self.data_file,
-                                                     fp_filename=fp_filename,
-                                                     max_seq_len=self.cfg.sampling.max_seq_len)
+                                                      fp_filename=fp_filename,
+                                                      max_seq_len=self.cfg.sampling.max_seq_len)
         self.dataset.index_col = self.dataset_spec['index_col']
         self.dataset.smiles_col = self.dataset_spec['smis_col']
         self.dataset.properties_cols = list(self.dataset_spec['properties_cols'])
@@ -76,8 +75,8 @@ class BaseEmbeddingMetric(BaseMetric):
             self.dataset.load_cols = self.dataset.smiles_col
 
         self.dataset.load(columns=self.dataset.load_cols,
-                              data_len=self.dataset_spec.input_size,
-                              nbits=metric_spec['nbits'])
+                          data_len=self.dataset_spec.input_size,
+                          nbits=metric_spec['nbits'])
 
         self.smiles_dataset = self.dataset.smiles
         self.fingerprint_dataset = self.dataset.fingerprints
@@ -192,8 +191,7 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
         metric = xpy.nanmean(metric)
-        if RAPIDS_AVAILABLE:
-            metric = xpy.asnumpy(metric)
+        metric = xpy.asnumpy(metric)
 
         top_k = embeddings.shape[0] - 1 if not top_k else top_k
 
@@ -322,16 +320,13 @@ class Modelability(BaseEmbeddingMetric):
             self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
         ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
-        if self.return_predictions & RAPIDS_AVAILABLE:
-            embedding_pred, fingerprint_pred = xpy.asnumpy(embedding_pred), xpy.asnumpy(fingerprint_pred)
-
         results = {'value': ratio,
                    'fingerprint_error': fingerprint_error,
                    'embedding_error': embedding_error,
                    'fingerprint_param': fingerprint_param,
                    'embedding_param': embedding_param,
-                   'predictions': {'fingerprint_pred': fingerprint_pred,
-                                   'embedding_pred': embedding_pred} }
+                   'predictions': {'fingerprint_pred': xpy.asnumpy(fingerprint_pred),
+                                   'embedding_pred': xpy.asnumpy(embedding_pred)} }
         return results
 
     def calculate(self, **kwargs):

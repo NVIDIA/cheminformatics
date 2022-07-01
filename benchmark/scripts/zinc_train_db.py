@@ -69,7 +69,7 @@ def parse_args():
     parser.add_argument('-p', '--data_path',
                         dest='data_path',
                         type=str,
-                        default='/data/zinc_csv/train/', #x0[00-72]*
+                        default='/data/zinc_csv_split/train/', #x0[00-72]*
                         help='Wildcard path to the CSV files containing training data')
     parser.add_argument('-d', '--db_name',
                         dest='db_name',

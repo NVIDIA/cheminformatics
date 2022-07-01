@@ -114,14 +114,14 @@ class DatasetCacheGenerator():
 
         dataset_type = dataset.type
         if dataset_type == 'EMBEDDING':
-            num_requested = 0;
+            num_requested = 0
 
         if dataset.input_size:
             df_file = pd.read_csv(dataset.file,
                                   nrows=dataset.input_size)
         else:
             df_file = pd.read_csv(dataset.file)
-        sr_smiles = df_file[dataset.smiles_column_name].drop_duplicates()
+        sr_smiles = df_file[dataset.smis_col].drop_duplicates()
 
         for radii in radius:
             dataset_df = pd.DataFrame()

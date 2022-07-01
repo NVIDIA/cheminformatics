@@ -2,7 +2,7 @@ version: 1
 exp_name: mim_k1_salv
 model:
   name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
-  display_name: nemo_chem
+  display_name: nemo_chem_1
   checkpoint_file: /models/megamolbart/Small_Span_Aug_2f63a83b_220424.nemo
   training_data: /data/db/zinc_train.sqlite3
   batch_size: 100 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
@@ -98,7 +98,7 @@ metrics:
         type: EMBEDDING
         input_size: null
         label: chembl
-    enabled: True
+    enabled: False
     top_k:
       - 50
       - 100
@@ -190,22 +190,22 @@ metrics:
     normalize_inputs: True
     return_predictions: True
 
-defaults:
-  - hydra/job_logging:
-      version: 1
-      formatters:
-        simple:
-          format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
-      handlers:
-        console:
-          class: logging.StreamHandler
-          formatter: simple
-          stream: ext://sys.stdout
-        file:
-          class: logging.FileHandler
-          formatter: simple
-          filename: /data/logs/benchmark.log
-      root:
-        level: INFO
-        handlers: [console, file]
-      disable_existing_loggers: false
+# defaults:
+#   - hydra/job_logging:
+#       version: 1
+#       formatters:
+#         simple:
+#           format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+#       handlers:
+#         console:
+#           class: logging.StreamHandler
+#           formatter: simple
+#           stream: ext://sys.stdout
+#         file:
+#           class: logging.FileHandler
+#           formatter: simple
+#           filename: /data/logs/benchmark.log
+#       root:
+#         level: INFO
+#         handlers: [console, file]
+#       disable_existing_loggers: false

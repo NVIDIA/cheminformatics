@@ -53,24 +53,24 @@ def main(cfg):
                                          batch_size=cfg.model.batch_size)
 
     # Initialize database with smiles in all datasets
-    radius = cfg.sampling.radius
-    for metric in  cfg.metrics:
-        datasets = cfg.metrics[metric].datasets
-        num_requested = cfg.sampling.sample_size
+    # radius = cfg.sampling.radius
+    # for metric in  cfg.metrics:
+    #     datasets = cfg.metrics[metric].datasets
+    #     num_requested = cfg.sampling.sample_size
 
-        if not cfg.metrics[metric].enabled:
-            continue
+    #     if not cfg.metrics[metric].enabled:
+    #         continue
 
-        for dataset in datasets:
-            if hasattr(dataset, 'file'):
-                ds_generator.initialize_db(dataset,
-                                           radius,
-                                           num_requested=num_requested)
-            else:
-                raise ValueError(f'Only {dataset} with file accepted')
+    #     for dataset in datasets:
+    #         if hasattr(dataset, 'file'):
+    #             ds_generator.initialize_db(dataset,
+    #                                        radius,
+    #                                        num_requested=num_requested)
+    #         else:
+    #             raise ValueError(f'Only {dataset} with file accepted')
 
-    # Fetch samples and embeddings and update database.
-    ds_generator.sample()
+    # # Fetch samples and embeddings and update database.
+    # ds_generator.sample()
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     for metric_name in  cfg.metrics:

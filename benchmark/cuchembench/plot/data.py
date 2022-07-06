@@ -12,7 +12,7 @@ from cuchembench.datasets.bioactivity import ExCAPEDataset
 
 logger = logging.getLogger(__name__)
 
-MODEL_RENAME_REGEX = re.compile(r"""(?:cuchembench.inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""")
+MODEL_RENAME_REGEX = re.compile(r"""(?:cuchem(?:bm|bench).inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""")
 MODEL_SIZE_REGEX = re.compile(r"""(?P<model_size>x?small)""")
 
 MEGAMOLBART_SAMPLE_RADIUS = {'xsmall': 1.0,

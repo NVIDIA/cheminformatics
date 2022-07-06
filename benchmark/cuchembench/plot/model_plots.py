@@ -18,7 +18,7 @@ def grouper(list_, num_rows):
         yield list_[i: i + num_rows]
 
 
-def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
+def make_model_plots(max_seq_len, plot_type, output_dir, plot_dir, n_plots_page=10):
     assert plot_type in ['physchem', 'bioactivity'], AssertionError(f"Error: plot type must be one of 'physchem' or 'bioactivity'.")
     sns.set_palette('dark')
 
@@ -27,13 +27,13 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
         pkl_path = os.path.join(output_dir, '**', '*physchem.pkl')
         group_col = 'property'
         index_cols = ['inferrer', 'property', 'model']
-        output_path = os.path.join(output_dir, 'Physchem_Single_Property_Plots.pdf')
+        plot_path = os.path.join(plot_dir, 'Physchem_Single_Property_Plots.pdf')
     elif plot_type == 'bioactivity':
         input_data_func = load_bioactivity_input_data
         pkl_path = os.path.join(output_dir, '**', '*bioactivity.pkl')
         group_col = 'gene'
         index_cols = ['inferrer', 'gene', 'model']
-        output_path = os.path.join(output_dir, 'Bioactivity_Single_Gene_Plots.pdf')
+        plot_path = os.path.join(plot_dir, 'Bioactivity_Single_Gene_Plots.pdf')
 
     keep_cols = index_cols + ['fingerprint_error', 'embedding_error']
 
@@ -54,7 +54,7 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
     metric_df = metric_df[keep_cols].set_index(index_cols)
     assert metric_df.groupby(['inferrer', group_col, 'model']).size().max() == 1, AssertionError(f'Duplicate entries are present for {plot_type} metrics.')
 
-    with PdfPages(output_path) as pdf:
+    with PdfPages(plot_path) as pdf:
         for pred_data_page in grouper(pred_data.groupby(['row']), n_plots_page):
             pred_data_page = pd.concat([x[1] for x in pred_data_page], axis=0)
             

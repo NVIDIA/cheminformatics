@@ -9,6 +9,8 @@ handlers:
 
 root:
   handlers: [console]
+  do_benchmark: False # set to True to run benchmark or False to skip model download etc, if only plots are needed
+  do_plots: True # set to True to make plots, or False to skip
 
 model:
   name: MegaMolBART #Latent #CDDD
@@ -26,7 +28,9 @@ sampling:
   concurrent_requests: 10
 
 output:
-  path: /data/benchmark_output/prcvr_test
+  metric_path: /data/benchmark_output/MegaMolBART/small_NeMo1.2_data_parallel #/data/benchmark_output
+  plot_path: /data/benchmark_output/plots
+
 
 metric:
   validity:

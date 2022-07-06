@@ -137,7 +137,7 @@ def make_latest_bioactivity_plots(embedding_df, axlist, max_plot_ratio=10):
             ax.legend().set_title('Model')
 
 
-def create_latest_aggregated_plots(output_dir, remove_elastic_net=True):
+def create_latest_aggregated_plots(output_dir, plot_dir, remove_elastic_net=True):
     """Create all aggregated plots for sampling and embedding metrics"""
 
     metric_df = load_aggregated_metric_results(output_dir)
@@ -161,5 +161,5 @@ def create_latest_aggregated_plots(output_dir, remove_elastic_net=True):
     make_latest_bioactivity_plots(embedding_df, axlist3)
 
     plt.tight_layout()
-    fig.savefig(os.path.join(output_dir, 'Latest_Benchmark_Metrics.png'), dpi=300)
+    fig.savefig(os.path.join(plot_dir, 'Latest_Benchmark_Metrics.png'), dpi=300)
     return

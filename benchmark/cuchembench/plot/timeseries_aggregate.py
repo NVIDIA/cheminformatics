@@ -195,7 +195,7 @@ def make_timeseries_bioactivity_plots(embedding_df, output_dir, max_plot_ratio=6
     fig.savefig(os.path.join(output_dir, 'Bioactivity_Aggregated_Benchmark.png'), dpi=300)
 
 
-def create_timeseries_aggregated_plots(output_dir):
+def create_timeseries_aggregated_plots(output_dir, plot_dir):
     """Create all aggregated plots for sampling and embedding metrics"""
     metric_df = load_aggregated_metric_results(output_dir)
     embedding_df = make_aggregated_embedding_df(metric_df)
@@ -218,5 +218,5 @@ def create_timeseries_aggregated_plots(output_dir):
     # make_timeseries_bioactivity_plots(embedding_df, axlist3)
 
     plt.tight_layout()
-    fig.savefig(os.path.join(output_dir, 'Timeseries_Benchmark_Metrics.png'), dpi=300)
+    fig.savefig(os.path.join(plot_dir, 'Timeseries_Benchmark_Metrics.png'), dpi=300)
     return

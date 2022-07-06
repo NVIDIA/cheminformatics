@@ -79,11 +79,11 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
                 prop, inferrer = row.split('+')
                 error_vals = metric_df.loc[inferrer, prop, model]
 
-                if ax.is_first_row():
+                if ax.get_subplotspec().is_first_row():
                     ax.set_title(model.replace('_', ' ').title())
-                if ax.is_last_row():
+                if ax.get_subplotspec().is_last_row():
                     ax.set_xlabel('Property Value')
-                if ax.is_first_col():
+                if ax.get_subplotspec().is_first_col():
                     ax.set_ylabel(f'{inferrer}\n{prop}\nPredicted Value')
 
                 error_str = []

@@ -118,9 +118,9 @@ def make_timeseries_physchem_plots(embedding_df, output_dir, max_plot_ratio=10):
         ax.set_xticklabels(ax.get_xticklabels(), fontsize='small')
         ax.set_ylim(0, max_plot_ratio)
         _label_bars(ax, int(0.9 * max_plot_ratio))
-        ax.set_title('Physchem Property Prediction (Most Recent Benchmark)') if ax.is_first_row() else ax.set_title('')
-        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.is_first_col() else ax.set_ylabel('')
-        ax.set_xlabel('Property') if ax.is_last_row() else ax.set_xlabel('')
+        ax.set_title('Physchem Property Prediction (Most Recent Benchmark)') if ax.get_subplotspec().is_first_row() else ax.set_title('')
+        ax.set_ylabel(f'{inferrer}\nMSE Ratio') if ax.get_subplotspec().is_first_col() else ax.set_ylabel('')
+        ax.set_xlabel('Property') if ax.get_subplotspec().is_last_row() else ax.set_xlabel('')
 
         if row == 0:
             handles, labels = ax.get_legend_handles_labels()
@@ -132,9 +132,9 @@ def make_timeseries_physchem_plots(embedding_df, output_dir, max_plot_ratio=10):
         ax.axhline(1.0, 0, 1, color='red', lw=1.0, zorder=-1)
         ax.set_xlim(*timestamp_lim)
         ax.set_ylim(0, max_plot_ratio)
-        ax.set_title('Physchem Property Prediction (Mean of All Properties as Timeseries)') if ax.is_first_row() else ax.set_title('')
+        ax.set_title('Physchem Property Prediction (Mean of All Properties as Timeseries)') if ax.get_subplotspec().is_first_row() else ax.set_title('')
         ax.set_ylabel(f'Average MSE Ratio (All Properties)')
-        ax.set_xlabel('Timestamp') if ax.is_last_row() else ax.set_xlabel('')
+        ax.set_xlabel('Timestamp') if ax.get_subplotspec().is_last_row() else ax.set_xlabel('')
 
     fig = plt.gcf()
     fig.legend(handles=handles, labels=labels, loc=7)

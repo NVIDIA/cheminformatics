@@ -28,7 +28,7 @@ def get_timeseries_inferrers(dat):
     return ts_dat
 
 
-def make_timeseries_sampling_plots(metric_df, axlist):
+def make_multimodel_sampling_plots(metric_df, axlist):
     """Make aggregate plots for validity, uniqueness, novelty --
        will be bar chart for single date or timeseries for multiple"""
 
@@ -55,9 +55,9 @@ def make_timeseries_sampling_plots(metric_df, axlist):
             ax.axhline(y=ACCEPTANCE_CRITERIA[metric], xmin=0, xmax=1, color='red', lw=1.0, zorder=-1)
 
         # Bar plot data
-        bar_dat = get_constant_inferrers(dat, group_col='radius')
-        bar_dat = bar_dat.pivot(columns='radius', values='value', index='inferrer')
-        bar_dat.plot(kind='bar', ax=ax, rot=0, legend=is_first_col)
+        # bar_dat = get_constant_inferrers(dat, group_col='radius')
+        # bar_dat = bar_dat.pivot(columns='radius', values='value', index='inferrer')
+        # bar_dat.plot(kind='bar', ax=ax, rot=0, legend=is_first_col)
 
         # Line plot data
         ts_dat = get_timeseries_inferrers(dat)
@@ -69,7 +69,7 @@ def make_timeseries_sampling_plots(metric_df, axlist):
         ax.set(title=f'Sampling: \n{metric.title()}', xlabel='Model (Timeseries Benchmark)', ylabel='Ratio')
 
 
-def make_timeseries_nearest_neighbor_plot(embedding_df, axlist):
+def make_multimodel_nearest_neighbor_plot(embedding_df, axlist):
     """Aggregate plot for nearest neighbor correlation ---
        bar chart for single time point, time series for multiple"""
     ax = axlist[0]
@@ -81,9 +81,9 @@ def make_timeseries_nearest_neighbor_plot(embedding_df, axlist):
     timestamp_lim = (dat['timestamp'].min() - 1, dat['timestamp'].max() + 1)
     
     # Bar plot data
-    bar_dat = get_constant_inferrers(dat, group_col='top_k')
-    bar_dat = bar_dat.pivot(index='inferrer', columns='top_k', values='value')
-    bar_dat.plot(kind='bar', ax=ax, rot=0, legend=True)
+    # bar_dat = get_constant_inferrers(dat, group_col='top_k')
+    # bar_dat = bar_dat.pivot(index='inferrer', columns='top_k', values='value')
+    # bar_dat.plot(kind='bar', ax=ax, rot=0, legend=True)
 
     # Line plot data
     ts_dat = dat[dat['inferrer'].str.contains('MegaMolBART')]
@@ -95,7 +95,7 @@ def make_timeseries_nearest_neighbor_plot(embedding_df, axlist):
     ax.set(title='Nearest Neighbor Metric', ylabel="Speaman's Rho", xlabel='Benchmark Date (Development Models)')
 
 
-def make_timeseries_physchem_plots(embedding_df, output_dir, max_plot_ratio=10):
+def make_multimodel_physchem_plots(embedding_df, output_dir, max_plot_ratio=10):
     """Plots of phychem property results"""
 
     dat = embedding_df[embedding_df.name == 'physchem']
@@ -142,7 +142,7 @@ def make_timeseries_physchem_plots(embedding_df, output_dir, max_plot_ratio=10):
     fig.savefig(os.path.join(output_dir, 'Physchem_Aggregated_Benchmark.png'), dpi=300)
 
 
-def make_timeseries_bioactivity_plots(embedding_df, output_dir, max_plot_ratio=6):
+def make_multimodel_bioactivity_plots(embedding_df, output_dir, max_plot_ratio=6):
     sns.set_palette('dark')
     
     dat = embedding_df[embedding_df.name == 'bioactivity']
@@ -195,9 +195,9 @@ def make_timeseries_bioactivity_plots(embedding_df, output_dir, max_plot_ratio=6
     fig.savefig(os.path.join(output_dir, 'Bioactivity_Aggregated_Benchmark.png'), dpi=300)
 
 
-def create_timeseries_aggregated_plots(output_dir, plot_dir):
+def create_multimodel_aggregated_plots(metric_paths, metric_labels, plot_dir):
     """Create all aggregated plots for sampling and embedding metrics"""
-    metric_df = load_aggregated_metric_results(output_dir)
+    metric_df = load_aggregated_metric_results(metric_paths=metric_paths, metric_labels=metric_labels, homogenize_timestamp=True)
     embedding_df = make_aggregated_embedding_df(metric_df)
 
     sns.set_palette('dark')
@@ -212,10 +212,10 @@ def create_timeseries_aggregated_plots(output_dir, plot_dir):
     axlist2 = [plt.subplot2grid((nrows, ncols), (1, 1))]
     axlist3 = [plt.subplot2grid((nrows, ncols), (1, 2))]
 
-    make_timeseries_sampling_plots(metric_df, axlist0)
-    make_timeseries_nearest_neighbor_plot(embedding_df, axlist1)
-    # make_timeseries_physchem_plots(embedding_df, axlist2)
-    # make_timeseries_bioactivity_plots(embedding_df, axlist3)
+    make_multimodel_sampling_plots(metric_df, axlist0)
+    make_multimodel_nearest_neighbor_plot(embedding_df, axlist1)
+    # make_multimodel_physchem_plots(embedding_df, axlist2)
+    # make_multimodel_bioactivity_plots(embedding_df, axlist3)
 
     plt.tight_layout()
     fig.savefig(os.path.join(plot_dir, 'Timeseries_Benchmark_Metrics.png'), dpi=300)

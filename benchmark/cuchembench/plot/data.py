@@ -12,37 +12,51 @@ from cuchembench.datasets.bioactivity import ExCAPEDataset
 
 logger = logging.getLogger(__name__)
 
-MODEL_RENAME_REGEX = re.compile(r"""(?:cuchem(?:bm|bench).inference.Grpc)?(?P<model>.+?)(?:Wrapper)?$""")
+MODEL_RENAME_REGEX = re.compile(r"""(?:(?:cuchem(?:bm|bench).inference.Grpc)|(?:nemo_chem.models.megamolbart.NeMo))?(?P<model>.+?)(?:Wrapper)?$""")
 MODEL_SIZE_REGEX = re.compile(r"""(?P<model_size>x?small)""")
 
-MEGAMOLBART_SAMPLE_RADIUS = {'xsmall': 1.0,
-                     'small': 0.75}
+MEGAMOLBART_SAMPLE_RADIUS = {'xsmall': (1.0, 1.0),
+                             'small':  (0.70, 0.75)} 
 
 PHYSCHEM_UNIT_RENAMER = {'logD': 'Lipophilicity (log[D])',
                          'log_solubility_(mol_per_L)': 'ESOL (log[solubility])',
                          'hydration_free_energy': 'FreeSolv (hydration free energy)'}
 
 
-def load_aggregated_metric_results(output_dir):
+def load_aggregated_metric_results(metric_paths: list, metric_labels: list, homogenize_timestamp=False):
     """Load aggregated metric results from CSV files"""
     custom_date_parser = lambda x: datetime.strptime(x, "%Y%m%d_%H%M%S")
-    file_list = glob.glob(os.path.join(output_dir, '**', '*.csv'), recursive=True)
-    metric_df = list()
 
-    for file in file_list:
-        df = pd.read_csv(file, parse_dates=['timestamp'], date_parser=custom_date_parser)
-        try:
-            model_size = re.search(MODEL_SIZE_REGEX, file).group('model_size')
-        except:
-            model_size = ""
-        df['model_size'] = model_size
-        metric_df.append(df)
+    combined_metric_df = []
+    for metric_path, metric_label in zip(metric_paths, metric_labels):
+        file_list = glob.glob(os.path.join(metric_path, '**', '*.csv'), recursive=True)
+        metric_df = []
 
-    metric_df = pd.concat(metric_df, axis=0).reset_index(drop=True)
-    metric_df['timestamp'] = metric_df['timestamp'].dt.to_period('M') # Floor by month
-    metric_df['name'] = metric_df['name'].str.replace('modelability-', '')
-    metric_df['inferrer'] = metric_df['inferrer'].str.extract(MODEL_RENAME_REGEX, expand=False)
-    return metric_df
+        for file in file_list:
+            df = pd.read_csv(file, parse_dates=['timestamp'], date_parser=custom_date_parser)
+            try:
+                model_size = re.search(MODEL_SIZE_REGEX, file).group('model_size')
+            except:
+                model_size = ""
+            df['model_size'] = model_size
+            metric_df.append(df)
+
+        metric_df = pd.concat(metric_df, axis=0).reset_index(drop=True)
+        metric_df['timestamp'] = metric_df['timestamp'].dt.to_period('M') # Floor by month
+        if homogenize_timestamp:
+            metric_df['timestamp'] = metric_df['timestamp'].min()
+        
+        # Cleanup names -- need to regularize with team
+        metric_df['name'] = metric_df['name'].str.replace('modelability-', '')
+        physchem_mask = metric_df['name'].str.contains('physchem')
+        metric_df.loc[physchem_mask, 'name'] = 'physchem'
+
+        metric_df['inferrer'] = metric_df['inferrer'].str.extract(MODEL_RENAME_REGEX, expand=False)
+        if metric_label:
+            metric_df['inferrer'] = metric_df['inferrer'] + '-' + metric_label
+        combined_metric_df.append(metric_df)
+        
+    return pd.concat(combined_metric_df, axis=0).reset_index(drop=True)
 
 
 def make_aggregated_embedding_df(metric_df, models=['linear_regression', 'elastic_net', 'support_vector_machine', 'random_forest']):

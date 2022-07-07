@@ -8,7 +8,7 @@ import pandas as pd
 from datetime import datetime
 from copy import deepcopy
 from cuchembench.data import MoleculeGenerator
-from cuchembench.plot import (create_latest_aggregated_plots, create_timeseries_aggregated_plots, make_model_plots)
+from cuchembench.plot import (create_single_model_plots, create_multimodel_aggregated_plots, make_model_plots)
 
 # Dataset classess
 from cuchembench.datasets.physchem import (ChEMBLApprovedDrugs,
@@ -141,13 +141,12 @@ def main(cfg):
     log.info(cfg)
     log.info(f'Timestamp: {timestamp}')
 
-    output_dir = cfg.output.metric_path
-    os.makedirs(output_dir, exist_ok=True)
-
     max_seq_len = int(cfg.sampling.max_seq_len)
-    exp_name = cfg.model.exp_name
 
     if cfg.root.do_benchmark:
+        output_dir = cfg.benchmark.output_path
+        exp_name = cfg.model.exp_name
+
         if cfg.model.name == 'MegaMolBART':
             from cuchembench.inference.megamolbart import MegaMolBARTWrapper
             inferrer = MegaMolBARTWrapper(checkpoint_file = cfg.model.checkpoint_file)
@@ -347,11 +346,16 @@ def main(cfg):
 
     # Plotting
     if cfg.root.do_plots:
-        plot_dir = cfg.output.plot_path
+        metric_paths = cfg.plotting.metric_paths
+        metric_labels = cfg.plotting.metric_labels
+        assert not isinstance(metric_paths, str) and not isinstance(metric_labels, str), AssertionError('The variables metric_paths and metric_labels must be lists')
+        assert len(metric_paths) == len(metric_labels), AssertionError('The variables metric_paths and metric_labels must be the same length')
+
+        plot_dir = cfg.plotting.plot_path
         os.makedirs(plot_dir, exist_ok=True)
 
-        create_latest_aggregated_plots(output_dir=output_dir, plot_dir=plot_dir) # TODO: improve test handling if specific metric data is absent
-        create_timeseries_aggregated_plots(output_dir=output_dir, plot_dir=plot_dir)
+        if len(metric_paths) > 1:
+            create_multimodel_aggregated_plots(metric_paths=metric_paths, metric_labels=metric_labels, plot_dir=plot_dir)
 
         make_model_plots(max_seq_len, 'physchem', output_dir=output_dir, plot_dir=plot_dir)
         make_model_plots(max_seq_len, 'bioactivity', output_dir=output_dir, plot_dir=plot_dir)

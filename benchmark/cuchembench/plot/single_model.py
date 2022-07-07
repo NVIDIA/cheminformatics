@@ -9,10 +9,10 @@ import seaborn as sns
 from .data import PHYSCHEM_UNIT_RENAMER, load_aggregated_metric_results, make_aggregated_embedding_df
 from .utils import _label_bars, ACCEPTANCE_CRITERIA
 
-__ALL__ = ['create_latest_aggregated_plots']
+__ALL__ = ['create_single_model_plots']
 
 
-def make_latest_sampling_plots(metric_df, axlist):
+def make_single_model_sampling_plots(metric_df, axlist):
     """Make aggregate plots for validity, uniqueness, novelty --
        will be bar chart for single date or timeseries for multiple"""
 
@@ -50,29 +50,30 @@ def make_latest_sampling_plots(metric_df, axlist):
         ax.set(title=f'Sampling: \n{metric.title()}', xlabel='Model (Latest Benchmark)', ylabel='Ratio')
 
 
-def make_latest_nearest_neighbor_plot(embedding_df, axlist):
+def make_single_model_nearest_neighbor_plot(embedding_df, axlist):
     """Aggregate plot for nearest neighbor correlation ---
        bar chart for single time point, time series for multiple"""
     ax = axlist[0]
 
     dat = embedding_df[embedding_df.name == 'nearest neighbor correlation']
-    dat = dat[['timestamp', 'inferrer', 'top_k', 'value']].drop_duplicates()
-    dat['top_k'] = dat['top_k'].astype(int)
-    
-    # Bar plot of most recent benchmark for all models
-    idx = dat.groupby(['inferrer', 'top_k'])['timestamp'].idxmax()
-    bar_dat = dat.loc[idx].pivot(index='inferrer', columns='top_k', values='value')
-    bar_dat.plot(kind='bar', ax=ax, rot=0).legend(loc=3)
-    _label_bars(ax)
-    ylim = ax.get_ylim()
-    if ylim[0] < 0:
-        ax.axhline(0, 0, 1, color='black', lw=0.5)
-    ax.legend().set_zorder(-1)
-    ax.legend().set_title('Top K')
-    ax.set(title='Embedding: \nNearest Neighbor', ylabel="Speaman's Rho", xlabel='Model (Latest Benchmark)')
+    if dat.shape[0] > 1:
+        dat = dat[['timestamp', 'inferrer', 'top_k', 'value']].drop_duplicates()
+        dat['top_k'] = dat['top_k'].astype(int)
+        
+        # Bar plot of most recent benchmark for all models
+        idx = dat.groupby(['inferrer', 'top_k'])['timestamp'].idxmax()
+        bar_dat = dat.loc[idx].pivot(index='inferrer', columns='top_k', values='value')
+        bar_dat.plot(kind='bar', ax=ax, rot=0).legend(loc=3)
+        _label_bars(ax)
+        ylim = ax.get_ylim()
+        if ylim[0] < 0:
+            ax.axhline(0, 0, 1, color='black', lw=0.5)
+        ax.legend().set_zorder(-1)
+        ax.legend().set_title('Top K')
+        ax.set(title='Embedding: \nNearest Neighbor', ylabel="Speaman's Rho", xlabel='Model (Latest Benchmark)')
 
 
-def make_latest_physchem_plots(embedding_df, axlist, max_plot_ratio=10):
+def make_single_model_physchem_plots(embedding_df, axlist, max_plot_ratio=10):
     """Plots of physchem property results"""
 
     dat = embedding_df[embedding_df.name == 'physchem']
@@ -101,7 +102,7 @@ def make_latest_physchem_plots(embedding_df, axlist, max_plot_ratio=10):
             ax.legend().set_title('Model')
 
 
-def make_latest_bioactivity_plots(embedding_df, axlist, max_plot_ratio=10):
+def make_single_model_bioactivity_plots(embedding_df, axlist, max_plot_ratio=10):
     """Plots of bioactivity results"""
 
     dat = embedding_df[embedding_df.name == 'bioactivity']
@@ -137,29 +138,35 @@ def make_latest_bioactivity_plots(embedding_df, axlist, max_plot_ratio=10):
             ax.legend().set_title('Model')
 
 
-def create_latest_aggregated_plots(output_dir, plot_dir, remove_elastic_net=True):
-    """Create all aggregated plots for sampling and embedding metrics"""
+def create_single_model_plots(metric_paths, metric_labels, plot_dir, remove_elastic_net=True):
+    """Create all single model plots for sampling and embedding metrics"""
 
-    metric_df = load_aggregated_metric_results(output_dir)
-    embedding_df = make_aggregated_embedding_df(metric_df, models=['linear_regression', 'support_vector_machine', 'random_forest'])
+    for metric_path, metric_label in zip(metric_paths, metric_labels):
+        metric_df = load_aggregated_metric_results(metric_paths=[metric_path], metric_labels=[metric_label])
+        embedding_df = make_aggregated_embedding_df(metric_df, models=['linear_regression', 'support_vector_machine', 'random_forest'])
 
-    sns.set_palette('dark')
-    pal = sns.color_palette()
-    sns.set_palette([pal[0]] + pal[2:])
-    sns.set_style('whitegrid', {'axes.edgecolor': 'black', 'axes.linewidth': 1.5})
+        sns.set_palette('dark')
+        pal = sns.color_palette()
+        sns.set_palette([pal[0]] + pal[2:])
+        sns.set_style('whitegrid', {'axes.edgecolor': 'black', 'axes.linewidth': 1.5})
 
-    ncols, nrows = 7, 3
-    fig = plt.figure(figsize=(ncols*4, nrows*4))
-    axlist0 = [plt.subplot2grid((nrows, ncols), (0, x)) for x in range(0, 3)]
-    axlist1 = [plt.subplot2grid((nrows, ncols), (0, 3))]
-    axlist2 = [plt.subplot2grid((nrows, ncols), (0, x)) for x in range(4, 7)]
-    axlist3 = [plt.subplot2grid((nrows, ncols), (y, 0), colspan=ncols) for y in range(1, 3)]
+        ncols, nrows = 7, 2
+        fig = plt.figure(figsize=(ncols*4, nrows*4))
+        axlist0 = [plt.subplot2grid((nrows, ncols), (0, x)) for x in range(0, 3)]
+        axlist1 = [plt.subplot2grid((nrows, ncols), (0, 3))]
+        axlist2 = [plt.subplot2grid((nrows, ncols), (0, x)) for x in range(4, 7)]
+        axlist3 = [plt.subplot2grid((nrows, ncols), (y, 0), colspan=ncols) for y in range(1, nrows)]
 
-    make_latest_sampling_plots(metric_df, axlist0)
-    make_latest_nearest_neighbor_plot(embedding_df, axlist1)
-    make_latest_physchem_plots(embedding_df, axlist2)
-    make_latest_bioactivity_plots(embedding_df, axlist3)
+        make_single_model_sampling_plots(metric_df, axlist0)
+        make_single_model_nearest_neighbor_plot(embedding_df, axlist1)
+        make_single_model_physchem_plots(embedding_df, axlist2)
+        make_single_model_bioactivity_plots(embedding_df, axlist3)
 
-    plt.tight_layout()
-    fig.savefig(os.path.join(plot_dir, 'Latest_Benchmark_Metrics.png'), dpi=300)
+        plt.tight_layout()
+        if metric_label:
+            filename = f'Single_Model_Benchmark_Metrics-{metric_label}.png'
+        else:
+            inferrer = metric_df.inferrer.iloc[0]
+            filename = f'Single_Model_Benchmark_Metrics-{inferrer}.png'
+        fig.savefig(os.path.join(plot_dir, filename), dpi=300)
     return

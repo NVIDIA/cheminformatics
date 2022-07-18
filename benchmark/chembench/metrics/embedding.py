@@ -222,15 +222,20 @@ class Modelability(BaseEmbeddingMetric):
         ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
         r2_emb = r2_score(properties, embedding_pred)
+        rmse_emb = mean_squared_error(properties, embedding_pred, squared=False).item()
+
         r2_fp = r2_score(properties, fingerprint_pred)
+        rmse_fp = mean_squared_error(properties, fingerprint_pred, squared=False).item()
 
         results = {'value': ratio,
-                   'r2_embedding': r2_emb,
-                   'r2_fingerprint': r2_fp,
-                   'fingerprint_error': fingerprint_error,
                    'embedding_error': embedding_error,
-                   'fingerprint_param': fingerprint_param,
+                   'embedding_r2': r2_emb,
+                   'embedding_rmse': rmse_emb,
                    'embedding_param': embedding_param,
+                   'fingerprint_error': fingerprint_error,
+                   'fingerprint_r2': r2_fp,
+                   'fingerprint_rmse': rmse_fp,
+                   'fingerprint_param': fingerprint_param,
                    'predictions': {'fingerprint_pred': cp.asnumpy(fingerprint_pred),
                                    'embedding_pred': cp.asnumpy(embedding_pred)} }
         return results

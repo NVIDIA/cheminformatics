@@ -127,7 +127,7 @@ metrics:
         input_size: null
     enabled: True
     y_randomize: True
-    random_iterations: 3
+    random_iterations: 10
     n_splits: 20
     nbits: 512
     normalize_inputs: True
@@ -148,6 +148,8 @@ metrics:
         type: EMBEDDING
         input_size: null
     enabled: False
+    y_randomize: True
+    random_iterations: 10
     n_splits: 20
     nbits: 512
     normalize_inputs: True
@@ -168,6 +170,8 @@ metrics:
         type: EMBEDDING
         input_size: null
     enabled: False
+    y_randomize: True
+    random_iterations: 10
     n_splits: 20
     nbits: 512
     normalize_inputs: True

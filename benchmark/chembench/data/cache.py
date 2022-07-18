@@ -40,27 +40,31 @@ class DatasetCacheGenerator():
         if result[0] == 0:
             with closing(self.conn.cursor()) as cursor:
                 # @(dreidenbach) changed to my workspace path
-                sql_file = open("/workspace/cheminformatics/benchmark/scripts/generated_smiles_db.sql")
+                sql_file = open("/workspace/chembench/scripts/generated_smiles_db.sql")
                 sql_as_string = sql_file.read()
                 cursor.executescript(sql_as_string)
 
     def _insert_sample(self, smi_id, g_smi, emb, cursor, generated):
         smi, is_valid, fp = validate_smiles(g_smi,
                                             return_fingerprint=True,
+                                            canonicalize=False,
                                             nbits=self.nbits)
         gscaffold = get_murcko_scaffold(smi)
 
         dim = pickle.dumps(list(emb.shape))
         emb = pickle.dumps(emb)
         fp = pickle.dumps(fp)
+
+        if not is_valid:
+            smi = None
         cursor.execute(
             '''
-            INSERT INTO smiles_samples(input_id, smiles, embedding,
+            INSERT INTO smiles_samples(input_id, smiles, csmiles, embedding,
                                        embedding_dim, is_valid,
                                        finger_print, is_generated, scaffold)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''',
-            [smi_id, smi, sqlite3.Binary(emb), sqlite3.Binary(dim),
+            [smi_id, g_smi, smi, sqlite3.Binary(emb), sqlite3.Binary(dim),
             is_valid, fp, generated, gscaffold])
 
     def _insert_generated_smis(self,
@@ -189,6 +193,10 @@ class DatasetCacheGenerator():
             num_requested = rec[1]
             scaled_radius = rec[2]
 
+            batch_size = self.batch_size
+            if dataset_type == 'EMBEDDING':
+                batch_size = 50 * self.batch_size
+
             log.info(f'Processing {dataset_type} with {num_requested} samples and radius {scaled_radius} for {rec[3]} recs...')
 
             while True:
@@ -198,7 +206,7 @@ class DatasetCacheGenerator():
                     WHERE processed = 0 and dataset_type = ?
                     LIMIT ?
                     ''',
-                    self.conn, params = [dataset_type, self.batch_size])
+                    self.conn, params = [dataset_type, batch_size])
 
                 if df.shape[0] == 0:
                     break

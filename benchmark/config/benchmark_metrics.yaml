@@ -1,78 +1,85 @@
 version: 1
-exp_name: mim_k1_salv
+exp_name: benchmark
 model:
   name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
-  display_name: nemo_chem_1
-  checkpoint_file: /models/megamolbart/Small_Span_Aug_2f63a83b_220424.nemo
+  random_weights: False
+  display_name: NeMoMegaMolBART
   training_data: /data/db/zinc_train.sqlite3
-  batch_size: 100 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
+  batch_size: 100
   perceiver_average: False
-  noise_mode: 2 # For LVM sampling selection default 0
+  noise_mode: 2
   average_tokens: True
 
 sampling:
   max_seq_len: 512
   sample_size: 10
+  input_size: 1000
   db: /data/db/${exp_name}.sqlite3
   concurrent_requests: 10
   radius:
     - 0.7
 
 output:
-  path: /data/benchmark_output/nemo
+  path: /data/benchmark_output/${exp_name}
 
 metrics:
   validity:
     impl: chembench.metrics.Validity
     datasets:
-      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ZINC15_test_split.csv
+      - file: /workspace/chembench/csv_data/benchmark_ZINC15_test_split.csv
         smis_col: canonical_smiles
         type: SAMPLE
-        input_size: 1000
+        input_size: ${sampling.input_size}
         label: sample_ds
-    enabled: True
+    enabled: False
 
   unique:
     impl: chembench.metrics.Unique
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: ${metrics.validity.enabled}
     remove_invalid: False
 
   novelty:
     impl: chembench.metrics.Novelty
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: ${metrics.validity.enabled}
+    remove_invalid: False
+
+  canonicalizeNovelty:
+    impl: chembench.metrics.CanonicalizeNovelty
+    datasets: ${metrics.validity.datasets}
+    enabled: ${metrics.validity.enabled}
     remove_invalid: False
 
   effective_novelty:
     impl: chembench.metrics.EffectiveNovelty
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: ${metrics.validity.enabled}
     remove_invalid: False
 
   non_identicality:
     impl: chembench.metrics.NonIdenticality
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: ${metrics.validity.enabled}
     remove_invalid: False
 
   scaffold_unique:
     impl: chembench.metrics.ScaffoldUnique
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: ${metrics.validity.enabled}
     remove_invalid: False
 
   scaffold_non_identical_similarity:
     impl: chembench.metrics.ScaffoldNonIdenticalSimilarity
     datasets: ${metrics.validity.datasets}
-    enabled: True
+    enabled: ${metrics.validity.enabled}
     remove_invalid: False
     nbits: 2048
 
   nearest_neighbor_correlation:
     impl: chembench.metrics.NearestNeighborCorrelation
     datasets:
-      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
+      - file: /workspace/chembench/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
         impl: chembench.datasets.base.GenericCSVDataset
         properties_cols:
           - max_phase_for_ind
@@ -107,7 +114,7 @@ metrics:
   physchem_lipophilicity:
     impl: chembench.metrics.Modelability
     datasets:
-      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
+      - file: /workspace/chembench/csv_data/benchmark_MoleculeNet_Lipophilicity.csv
         impl: chembench.datasets.base.GenericCSVDataset
         label: lipophilicity
         index_col: index
@@ -119,6 +126,8 @@ metrics:
         type: EMBEDDING
         input_size: null
     enabled: True
+    y_randomize: True
+    random_iterations: 3
     n_splits: 20
     nbits: 512
     normalize_inputs: True
@@ -127,7 +136,7 @@ metrics:
   physchem_esol:
     impl: chembench.metrics.Modelability
     datasets:
-      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv
+      - file: /workspace/chembench/csv_data/benchmark_MoleculeNet_ESOL.csv
         impl: chembench.datasets.base.GenericCSVDataset
         label: esol
         index_col: index
@@ -138,7 +147,7 @@ metrics:
           - measured log solubility in mols per litre
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     n_splits: 20
     nbits: 512
     normalize_inputs: True
@@ -147,7 +156,7 @@ metrics:
   physchem_freesolv:
     impl: chembench.metrics.Modelability
     datasets:
-      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv
+      - file: /workspace/chembench/csv_data/benchmark_MoleculeNet_FreeSolv.csv
         impl: chembench.datasets.base.GenericCSVDataset
         label: freesolv
         index_col: index
@@ -158,7 +167,7 @@ metrics:
           - y
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     n_splits: 20
     nbits: 512
     normalize_inputs: True
@@ -167,7 +176,7 @@ metrics:
   bioactivity:
     impl: chembench.metrics.Modelability
     datasets:
-      - file: /workspace/cheminformatics/benchmark/csv_data/benchmark_ExCAPE_Bioactivity.csv
+      - file: /workspace/chembench/csv_data/benchmark_ExCAPE_Bioactivity.csv
         impl: chembench.datasets.ExCAPEDataset
         label: excape
         index_col: index
@@ -183,7 +192,7 @@ metrics:
         variations:
           group_by: 'gene'
         input_size: null
-    enabled: True
+    enabled: False
     gene_cnt: -1
     n_splits: 20
     nbits: 512

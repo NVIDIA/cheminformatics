@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS smiles_samples (
 	id INTEGER PRIMARY KEY AUTOINCREMENT,
    	input_id INTEGER NOT NULL,
    	smiles TEXT NOT NULL,
+   	csmiles TEXT,
 	scaffold TEXT NOT NULL,
 	embedding TEXT NOT NULL,
 	embedding_dim TEXT NOT NULL,

@@ -1,24 +1,22 @@
-import os
 import time
 import logging
 import numpy as np
-import pickle
-import sqlite3
 
-from pydoc import locate
 from sklearn.model_selection import ParameterGrid, KFold
 
-from chembench.data.memcache import Cache
-from chembench.metrics import BaseMetric
-
-import cupy as xpy
+import cupy as cp
 from cuml.metrics import pairwise_distances, mean_squared_error
 from cuml.linear_model import LinearRegression, ElasticNet
+from cuml.metrics.regression import r2_score
 from cuml.svm import SVR
 from cuml.ensemble import RandomForestRegressor
+from cuml.experimental.preprocessing import StandardScaler
+
+from . import BaseEmbeddingMetric
+
+from chembench.data.memcache import Cache
 from chembench.utils.metrics import spearmanr
 from chembench.utils.distance import tanimoto_calculate
-from cuml.experimental.preprocessing import StandardScaler
 
 
 logger = logging.getLogger(__name__)
@@ -35,118 +33,19 @@ def get_model_dict():
     en_param_dict = {'alpha': [0.001, 0.01, 0.1, 1.0, 10.0, 100],
                      'l1_ratio': [0.0, 0.2, 0.5, 0.7, 1.0]}
 
-    # cache_size=4096.0 -- did not seem to improve runtime
     sv_estimator = SVR(kernel='rbf')
     sv_param_dict = {'C': [1.75, 5.0, 7.5, 10.0, 20.0],
                      'gamma': [0.0001, 0.001, 0.01, 0.1, 1.0],
                      'epsilon': [0.001, 0.01, 0.1, 0.3],
                      'degree': [3, 5, 7, 9]}
 
-    # n_streams=12 -- did not seem to improve runtime
     rf_estimator = RandomForestRegressor(accuracy_metric='mse', random_state=0)
     rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
     return {'linear_regression': [lr_estimator, lr_param_dict],
-            # 'elastic_net': [en_estimator, en_param_dict], # Removing Elastic Net for timing
-            'support_vector_machine': [sv_estimator, sv_param_dict],
-            'random_forest': [rf_estimator, rf_param_dict],
+            # 'support_vector_machine': [sv_estimator, sv_param_dict],
+            # 'random_forest': [rf_estimator, rf_param_dict],
             }
-
-class BaseEmbeddingMetric(BaseMetric):
-    name = None
-
-    """Base class for metrics based on embedding datasets"""
-    def __init__(self, metric_name, metric_spec, cfg):
-        super().__init__(metric_name, metric_spec, cfg)
-
-        fp_filename = f'fp_{os.path.splitext(os.path.basename(self.data_file))[0]}_{metric_spec["nbits"]}.csv'
-
-        self.dataset = locate(self.dataset_spec.impl)(data_filename=self.data_file,
-                                                      fp_filename=fp_filename,
-                                                      max_seq_len=self.cfg.sampling.max_seq_len)
-        self.dataset.index_col = self.dataset_spec['index_col']
-        self.dataset.smiles_col = self.dataset_spec['smis_col']
-        self.dataset.properties_cols = list(self.dataset_spec['properties_cols'])
-        self.dataset.orig_property_name = self.dataset_spec['orig_property_name']
-
-        if 'load_cols' in self.dataset_spec:
-            self.dataset.load_cols = list(self.dataset_spec['load_cols'])
-        else:
-            self.dataset.load_cols = self.dataset.smiles_col
-
-        self.dataset.load(columns=self.dataset.load_cols,
-                          data_len=self.dataset_spec.input_size,
-                          nbits=metric_spec['nbits'])
-
-        self.smiles_dataset = self.dataset.smiles
-        self.fingerprint_dataset = self.dataset.fingerprints
-        self.smiles_properties = self.dataset.properties
-
-        self.conn = sqlite3.connect(self.cfg.sampling.db,
-                                    uri=True,
-                                    check_same_thread=False)
-
-    def __len__(self):
-        return len(self.dataset.smiles)
-
-    def is_prediction(self):
-        return True
-
-    def _find_embedding(self, smiles):
-        # Check db for results from a previous run
-        result = self.conn.execute('''
-                SELECT ss.embedding, ss.embedding_dim
-                FROM smiles s, smiles_samples ss
-                WHERE s.id = ss.input_id
-                    AND ss.is_generated = 0
-                    AND s.processed = 1
-                    AND s.smiles = ?
-                LIMIT 1
-                ''',
-                [smiles]).fetchone()
-
-        embedding = pickle.loads(result[0])
-        embedding_dim = pickle.loads(result[1])
-        return (embedding, embedding_dim)
-
-    def encode(self, smiles, zero_padded_vals, average_tokens, max_seq_len=None):
-        """Encode a single SMILES to embedding from model"""
-        embedding, dim = self._find_embedding(smiles)
-        embedding = xpy.array(embedding).reshape(dim).squeeze()
-        n_dim = embedding.ndim
-
-        if zero_padded_vals:
-            if n_dim == 2:
-                embedding[len(smiles):, :] = 0.0
-            else:
-                embedding[len(smiles):] = 0.0
-
-        if n_dim == 2:
-            if average_tokens:
-                embedding = embedding[:len(smiles)].mean(axis=0).squeeze()
-            else:
-                embedding = embedding.flatten()
-
-        return embedding
-
-    def _calculate_metric(self):
-        raise NotImplementedError
-
-    def encode_many(self, smis, max_seq_len=None, zero_padded_vals=True, average_tokens=False):
-        # Calculate pairwise distances for embeddings
-
-        if not max_seq_len:
-            max_seq_len = self.cfg.sampling.max_seq_len
-
-        embeddings = []
-        for smiles in smis:
-            embedding = self.encode(smiles, zero_padded_vals, average_tokens, max_seq_len=max_seq_len)
-            embeddings.append(embedding)
-
-        return embeddings
-
-    def calculate(self):
-        raise NotImplementedError
 
 
 class NearestNeighborCorrelation(BaseEmbeddingMetric):
@@ -179,8 +78,8 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         if embeddings is None:
             embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens) #zero_padded_vals=True
             logger.info(f'Embedding len and type {len(embeddings)}  {type(embeddings[0])}')
-            embeddings = xpy.vstack(embeddings)
-            fingerprints = xpy.asarray(self.fingerprint_dataset)
+            embeddings = cp.vstack(embeddings)
+            fingerprints = cp.asarray(self.fingerprint_dataset)
 
             cache.set_data('NN_embeddings', embeddings)
             cache.set_data('NN_fingerprints', fingerprints)
@@ -190,8 +89,8 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         logging.info('Encoding time: {}'.format(time.time() - start_time))
 
         metric = self._calculate_metric(embeddings, fingerprints, top_k)
-        metric = xpy.nanmean(metric)
-        metric = xpy.asnumpy(metric)
+        metric = cp.nanmean(metric)
+        metric = cp.asnumpy(metric)
 
         top_k = embeddings.shape[0] - 1 if not top_k else top_k
 
@@ -211,6 +110,7 @@ class Modelability(BaseEmbeddingMetric):
         super().__init__(metric_name, metric_spec, cfg)
         # self.name = name
         self.model_dict = get_model_dict()
+        self.metric_spec = metric_spec
         self.n_splits = metric_spec['n_splits']
         self.return_predictions = metric_spec['return_predictions']
 
@@ -220,6 +120,7 @@ class Modelability(BaseEmbeddingMetric):
             self.norm_data, self.norm_prop = None, None
 
     def variations(self, model_dict=None, **kwargs):
+        # TODO: Revisit get_model_dict to make this function simpler.
         if 'variations' in self.dataset_spec:
             group_by = self.dataset_spec['variations']['group_by']
             groups = self.dataset.smiles.groupby(level=group_by)
@@ -227,9 +128,9 @@ class Modelability(BaseEmbeddingMetric):
             kwargs = []
             for gene, smis in groups:
                 gene_kwargs = [{'model': k,
-                           'average_tokens': self.cfg.model.average_tokens,
-                           'estimator': self.model_dict[k][0],
-                           'param_dict': self.model_dict[k][1]} for k in self.model_dict.keys()]
+                                'average_tokens': self.cfg.model.average_tokens,
+                                'estimator': self.model_dict[k][0],
+                                'param_dict': self.model_dict[k][1]} for k in self.model_dict.keys()]
 
                 properties = self.dataset.properties.loc[
                     smis.index.get_level_values(self.dataset_spec['index_col'])]
@@ -244,9 +145,9 @@ class Modelability(BaseEmbeddingMetric):
                     kwargs.append(ar)
         else:
             kwargs = [{'model': k,
-                    'average_tokens': self.cfg.model.average_tokens,
-                    'estimator': self.model_dict[k][0],
-                    'param_dict': self.model_dict[k][1]} for k in self.model_dict.keys()]
+                       'average_tokens': self.cfg.model.average_tokens,
+                       'estimator': self.model_dict[k][0],
+                       'param_dict': self.model_dict[k][1]} for k in self.model_dict.keys()]
         return kwargs
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata):
@@ -274,16 +175,16 @@ class Modelability(BaseEmbeddingMetric):
 
                 if self.norm_prop is not None:
                     ytrain, ytest = ytrain.copy(), ytest.copy()
-                    ytrain = self.norm_prop.fit_transform(ytrain[:, xpy.newaxis]).squeeze()
-                    ytest = self.norm_prop.transform(ytest[:, xpy.newaxis]).squeeze()
+                    ytrain = self.norm_prop.fit_transform(ytrain[:, cp.newaxis]).squeeze()
+                    ytest = self.norm_prop.transform(ytest[:, cp.newaxis]).squeeze()
 
                 estimator.fit(xtrain, ytrain)
                 ypred = estimator.predict(xtest)
 
                 # Ensure error is calculated on untransformed data for external comparison
                 if self.norm_prop is not None:
-                    ytest_unxform = self.norm_prop.inverse_transform(ytest[:, xpy.newaxis]).squeeze()
-                    ypred_unxform = self.norm_prop.inverse_transform(ypred[:, xpy.newaxis]).squeeze()
+                    ytest_unxform = self.norm_prop.inverse_transform(ytest[:, cp.newaxis]).squeeze()
+                    ypred_unxform = self.norm_prop.inverse_transform(ypred[:, cp.newaxis]).squeeze()
                 else:
                     ytest_unxform, ypred_unxform = ytest, ypred
 
@@ -298,13 +199,13 @@ class Modelability(BaseEmbeddingMetric):
 
         if self.return_predictions:
             xdata_pred = self.norm_data.fit_transform(xdata) if self.norm_data is not None else xdata
-            ydata_pred = self.norm_prop.fit_transform(ydata[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else ydata
+            ydata_pred = self.norm_prop.fit_transform(ydata[:, cp.newaxis]).squeeze() if self.norm_prop is not None else ydata
 
             estimator.set_params(**best_param)
             estimator.fit(xdata_pred, ydata_pred)
 
             best_pred = estimator.predict(xdata_pred)
-            best_pred = self.norm_prop.inverse_transform(best_pred[:, xpy.newaxis]).squeeze() if self.norm_prop is not None else best_pred
+            best_pred = self.norm_prop.inverse_transform(best_pred[:, cp.newaxis]).squeeze() if self.norm_prop is not None else best_pred
 
         return best_score, best_param, best_pred
 
@@ -312,7 +213,7 @@ class Modelability(BaseEmbeddingMetric):
         """Perform grid search for each metric and calculate ratio"""
         assert len(properties.columns) == 1
         prop_name = properties.columns[0]
-        properties = xpy.asarray(properties[prop_name], dtype=xpy.float32)
+        properties = cp.asarray(properties[prop_name], dtype=cp.float32)
 
         embedding_error, embedding_param, embedding_pred = \
             self.gpu_gridsearch_cv(estimator, param_dict, embeddings, properties)
@@ -320,13 +221,18 @@ class Modelability(BaseEmbeddingMetric):
             self.gpu_gridsearch_cv(estimator, param_dict, fingerprints, properties)
         ratio = fingerprint_error / embedding_error # If ratio > 1.0 --> embedding error is smaller --> embedding model is better
 
+        r2_emb = r2_score(properties, embedding_pred)
+        r2_fp = r2_score(properties, fingerprint_pred)
+
         results = {'value': ratio,
+                   'r2_embedding': r2_emb,
+                   'r2_fingerprint': r2_fp,
                    'fingerprint_error': fingerprint_error,
                    'embedding_error': embedding_error,
                    'fingerprint_param': fingerprint_param,
                    'embedding_param': embedding_param,
-                   'predictions': {'fingerprint_pred': xpy.asnumpy(fingerprint_pred),
-                                   'embedding_pred': xpy.asnumpy(embedding_pred)} }
+                   'predictions': {'fingerprint_pred': cp.asnumpy(fingerprint_pred),
+                                   'embedding_pred': cp.asnumpy(embedding_pred)} }
         return results
 
     def calculate(self, **kwargs):
@@ -349,15 +255,15 @@ class Modelability(BaseEmbeddingMetric):
                 smis = self.smiles_dataset['canonical_smiles']
             embeddings = self.encode_many(smis, zero_padded_vals=False,
                                           average_tokens=average_tokens)
-            embeddings = xpy.asarray(embeddings, dtype=xpy.float32)
+            embeddings = cp.asarray(embeddings, dtype=cp.float32)
 
             if 'fingerprints' in kwargs:
                 fingerprints = kwargs['fingerprints']
-                fingerprints = xpy.asarray(fingerprints.values,
-                                           dtype=xpy.float32)
+                fingerprints = cp.asarray(fingerprints.values,
+                                          dtype=cp.float32)
             else:
-                fingerprints = xpy.asarray(self.fingerprint_dataset.values,
-                                           dtype=xpy.float32)
+                fingerprints = cp.asarray(self.fingerprint_dataset.values,
+                                          dtype=cp.float32)
 
             cache.set_data(f'Modelability_{self.label}_embeddings', embeddings)
             cache.set_data(f'Modelability_{self.label}_fingerprints', fingerprints)
@@ -374,13 +280,32 @@ class Modelability(BaseEmbeddingMetric):
         else:
             properties = self.smiles_properties
 
-        results = self._calculate_metric(embeddings,
-                                         fingerprints,
-                                         properties,
-                                         estimator,
-                                         param_dict)
-        results['property'] = properties.columns[0]
-        results['name'] = self.name
+        results = []
+        result = self._calculate_metric(embeddings,
+                                        fingerprints,
+                                        properties,
+                                        estimator,
+                                        param_dict)
+        result['property'] = properties.columns[0]
+        result['name'] = self.name
+        results.append(result)
+
+        if self.metric_spec.get('y_randomize'):
+            randomzed_embedding = embeddings.copy()
+            randomzed_fingerprints = fingerprints.copy()
+            for i in range(self.metric_spec['random_iterations']):
+                cp.random.shuffle(randomzed_embedding)
+                cp.random.shuffle(randomzed_fingerprints)
+                result = self._calculate_metric(randomzed_embedding,
+                                                randomzed_fingerprints,
+                                                properties,
+                                                estimator,
+                                                param_dict)
+                result['property'] = properties.columns[0]
+                result['name'] = self.name
+                result['model'] = kwargs['model'] + f'_y_randomized_{i}'
+                results.append(result)
+
         return results
 
     def cleanup(self):

@@ -15,7 +15,7 @@ from generativesampler_pb2 import (GenerativeSpec,
 
 from chembench.utils.singleton import Singleton
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 class MegaMolBARTWrapper(metaclass=Singleton):
@@ -33,9 +33,9 @@ class MegaMolBARTWrapper(metaclass=Singleton):
 
         from megamolbart.inference_perceiver import MegaMolBART
 
-        logger.info(f'Loading model from {dir}/{checkpoint_file}')
+        log.info(f'Loading model from {dir}/{checkpoint_file}')
         self.megamolbart = MegaMolBART(model_path=os.path.join(dir, checkpoint_file))
-        logger.info(f'Loaded Version {self.megamolbart.version}')
+        log.info(f'Loaded Version {self.megamolbart.version}')
 
     def is_ready(self, timeout: int = 10) -> bool:
         return True
@@ -130,10 +130,10 @@ class GrpcMegaMolBARTWrapper():
         try:
             self.find_similars_smiles(smiles='CC')
             # grpc.channel_ready_future(self.channel).result(timeout=timeout)
-            logger.info('Megatron MolBART is ready')
+            log.info('Megatron MolBART is ready')
             return True
         except (grpc.RpcError):
-            logger.warning('Megatron MolBART is not reachable.')
+            log.warning('Megatron MolBART is not reachable.')
             return False
 
     def smiles_to_embedding(self,
@@ -226,9 +226,9 @@ class MegaMolBARTLatentWrapper(MegaMolBARTWrapper):
         from megamolbart.inference_perceiver import MegaMolBARTLatent
         # this wrapper is not yet ready for MegaMolBARTLatent
 
-        logger.info(f'Loading model from {dir}/{checkpoint_file}')
+        log.info(f'Loading model from {dir}/{checkpoint_file}')
         self.megamolbart = MegaMolBARTLatent(model_dir=os.path.join(dir, checkpoint_file), noise_mode = noise_mode)
-        logger.info(f'Loaded Version {self.megamolbart.version}')
+        log.info(f'Loaded Version {self.megamolbart.version}')
 
     def is_ready(self, timeout: int = 10) -> bool:
         return True

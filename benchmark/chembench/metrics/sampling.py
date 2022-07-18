@@ -12,16 +12,6 @@ from chembench.utils.smiles import calc_similarity
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['Validity',
-           'Unique',
-           'Novelty',
-           'NonIdenticality',
-           'EffectiveNovelty',
-           'ScaffoldUnique',
-           'ScaffoldNonIdenticalSimilarity',
-           'ScaffoldNovelty',
-           'EffectiveScaffoldNovelty',
-           'Entropy']
 
 
 class Validity(BaseMetric):
@@ -121,7 +111,7 @@ class ScaffoldUnique(BaseMetric):
 
 
 class Novelty(BaseMetric):
-    name = 'novelty'
+    name = 'Novelty'
 
     def __init__(self, metric_name, metric_spec, cfg):
         super().__init__(metric_name, metric_spec, cfg)
@@ -140,6 +130,40 @@ class Novelty(BaseMetric):
                 SELECT count(distinct ss.smiles)
                 FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
                 WHERE ss.smiles = td.smiles
+                    AND s.id = ss.input_id
+                    AND s.scaled_radius = ?
+                    AND ss.is_valid = 1
+                    AND ss.is_generated = 1
+                    AND s.processed = 1
+                    AND s.dataset_type = ?
+                ''',
+                [radius, 'SAMPLE'])
+            rec = res.fetchone()
+            novel_molecules = valid_molecules - rec[0]
+
+        return novel_molecules, valid_molecules
+
+
+class CanonicalizeNovelty(BaseMetric):
+    name = 'canonicalizeNovelty'
+
+    def __init__(self, metric_name, metric_spec, cfg):
+        super().__init__(metric_name, metric_spec, cfg)
+        self.training_data = cfg.model.training_data
+
+    def compute_metrics(self, num_samples, radius):
+        validity = Validity(self.name, self.metric_spec, self.cfg)
+        valid_molecules, self.total_molecules = validity.compute_metrics(num_samples, radius)
+        self.total_molecules = self.total_molecules//num_samples
+
+        with closing(sqlite3.connect(self.cfg.sampling.db,
+                                     uri=True,
+                                     check_same_thread=False)) as conn:
+            conn.execute('ATTACH ? AS training_db', [self.training_data])
+            res = conn.execute('''
+                SELECT count(distinct ss.csmiles)
+                FROM main.smiles s, main.smiles_samples ss, training_db.train_data td
+                WHERE ss.csmiles = td.smiles
                     AND s.id = ss.input_id
                     AND s.scaled_radius = ?
                     AND ss.is_valid = 1

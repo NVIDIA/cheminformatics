@@ -5,6 +5,7 @@ import pandas as pd
 
 from datetime import datetime
 from pydoc import locate
+from collections import OrderedDict
 from chembench.data.cache import DatasetCacheGenerator
 
 log = logging.getLogger(__name__)
@@ -52,7 +53,7 @@ def main(cfg):
                                          db_file=cfg.sampling.db,
                                          batch_size=cfg.model.batch_size)
 
-    # Initialize database with smiles in all datasets
+    ## Initialize database with smiles in all datasets
     # radius = cfg.sampling.radius
     # for metric in  cfg.metrics:
     #     datasets = cfg.metrics[metric].datasets
@@ -70,7 +71,7 @@ def main(cfg):
     #             raise ValueError(f'Only {dataset} with file accepted')
 
     # # Fetch samples and embeddings and update database.
-    # ds_generator.sample()
+    ds_generator.sample()
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     for metric_name in  cfg.metrics:
@@ -82,26 +83,31 @@ def main(cfg):
         variations = impl.variations()
         for variation in variations:
             start_time = datetime.now()
-            result = impl.calculate(**variation)
+            results = impl.calculate(**variation)
             run_time = convert_runtime(datetime.now() - start_time)
 
-            result['inferrer'] = cfg.model.name
-            result['iteration'] = 0
-            result['run_time'] = run_time
-            result['timestamp'] = timestamp
-            result['data_size'] = len(impl)
+            if not isinstance(results, list):
+                results = [results]
 
-            # Updates to irregularly used arguments
-            key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
-            for key in key_list:
-                if key in variation:
-                    result[key] = variation[key]
+            for result in results:
+                result['inferrer'] = cfg.model.name
+                result['iteration'] = 0
+                result['run_time'] = run_time
+                result['timestamp'] = timestamp
+                result['data_size'] = len(impl)
 
-            return_predictions = impl.is_prediction()
-            save_metric_results(f'{cfg.model.display_name}-{cfg.exp_name}-{metric_name}',
-                                [pd.Series(result)],
-                                cfg.output.path,
-                                return_predictions=return_predictions)
+                # Updates to irregularly used arguments
+                key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
+                for key in key_list:
+                    if key in variation and not key in result:
+                        result[key] = variation[key]
+
+                return_predictions = impl.is_prediction()
+                result = OrderedDict(sorted(result.items()))
+                save_metric_results(f'{cfg.model.display_name}-{cfg.exp_name}-{metric_name}',
+                                    [pd.Series(result)],
+                                    cfg.output.path,
+                                    return_predictions=return_predictions)
 
         impl.cleanup()
 

@@ -16,6 +16,7 @@ sampling:
   input_size: 1000
   db: /data/db/${exp_name}.sqlite3
   concurrent_requests: 10
+  initialize_db: True
   radius:
     - 0.7
 

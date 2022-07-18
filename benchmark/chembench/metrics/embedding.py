@@ -43,8 +43,8 @@ def get_model_dict():
     rf_param_dict = {'n_estimators': [50, 100, 150, 200, 500, 750, 1000]}
 
     return {'linear_regression': [lr_estimator, lr_param_dict],
-            # 'support_vector_machine': [sv_estimator, sv_param_dict],
-            # 'random_forest': [rf_estimator, rf_param_dict],
+            'support_vector_machine': [sv_estimator, sv_param_dict],
+            'random_forest': [rf_estimator, rf_param_dict],
             }
 
 

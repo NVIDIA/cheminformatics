@@ -354,6 +354,7 @@ def main(cfg):
         plot_dir = cfg.plotting.plot_path
         os.makedirs(plot_dir, exist_ok=True)
 
+        # create_single_model_plots(metric_paths=metric_paths, metric_labels=metric_labels, plot_dir=plot_dir) # TODO: improve test handling if specific metric data is absent
         if len(metric_paths) > 1:
             create_multimodel_aggregated_plots(metric_paths=metric_paths, metric_labels=metric_labels, plot_dir=plot_dir)
 

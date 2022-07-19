@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 MODEL_RENAME_REGEX = re.compile(r"""(?:(?:cuchem(?:bm|bench).inference.Grpc)|(?:nemo_chem.models.megamolbart.NeMo))?(?P<model>.+?)(?:Wrapper)?$""")
 MODEL_SIZE_REGEX = re.compile(r"""(?P<model_size>x?small)""")
 
-MEGAMOLBART_SAMPLE_RADIUS = {'xsmall': (1.0, 1.0),
+MEGAMOLBART_SAMPLE_RADIUS = {'10M': (0.1, 0.1),
+                             'xsmall': (1.0, 1.0),
                              'small':  (0.70, 0.75)} 
 
 PHYSCHEM_UNIT_RENAMER = {'logD': 'Lipophilicity (log[D])',

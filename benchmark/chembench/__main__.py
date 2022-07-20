@@ -3,36 +3,12 @@ import logging
 import hydra
 import pandas as pd
 
-from pydoc import locate
 from datetime import datetime
-from copy import deepcopy
-from chembench.data import DatasetCacheGenerator
-from chembench.plot import (create_latest_aggregated_plots,
-                            create_timeseries_aggregated_plots,
-                            make_model_plots)
+from pydoc import locate
+from collections import OrderedDict
+from chembench.data.cache import DatasetCacheGenerator
 
-# Dataset classess
-from chembench.datasets.physchem import (ChEMBLApprovedDrugs,
-                                         MoleculeNetESOL,
-                                         MoleculeNetFreeSolv,
-                                         MoleculeNetLipophilicity)
-from chembench.datasets.bioactivity import ExCAPEDataset
-
-# Metrics
-from chembench.metrics import (Validity,
-                              Unique,
-                              Novelty,
-                              NonIdenticality,
-                              EffectiveNovelty,
-                              ScaffoldUnique,
-                              ScaffoldNonIdenticalSimilarity,
-                              ScaffoldNovelty,
-                              EffectiveScaffoldNovelty,
-                              Entropy,
-                              NearestNeighborCorrelation,
-                              Modelability)
-
-log = logging.getLogger('model benchmarking')
+log = logging.getLogger(__name__)
 
 
 def convert_runtime(time_):
@@ -40,11 +16,11 @@ def convert_runtime(time_):
 
 
 def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
-    """Save CSV for metrics"""
-
+    '''
+    Saves metrics into a CSV file.
+    '''
     metric_df = pd.concat(metric_list, axis=1).T
-    metric = metric_df.iloc[0]['name'].replace(' ', '_')
-    file_path = os.path.join(output_dir, f'{mode_name}_{metric}')
+    file_path = os.path.join(output_dir, f'{mode_name}')
 
     if return_predictions:
         pickle_file = file_path + '.pkl'
@@ -67,282 +43,79 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
     metric_df.to_csv(csv_file_path, index=False, mode='a', header=write_header)
 
 
-def create_dataset(cfg):
-    sample_input = -1
-    radii = set()
-    data_files = {}
-    sample_data_req = False
-
-    for sampling_metric in [Validity,
-                            Unique,
-                            Novelty,
-                            NonIdenticality,
-                            EffectiveNovelty,
-                            ScaffoldUnique,
-                            ScaffoldNonIdenticalSimilarity,
-                            ScaffoldNovelty,
-                            Entropy]:
-        name = sampling_metric.name
-        sample_input = max(sample_input, eval(f'cfg.metric.{name}.input_size'))
-        radii.update(eval(f'cfg.metric.{name}.radius'))
-        metric_cfg = eval(f'cfg.metric.{name}')
-        if metric_cfg.enabled:
-            sample_data_req = True
-
-    if sample_data_req:
-        data_files['benchmark_ZINC15_test_split'] =\
-            {'col_name': 'canonical_smiles',
-             'dataset_type': 'SAMPLE',
-             'input_size': sample_input,
-             'dataset': '/workspace/benchmark/csv_data/benchmark_ZINC15_test_split.csv'}
-
-    if cfg.metric.nearest_neighbor_correlation.enabled:
-        data_files['benchmark_ChEMBL_approved_drugs_physchem'] =\
-            {'col_name': 'canonical_smiles',
-             'dataset_type': 'EMBEDDING',
-             'input_size': cfg.metric.nearest_neighbor_correlation.input_size,
-             'dataset': '/workspace/benchmark/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv'}
-
-    if cfg.metric.modelability.physchem.enabled:
-        data_files['benchmark_MoleculeNet_Lipophilicity'] =\
-            {'col_name': 'SMILES',
-             'dataset_type': 'EMBEDDING',
-             'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'}
-        data_files['benchmark_MoleculeNet_ESOL.csv'] =\
-            {'col_name': 'SMILES',
-             'dataset_type': 'EMBEDDING',
-             'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv'}
-        data_files['benchmark_MoleculeNet_FreeSolv'] =\
-            {'col_name': 'SMILES',
-             'dataset_type': 'EMBEDDING',
-             'input_size': cfg.metric.modelability.physchem.input_size,
-             'dataset': '/workspace/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv'}
-
-    return data_files, radii
-
-def get_input_size(metric_cfg):
-    input_size = None
-    if metric_cfg.input_size:
-        i_size_ = int(metric_cfg.input_size)
-        input_size = i_size_ if i_size_ > 0 else input_size
-    return input_size
-
-
-@hydra.main(config_path=".", config_name="benchmark_metrics")
+@hydra.main(config_path=".",
+            config_name="benchmark_metrics")
 def main(cfg):
+    os.makedirs(cfg.output.path, exist_ok=True)
+    log.info(f'Benchmarking mode {cfg.model.name}')
+
+    # inferrer = locate(cfg.model.name)()
+    # ds_generator = DatasetCacheGenerator(inferrer,
+    #                                      db_file=cfg.sampling.db,
+    #                                      batch_size=cfg.model.batch_size)
+
+    # ## Initialize database with smiles in all datasets
+    # log.info(f'DB initialization enabled = {cfg.sampling.initialize_db}')
+    # if cfg.sampling.initialize_db:
+    #     radius = cfg.sampling.radius
+    #     for metric in  cfg.metrics:
+    #         log.info(f'Loading dataset for {metric}...')
+
+    #         datasets = cfg.metrics[metric].datasets
+    #         num_requested = cfg.sampling.sample_size
+
+    #         if not cfg.metrics[metric].enabled:
+    #             continue
+
+    #         for dataset in datasets:
+    #             if hasattr(dataset, 'file'):
+    #                 ds_generator.initialize_db(dataset,
+    #                                            radius,
+    #                                            num_requested=num_requested)
+    #             else:
+    #                 raise ValueError(f'Only {dataset} with file accepted')
+
+    # # # Fetch samples and embeddings and update database.
+    # ds_generator.sample()
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log.info(cfg)
-    log.info(f'Timestamp: {timestamp}')
+    for metric_name in  cfg.metrics:
+        metric = cfg.metrics[metric_name]
+        if not metric.enabled:
+            continue
+        impl = locate(metric.impl)(metric_name, metric, cfg)
 
-    output_dir = cfg.output.path
-    os.makedirs(output_dir, exist_ok=True)
-
-    max_seq_len = int(cfg.sampling.max_seq_len)
-    exp_name = cfg.model.exp_name
-    if cfg.model.name == 'MegaMolBART':
-        from chembench.inference.megamolbart import MegaMolBARTWrapper
-        inferrer = MegaMolBARTWrapper(checkpoint_file = cfg.model.checkpoint_file)
-        encoder_type = inferrer.megamolbart.model.model.encoder_type
-        if not cfg.model.perceiver_average and encoder_type == 'perceiver':
-            nbits = inferrer.megamolbart.model.model.max_seq_len * inferrer.megamolbart.model.model.steps_model #512 * k
-        else:
-            nbits = 512
-        log.info(f'Creating model {cfg.model.name} {encoder_type} with {nbits} bits')
-    elif cfg.model.name == 'MegaMolBARTLatent':
-        from chembench.inference.megamolbart import MegaMolBARTLatentWrapper
-        inferrer = MegaMolBARTLatentWrapper(checkpoint_file = cfg.model.checkpoint_file, noise_mode = cfg.model.noise_mode)
-        encoder_type = inferrer.megamolbart.model.model.encoder_type
-        if not cfg.model.perceiver_average and encoder_type == 'perceiver':
-            nbits = inferrer.megamolbart.model.model.max_seq_len * inferrer.megamolbart.model.model.steps_model #512 * k
-        else:
-            nbits = 512
-        log.info(f'Creating model {cfg.model.name} {encoder_type} with {nbits} bits')
-    elif cfg.model.name == 'CDDD':
-        from chembench.inference.cddd import CdddWrapper
-        inferrer = CdddWrapper()
-        nbits = 512
-    else:
-        log.warning(f'Creating model {cfg.model.name} & training data {cfg.model.training_data}')
-        inf_class = locate(cfg.model.name)
-        inferrer = inf_class()
-
-    data_files, radii = create_dataset(cfg)
-    # Metrics
-    metric_list = []
-
-    for sampling_metric in [Validity, Unique, Novelty, NonIdenticality, EffectiveNovelty, ScaffoldUnique, ScaffoldNonIdenticalSimilarity, ScaffoldNovelty, EffectiveScaffoldNovelty, Entropy]:
-        name = sampling_metric.name
-        metric_cfg = eval(f'cfg.metric.{name}')
-        if metric_cfg.enabled:
-            param_list = [inferrer, cfg]
-            metric_list.append({name: sampling_metric(*param_list)})
-
-    if cfg.metric.nearest_neighbor_correlation.enabled:
-        name = NearestNeighborCorrelation.name
-        metric_cfg = cfg.metric.nearest_neighbor_correlation
-        input_size = get_input_size(metric_cfg)
-
-        smiles_dataset = ChEMBLApprovedDrugs(max_seq_len=max_seq_len, fp_filename=f'fingerprints_ChEMBL_approved_drugs_physchem_{nbits}.csv')
-
-        smiles_dataset.load(data_len=input_size, nbits=nbits)
-
-        metric_list.append({name: NearestNeighborCorrelation(inferrer,
-                                                             cfg,
-                                                             smiles_dataset)})
-
-    if cfg.metric.modelability.physchem.enabled:
-        metric_cfg = cfg.metric.modelability.physchem
-        input_size = get_input_size(metric_cfg)
-        # Could concat datasets to make prep similar to bioactivity
-        smiles_dataset_list = [MoleculeNetESOL(max_seq_len=max_seq_len, fp_filename=f'fingerprints_MoleculeNet_ESOL_{nbits}.csv'),
-                               MoleculeNetFreeSolv(max_seq_len=max_seq_len, fp_filename=f'fingerprints_MoleculeNet_FreeSolv_{nbits}.csv'),
-                               MoleculeNetLipophilicity(max_seq_len=max_seq_len, fp_filename=f'fingerprints_MoleculeNet_Lipophilicity_{nbits}.csv')]
-
-        n_splits = metric_cfg.n_splits
-
-        for smiles_dataset in smiles_dataset_list:
-            log.info(f'Loading {smiles_dataset.table_name}...')
-
-            smiles_dataset.load(data_len=input_size, columns=['SMILES'], nbits = nbits)
-
-            metric_list.append(
-                {smiles_dataset.table_name: Modelability('modelability-physchem',
-                                                         inferrer,
-                                                         cfg,
-                                                         smiles_dataset,
-                                                         smiles_dataset.table_name,
-                                                         n_splits=n_splits,
-                                                         return_predictions=metric_cfg.return_predictions,
-                                                         normalize_inputs=metric_cfg.normalize_inputs)})
-
-    if cfg.metric.modelability.bioactivity.enabled:
-        metric_cfg = cfg.metric.modelability.bioactivity
-        metric_name = 'modelability-bioactivity'
-
-        excape_dataset = ExCAPEDataset(max_seq_len=max_seq_len, fp_filename=f'fingerprints_ExCAPE_Bioactivity_{nbits}.csv')
-        excape_dataset.load(columns=['SMILES', 'Gene_Symbol'],
-                            data_len=metric_cfg.input_size, nbits = nbits)
-
-        log.info('Creating groups...')
-        n_splits = metric_cfg.n_splits
-        gene_dataset = deepcopy(excape_dataset)
-        genes_cnt = 0
-
-        data_files['benchmark_ExCAPE_Bioactivity'] =\
-            {'col_name': 'canonical_smiles',
-             'dataset_type': 'EMBEDDING',
-             'input_size': cfg.metric.modelability.bioactivity.input_size,
-             'dataset': excape_dataset.smiles}
-
-        # Get a list of genes already processed
-        results_file = os.path.join(output_dir, f'{cfg.model.name}_{exp_name}_{metric_name}.csv')
-        if os.path.exists(results_file):
-            results_df = pd.read_csv(results_file)
-            processed_genes = set(results_df['gene'])
-        else:
-            processed_genes = set()
-
-        for label, sm_ in excape_dataset.smiles.groupby(level='gene'):
-            # Skipping genes already processed
-            if label in processed_genes:
-                log.info(f'Skipping {label}')
-                continue
-
-            gene_dataset.smiles = sm_
-
-            index = sm_.index.get_level_values(gene_dataset.index_col)
-            gene_dataset.properties = excape_dataset.properties.loc[index]
-            gene_dataset.fingerprints = excape_dataset.fingerprints.loc[index]
-
-            log.info(f'Creating bioactivity Modelability metric for {label}...')
-
-            metric_list.append({label: Modelability(metric_name,
-                                                    inferrer,
-                                                    cfg,
-                                                    gene_dataset,
-                                                    label,
-                                                    n_splits,
-                                                    metric_cfg.return_predictions,
-                                                    metric_cfg.normalize_inputs,
-                                                    data_file=data_files['benchmark_ExCAPE_Bioactivity']['dataset'])})
-            genes_cnt += 1
-            if metric_cfg.gene_cnt > 0 and genes_cnt > metric_cfg.gene_cnt:
-                break
-
-    generator = DatasetCacheGenerator(inferrer, db_file=cfg.sampling.db, batch_size=cfg.model.batch_size, nbits = nbits)
-    for radius in radii:
-        log.info(f'Generating samples for radius {radius}...')
-        generator.generate_and_store(data_files,
-                                     num_requested=10,
-                                     scaled_radius=radius,
-                                     force_unique=False,
-                                     sanitize=True,
-                                     concurrent_requests=cfg.sampling.concurrent_requests)
-    generator.conn.close()
-
-    for metric_dict in metric_list:
-        metric_key, metric = list(metric_dict.items())[0]
-        iter_dict = metric.variations(cfg=cfg)
-        iter_label, iter_vals = list(iter_dict.items())[0]
-
-        result_list = []
-        for iter_val in iter_vals:
+        variations = impl.variations()
+        for variation in variations:
+            log.info(f'Processing {metric_name} with parameters {variations}...')
             start_time = datetime.now()
-            log.debug(f'Metric name: {metric.name}::{iter_val}')
-
-            kwargs = {iter_label: iter_val}
-            if cfg.model.name == 'CDDD':
-                kwargs['average_tokens'] =  True
-            else:
-                kwargs['average_tokens'] =  cfg.model.perceiver_average or encoder_type == 'seq2seq' # encoder_type == 'seq2seq'
-            if metric.name.startswith('modelability'):
-                estimator, param_dict = metric.model_dict[iter_val]
-                kwargs.update({'estimator': estimator, 'param_dict': param_dict})
-                if metric.name.endswith('bioactivity'):
-                    kwargs['n_splits'] = cfg.metric.modelability.bioactivity.n_splits
-                    kwargs['gene'] = metric_key
-                else:
-                    kwargs['n_splits'] = cfg.metric.modelability.physchem.n_splits
-
-            if metric.name in ['validity', 'unique', 'novelty', 'non_identicality', 'effective_novelty', 'scaffold_unique', 'scaffold_non_identical_similarity', 'scaffold_novelty', 'effective_scaffold_novelty', 'entropy']:
-                kwargs['num_samples'] = int(cfg.sampling.sample_size)
-                metric_cfg = eval('cfg.metric.' + metric.name)
-                kwargs['remove_invalid'] = metric_cfg.get('remove_invalid', None)
-
-            log.info(f'Metric name: {metric.name}::{metric_key} with args {kwargs}')
-            result = metric.calculate(**kwargs)
+            results = impl.calculate(**variation)
             run_time = convert_runtime(datetime.now() - start_time)
 
-            result['inferrer'] = cfg.model.name
-            result['iteration'] = 0 # TODO: update with version from model inferrer when implemented
-            result['run_time'] = run_time
-            result['timestamp'] = timestamp
-            # TODO: inputsize as dataset size is bad assumption
-            result['data_size'] = len(metric)
+            if not isinstance(results, list):
+                results = [results]
 
-            # Updates to irregularly used arguments
-            key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
-            for key in key_list:
-                if key in kwargs:
-                    result[key] = kwargs[key]
+            for result in results:
+                result['inferrer'] = cfg.model.name
+                result['iteration'] = 0
+                result['run_time'] = run_time
+                result['timestamp'] = timestamp
+                result['data_size'] = len(impl)
 
-            result_list.append(pd.Series(result))
-        if result['name'].startswith('modelability'):
-            metric_name = result['name'].split('-')[1]
-            return_predictions = cfg.metric.modelability[metric_name]['return_predictions']
-        else:
-            return_predictions = False
-        save_metric_results(f'{cfg.model.name}_{exp_name}', result_list, output_dir, return_predictions=return_predictions)
-        metric.cleanup()
+                # Updates to irregularly used arguments
+                key_list = ['model', 'gene', 'remove_invalid', 'n_splits']
+                for key in key_list:
+                    if key in variation and not key in result:
+                        result[key] = variation[key]
 
-    # Plotting
-    # create_latest_aggregated_plots(output_dir) # TODO: improve test handling if specific metric data is absent
-    # create_timeseries_aggregated_plots(output_dir)
-    # make_model_plots(max_seq_len, 'physchem', output_dir)
-    # make_model_plots(max_seq_len, 'bioactivity', output_dir)
+                return_predictions = impl.is_prediction()
+                result = OrderedDict(sorted(result.items()))
+                save_metric_results(f'{cfg.model.display_name}-{cfg.exp_name}-{metric_name}',
+                                    [pd.Series(result)],
+                                    cfg.output.path,
+                                    return_predictions=return_predictions)
 
+        impl.cleanup()
 
 if __name__ == '__main__':
     main()

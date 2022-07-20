@@ -1,4 +1,3 @@
-version: 1
 exp_name: benchmark
 model:
   name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
@@ -32,7 +31,7 @@ metrics:
         type: SAMPLE
         input_size: ${sampling.input_size}
         label: sample_ds
-    enabled: True
+    enabled: False
 
   unique:
     impl: chembench.metrics.Unique
@@ -106,7 +105,7 @@ metrics:
         type: EMBEDDING
         input_size: null
         label: chembl
-    enabled: True
+    enabled: False
     top_k:
       - 50
       - 100
@@ -127,7 +126,7 @@ metrics:
         type: EMBEDDING
         input_size: null
     enabled: True
-    y_randomize: True
+    y_randomize: False
     random_iterations: 10
     n_splits: 20
     nbits: 512
@@ -148,7 +147,7 @@ metrics:
           - measured log solubility in mols per litre
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     y_randomize: True
     random_iterations: 10
     n_splits: 20
@@ -170,7 +169,7 @@ metrics:
           - y
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     y_randomize: True
     random_iterations: 10
     n_splits: 20
@@ -197,29 +196,9 @@ metrics:
         variations:
           group_by: 'gene'
         input_size: null
-    enabled: True
+    enabled: False
     gene_cnt: -1
     n_splits: 20
     nbits: 512
     normalize_inputs: True
     return_predictions: True
-
-# defaults:
-#   - hydra/job_logging:
-#       version: 1
-#       formatters:
-#         simple:
-#           format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
-#       handlers:
-#         console:
-#           class: logging.StreamHandler
-#           formatter: simple
-#           stream: ext://sys.stdout
-#         file:
-#           class: logging.FileHandler
-#           formatter: simple
-#           filename: /data/logs/benchmark.log
-#       root:
-#         level: INFO
-#         handlers: [console, file]
-#       disable_existing_loggers: false

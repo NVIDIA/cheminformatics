@@ -31,7 +31,7 @@ metrics:
         type: SAMPLE
         input_size: ${sampling.input_size}
         label: sample_ds
-    enabled: False
+    enabled: True
 
   unique:
     impl: chembench.metrics.Unique
@@ -147,7 +147,7 @@ metrics:
           - measured log solubility in mols per litre
         type: EMBEDDING
         input_size: null
-    enabled: False
+    enabled: True
     y_randomize: True
     random_iterations: 10
     n_splits: 20
@@ -169,7 +169,7 @@ metrics:
           - y
         type: EMBEDDING
         input_size: null
-    enabled: False
+    enabled: True
     y_randomize: True
     random_iterations: 10
     n_splits: 20
@@ -196,7 +196,7 @@ metrics:
         variations:
           group_by: 'gene'
         input_size: null
-    enabled: False
+    enabled: True
     gene_cnt: -1
     n_splits: 20
     nbits: 512

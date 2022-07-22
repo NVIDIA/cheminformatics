@@ -27,7 +27,8 @@ class ChEMBLApprovedDrugs(GenericCSVDataset):
                                 'cx_logp', 'cx_logd', 'full_mwt', 'aromatic_rings', 'heavy_atoms',
                                 'qed_weighted', 'mw_monoisotopic', 'hba_lipinski', 'hbd_lipinski',
                                 'num_lipinski_ro5_violations']
-        super().__init__(data_filename='benchmark_ChEMBL_approved_drugs_physchem.csv', **kwargs) # @(dreidenbach) kwargs now contains both names as we use them as inputs for exp_name specificity
+        fp_filename = kwargs.pop('fp_filename', 'fingerprints_ChEMBL_approved_drugs_physchem_512.csv')
+        super().__init__(data_filename='benchmark_ChEMBL_approved_drugs_physchem.csv', fp_filename=fp_filename, **kwargs)
         self.name = 'ChEMBL Approved Drugs (Phase III/IV)'
         self.table_name = 'chembl'
         self.index_col = 'index'
@@ -36,7 +37,8 @@ class ChEMBLApprovedDrugs(GenericCSVDataset):
 
 class MoleculeNetLipophilicity(GenericCSVDataset):
     def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_MoleculeNet_Lipophilicity.csv', **kwargs)
+        fp_filename = kwargs.pop('fp_filename', 'fingerprints_MoleculeNet_Lipophilicity_512.csv')
+        super().__init__(data_filename='benchmark_MoleculeNet_Lipophilicity.csv', fp_filename=fp_filename, **kwargs)
         self.name = 'MoleculeNet Lipophilicity'
         self.table_name = 'lipophilicity'
         self.index_col = 'index'
@@ -47,7 +49,8 @@ class MoleculeNetLipophilicity(GenericCSVDataset):
 
 class MoleculeNetESOL(GenericCSVDataset):
     def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_MoleculeNet_ESOL.csv', **kwargs)
+        fp_filename = kwargs.pop('fp_filename', 'fingerprints_MoleculeNet_ESOL_512.csv')
+        super().__init__(data_filename='benchmark_MoleculeNet_ESOL.csv', fp_filename=fp_filename, **kwargs)
         self.name = 'MoleculeNet ESOL'
         self.table_name = 'esol'
         self.index_col = 'index'
@@ -58,7 +61,8 @@ class MoleculeNetESOL(GenericCSVDataset):
 
 class MoleculeNetFreeSolv(GenericCSVDataset):
     def __init__(self, **kwargs):
-        super().__init__(data_filename='benchmark_MoleculeNet_FreeSolv.csv', **kwargs)
+        fp_filename = kwargs.pop('fp_filename', 'fingerprints_MoleculeNet_FreeSolv_512.csv')
+        super().__init__(data_filename='benchmark_MoleculeNet_FreeSolv.csv', fp_filename=fp_filename, **kwargs)
         self.name = 'MoleculeNet FreeSolv'
         self.table_name = 'freesolv'
         self.index_col = 'index'
@@ -70,8 +74,9 @@ class MoleculeNetFreeSolv(GenericCSVDataset):
 class ZINC15TestSplit(GenericCSVDataset, metaclass=Singleton):
 
     def __init__(self, **kwargs):
+        fp_filename = kwargs.pop('fp_filename', 'fingerprints_ZINC15_test_split.csv')
         super().__init__(data_filename='benchmark_ZINC15_test_split.csv',
-                         fp_filename='fingerprints_ZINC15_test_split.csv',
+                         fp_filename=fp_filename,
                          **kwargs)
         self.name = 'ZINC15 Test Split 20K Samples'
         self.table_name = 'zinc15_test'

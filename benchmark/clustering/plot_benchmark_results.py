@@ -183,7 +183,7 @@ def prepare_acceleration_stacked_plot(df, machine_config, output_path, palette=N
         if n_molecules == -1:
             n_molecules = 'ALL'
         ax.set(title=f'{n_molecules:} Molecules', xlabel='')
-        if ax.is_first_col():
+        if ax.get_subplotspec().is_first_col():
             ax.set(ylabel='Compute Time (s)\nfor RAPIDS / Sklearn Workflow')
 
     title = f'Cheminformatics Visualization Benchmark\n{machine_config.values[0]}\n'

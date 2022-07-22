@@ -9,6 +9,8 @@ handlers:
 
 root:
   handlers: [console]
+  do_benchmark: False # set to True to run benchmark or False to skip model download etc, if only plots are needed
+  do_plots: True # set to True to make plots, or False to skip
 
 model:
   name: MegaMolBART #Latent #CDDD
@@ -25,8 +27,20 @@ sampling:
   db: /data/db/embedding_cache_megamolbart_prcvr_k4_sampling_full_test.sqlite3 #embedding_cache_megamolbart_vae_k4_sampling_full.sqlite3
   concurrent_requests: 10
 
-output:
-  path: /data/benchmark_output/prcvr_test
+benchmark:
+  metric_path: /data/benchmark_output/MegaMolBART/small_NeMo1.2_data_parallel
+
+plotting:
+  metric_paths:
+    - /data/benchmark_output/CDDD
+    - /data/benchmark_output/MegaMolBART/small_NeMo1.2_data_parallel
+    - /data/benchmark_output/MegaMolBART/small_NeMo1.10_model_parallel
+  metric_labels: # labels to append to model names for plotting, can be null, must be same length as metric_paths
+    - null
+    - NeMo1.2
+    - NeMo1.10
+  plot_path: /data/benchmark_output/plots
+
 
 metric:
   validity:

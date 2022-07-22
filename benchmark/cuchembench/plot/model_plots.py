@@ -9,6 +9,9 @@ from .data import (PHYSCHEM_UNIT_RENAMER,
                    load_bioactivity_input_data, 
                    load_plot_data)
 
+import logging
+log = logging.getLogger('model benchmarking')
+
 __ALL__ = ['make_model_plots']
 
 
@@ -18,29 +21,31 @@ def grouper(list_, num_rows):
         yield list_[i: i + num_rows]
 
 
-def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
+def make_model_plots(max_seq_len, plot_type, output_dirs, plot_dir, n_plots_page=10):
     assert plot_type in ['physchem', 'bioactivity'], AssertionError(f"Error: plot type must be one of 'physchem' or 'bioactivity'.")
     sns.set_palette('dark')
 
     if plot_type == 'physchem':
         input_data_func = load_physchem_input_data
-        pkl_path = os.path.join(output_dir, '**', '*physchem.pkl')
+        pkl_paths = [os.path.join(x, '**', '*physchem.pkl') for x in output_dirs]
         group_col = 'property'
         index_cols = ['inferrer', 'property', 'model']
-        output_path = os.path.join(output_dir, 'Physchem_Single_Property_Plots.pdf')
+        plot_path = os.path.join(plot_dir, 'Physchem_Single_Property_Plots.pdf')
     elif plot_type == 'bioactivity':
         input_data_func = load_bioactivity_input_data
-        pkl_path = os.path.join(output_dir, '**', '*bioactivity.pkl')
+        pkl_paths = [os.path.join(x, '**', '*bioactivity.pkl') for x in output_dirs]
         group_col = 'gene'
         index_cols = ['inferrer', 'gene', 'model']
-        output_path = os.path.join(output_dir, 'Bioactivity_Single_Gene_Plots.pdf')
+        plot_path = os.path.join(plot_dir, 'Bioactivity_Single_Gene_Plots.pdf')
 
     keep_cols = index_cols + ['fingerprint_error', 'embedding_error']
 
     input_data = input_data_func(max_seq_len=max_seq_len)
-    pred_data = load_plot_data(pkl_path=pkl_path, input_data=input_data, group_col=group_col)
+    pred_data = load_plot_data(pkl_paths=pkl_paths, input_data=input_data, group_col=group_col)
 
-    metric_df = load_aggregated_metric_results(output_dir)
+    metric_df = load_aggregated_metric_results(output_dirs)
+    mask = metric_df['name'].str.contains('physchem')
+    metric_df.loc[mask, 'name'] = 'physchem'
     metric_df = metric_df[metric_df['name'] == plot_type].dropna(axis=1, how='all')
 
     if plot_type == 'physchem':
@@ -48,13 +53,13 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
         metric_df['property'] = metric_df['property'].map(lambda x: PHYSCHEM_UNIT_RENAMER[x])
 
     pred_data['row'] = pred_data.apply(lambda x: '+'.join([x['property'], x['inferrer']]), axis=1)
-    model_dtype = pd.CategoricalDtype(categories=['linear_regression', 'elastic_net', 'support_vector_machine', 'random_forest'], ordered=True)
+    model_dtype = pd.CategoricalDtype(categories=['linear_regression', 'support_vector_machine', 'random_forest'], ordered=True)
     pred_data['model'] = pred_data['model'].astype(model_dtype)
 
     metric_df = metric_df[keep_cols].set_index(index_cols)
     assert metric_df.groupby(['inferrer', group_col, 'model']).size().max() == 1, AssertionError(f'Duplicate entries are present for {plot_type} metrics.')
 
-    with PdfPages(output_path) as pdf:
+    with PdfPages(plot_path) as pdf:
         for pred_data_page in grouper(pred_data.groupby(['row']), n_plots_page):
             pred_data_page = pd.concat([x[1] for x in pred_data_page], axis=0)
             
@@ -79,11 +84,11 @@ def make_model_plots(max_seq_len, plot_type, output_dir, n_plots_page=10):
                 prop, inferrer = row.split('+')
                 error_vals = metric_df.loc[inferrer, prop, model]
 
-                if ax.is_first_row():
+                if ax.get_subplotspec().is_first_row():
                     ax.set_title(model.replace('_', ' ').title())
-                if ax.is_last_row():
+                if ax.get_subplotspec().is_last_row():
                     ax.set_xlabel('Property Value')
-                if ax.is_first_col():
+                if ax.get_subplotspec().is_first_col():
                     ax.set_ylabel(f'{inferrer}\n{prop}\nPredicted Value')
 
                 error_str = []

@@ -297,18 +297,18 @@ class Modelability(BaseEmbeddingMetric):
 
         if self.metric_spec.get('y_randomize'):
             randomzed_embedding = embeddings.copy()
-            randomzed_fingerprints = fingerprints.copy()
+            # randomzed_fingerprints = fingerprints.copy()
             for i in range(self.metric_spec['random_iterations']):
                 cp.random.shuffle(randomzed_embedding)
-                cp.random.shuffle(randomzed_fingerprints)
+                # cp.random.shuffle(randomzed_fingerprints)
                 result = self._calculate_metric(randomzed_embedding,
-                                                randomzed_fingerprints,
+                                                fingerprints,
                                                 properties,
                                                 estimator,
                                                 param_dict)
                 result['property'] = properties.columns[0]
                 result['name'] = self.name
-                result['model'] = kwargs['model'] + f'_y_randomized_{i}'
+                result['model'] = f'y_randomized_{kwargs["model"]}_{i}'
                 results.append(result)
 
         return results

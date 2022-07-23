@@ -48,13 +48,12 @@ def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
 def main(cfg):
     os.makedirs(cfg.output.path, exist_ok=True)
     log.info(f'Benchmarking mode {cfg.model.name}')
-
     inferrer = locate(cfg.model.name)()
+    log.setLevel(cfg.log.level)
     ds_generator = DatasetCacheGenerator(inferrer,
                                          db_file=cfg.sampling.db,
                                          batch_size=cfg.model.batch_size)
-
-    ## Initialize database with smiles in all datasets
+    # Initialize database with smiles in all datasets
     log.info(f'DB initialization enabled = {cfg.sampling.initialize_db}')
     if cfg.sampling.initialize_db:
         radius = cfg.sampling.radius
@@ -76,7 +75,9 @@ def main(cfg):
                     raise ValueError(f'Only {dataset} with file accepted')
 
     # Fetch samples and embeddings and update database.
-    ds_generator.sample()
+    log.info(f'Generating samples and embedding...')
+    # ds_generator.sample()
+    log.setLevel(cfg.log.level)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     for metric_name in  cfg.metrics:

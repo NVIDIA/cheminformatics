@@ -1,4 +1,6 @@
 exp_name: benchmark
+log:
+  level: 10 # https://docs.python.org/3/library/logging.html#levels
 model:
   name: nemo_chem.models.megamolbart.NeMoMegaMolBARTWrapper
   random_weights: False

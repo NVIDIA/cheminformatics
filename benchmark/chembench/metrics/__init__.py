@@ -66,7 +66,7 @@ class BaseEmbeddingMetric(BaseMetric):
         self.dataset.index_col = self.dataset_spec['index_col']
         self.dataset.smiles_col = self.dataset_spec['smis_col']
         self.dataset.properties_cols = list(self.dataset_spec['properties_cols'])
-        self.dataset.orig_property_name = self.dataset_spec['orig_property_name']
+        self.dataset.orig_property_name = self.dataset_spec.get('orig_property_name')
 
         if 'load_cols' in self.dataset_spec:
             self.dataset.load_cols = list(self.dataset_spec['load_cols'])

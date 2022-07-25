@@ -76,7 +76,7 @@ def main(cfg):
 
     # Fetch samples and embeddings and update database.
     log.info(f'Generating samples and embedding...')
-    # ds_generator.sample()
+    ds_generator.sample()
     log.setLevel(cfg.log.level)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

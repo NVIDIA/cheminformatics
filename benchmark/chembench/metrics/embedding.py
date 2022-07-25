@@ -19,7 +19,7 @@ from chembench.utils.metrics import spearmanr
 from chembench.utils.distance import tanimoto_calculate
 
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 __all__ = ['NearestNeighborCorrelation', 'Modelability']
 
@@ -55,12 +55,16 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
     def __init__(self, metric_name, metric_spec, cfg):
         super().__init__(metric_name, metric_spec, cfg)
 
-    def variations(self, cfg, **kwargs):
-        top_k_list = list(cfg.metric.nearest_neighbor_correlation.top_k)
-        top_k_list = [int(x) for x in top_k_list]
-        return {'top_k': top_k_list}
+    def variations(self, **kwargs):
+        top_k_list = list(self.metric_spec['top_k'])
+
+        kwargs = [{'top_k': top_k} for top_k in top_k_list]
+        return kwargs
 
     def _calculate_metric(self, embeddings, fingerprints, top_k=None):
+        if embeddings.dtype != np.float32 and embeddings.dtype != np.float64:
+            embeddings = embeddings.astype(np.float32)
+
         embeddings_dist = pairwise_distances(embeddings)
         del embeddings
 
@@ -70,14 +74,20 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
         corr = spearmanr(fingerprints_dist, embeddings_dist, top_k=top_k)
         return corr
 
-    def calculate(self, top_k=None, average_tokens = False, **kwargs):
+    def calculate(self, **kwargs):
+
+        top_k = kwargs['top_k']
+        average_tokens = self.cfg.model.average_tokens
 
         start_time = time.time()
         cache = Cache()
         embeddings = None # TODO: cache.get_data('NN_embeddings')
         if embeddings is None:
-            embeddings = self.encode_many(zero_padded_vals=False, average_tokens=average_tokens) #zero_padded_vals=True
-            logger.info(f'Embedding len and type {len(embeddings)}  {type(embeddings[0])}')
+            smis = self.smiles_dataset[self.dataset.smiles_col]
+            embeddings = self.encode_many(smis, zero_padded_vals=False,
+                                          average_tokens=average_tokens)
+
+            log.info(f'Embedding len and type {len(embeddings)}  {type(embeddings[0])}')
             embeddings = cp.vstack(embeddings)
             fingerprints = cp.asarray(self.fingerprint_dataset)
 
@@ -152,14 +162,14 @@ class Modelability(BaseEmbeddingMetric):
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata):
         """Perform grid search with cross validation and return score"""
-        logger.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
+        log.info(f"Validating input shape {xdata.shape[0]} == {ydata.shape[0]}")
         assert xdata.shape[0] == ydata.shape[0]
 
         best_score, best_param, best_pred = np.inf, None, None
         # TODO -- if RF method throws errors with large number of estimators, can prune params based on dataset size.
         for param in ParameterGrid(param_dict):
             estimator.set_params(**param)
-            logger.info(f"Grid search param {param}")
+            log.info(f"Grid search param {param}")
 
             # Generate CV folds
             kfold_gen = KFold(n_splits=self.n_splits, shuffle=True, random_state=0)
@@ -249,11 +259,11 @@ class Modelability(BaseEmbeddingMetric):
         if 'gene' in kwargs:
             self.label = kwargs['gene']
 
-        logger.info(f'Processing {self.label}...')
+        log.info(f'Processing {self.label}...')
         cache = Cache()
         embeddings = None #cache.get_data(f'Modelability_{self.label}_embeddings') Caching with this label is unaccurate for benchmarking multiple models
         if embeddings is None:
-            logger.info(f'Grabbing Fresh Embeddings with average_tokens = {average_tokens}')
+            log.info(f'Grabbing Fresh Embeddings with average_tokens = {average_tokens}')
             if 'smiles' in kwargs:
                 smis = kwargs['smiles']
             else:
@@ -279,7 +289,7 @@ class Modelability(BaseEmbeddingMetric):
         assert fingerprints.ndim == 2, AssertionError('Fingerprints are not of dimension 2')
         assert embeddings.shape[0] == fingerprints.shape[0], AssertionError('Number of samples in embeddings and fingerprints do not match')
 
-        logger.info("Computing metric...")
+        log.info("Computing metric...")
         if 'smiles' in kwargs:
             properties = kwargs['properties']
         else:

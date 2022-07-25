@@ -33,7 +33,7 @@ metrics:
         type: SAMPLE
         input_size: ${sampling.input_size}
         label: sample_ds
-    enabled: True
+    enabled: False
 
   unique:
     impl: chembench.metrics.Unique
@@ -83,6 +83,7 @@ metrics:
     datasets:
       - file: /workspace/chembench/csv_data/benchmark_ChEMBL_approved_drugs_physchem.csv
         impl: chembench.datasets.base.GenericCSVDataset
+        label: chembl
         properties_cols:
           - max_phase_for_ind
           - mw_freebase
@@ -103,11 +104,12 @@ metrics:
           - hba_lipinski
           - hbd_lipinski
           - num_lipinski_ro5_violations
+        index_col: index
         smis_col: canonical_smiles
         type: EMBEDDING
         input_size: null
-        label: chembl
-    enabled: False
+    nbits: 512
+    enabled: True
     top_k:
       - 50
       - 100
@@ -127,7 +129,7 @@ metrics:
           - exp
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     y_randomize: False
     random_iterations: 10
     n_splits: 20
@@ -149,7 +151,7 @@ metrics:
           - measured log solubility in mols per litre
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     y_randomize: True
     random_iterations: 10
     n_splits: 20
@@ -171,7 +173,7 @@ metrics:
           - y
         type: EMBEDDING
         input_size: null
-    enabled: True
+    enabled: False
     y_randomize: True
     random_iterations: 10
     n_splits: 20
@@ -198,7 +200,7 @@ metrics:
         variations:
           group_by: 'gene'
         input_size: null
-    enabled: True
+    enabled: False
     gene_cnt: -1
     n_splits: 20
     nbits: 512

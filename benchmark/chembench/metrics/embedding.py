@@ -1,6 +1,8 @@
+import os
 import time
 import logging
 import numpy as np
+import pandas as pd
 
 from sklearn.model_selection import ParameterGrid, KFold
 
@@ -55,10 +57,23 @@ class NearestNeighborCorrelation(BaseEmbeddingMetric):
     def __init__(self, metric_name, metric_spec, cfg):
         super().__init__(metric_name, metric_spec, cfg)
 
-    def variations(self, **kwargs):
-        top_k_list = list(self.metric_spec['top_k'])
+    def variations(self, result_filename):
+        results_file = os.path.join(f'{result_filename}.csv')
+        processed_top_ks = set()
+        if os.path.exists(results_file):
+            results_df = pd.read_csv(results_file)
+            processed_top_ks = set(results_df['top_k'])
 
-        kwargs = [{'top_k': top_k} for top_k in top_k_list]
+        kwargs = []
+        for top_k in list(self.metric_spec['top_k']):
+            if top_k in processed_top_ks:
+                log.warn(f'Processed {self.name} with radius {top_k}. Skipping')
+                continue
+
+            kwargs.append({'top_k': top_k})
+        else:
+            log.warn(f'Processed {self.name} with radius {top_k}. Skipping')
+
         return kwargs
 
     def _calculate_metric(self, embeddings, fingerprints, top_k=None):
@@ -118,7 +133,6 @@ class Modelability(BaseEmbeddingMetric):
 
     def __init__(self, metric_name, metric_spec, cfg):
         super().__init__(metric_name, metric_spec, cfg)
-        # self.name = name
         self.model_dict = get_model_dict()
         self.metric_spec = metric_spec
         self.n_splits = metric_spec['n_splits']
@@ -129,14 +143,25 @@ class Modelability(BaseEmbeddingMetric):
         else:
             self.norm_data, self.norm_prop = None, None
 
-    def variations(self, model_dict=None, **kwargs):
+    def variations(self, result_filename):
         # TODO: Revisit get_model_dict to make this function simpler.
+
+        results_file = os.path.join(f'{result_filename}.csv')
         if 'variations' in self.dataset_spec:
             group_by = self.dataset_spec['variations']['group_by']
             groups = self.dataset.smiles.groupby(level=group_by)
 
+            processed_grps = set()
+            if os.path.exists(results_file):
+                results_df = pd.read_csv(results_file)
+                processed_grps = set(results_df[group_by])
+
             kwargs = []
             for gene, smis in groups:
+                if gene in processed_grps:
+                    log.warn(f'Skipping {gene}')
+                    continue
+
                 gene_kwargs = [{'model': k,
                                 'average_tokens': self.cfg.model.average_tokens,
                                 'estimator': self.model_dict[k][0],
@@ -154,10 +179,22 @@ class Modelability(BaseEmbeddingMetric):
                     ar['fingerprints'] = fingerprints
                     kwargs.append(ar)
         else:
-            kwargs = [{'model': k,
-                       'average_tokens': self.cfg.model.average_tokens,
-                       'estimator': self.model_dict[k][0],
-                       'param_dict': self.model_dict[k][1]} for k in self.model_dict.keys()]
+            processed_models = set()
+            if os.path.exists(results_file):
+                results_df = pd.read_csv(results_file)
+                processed_models = set(results_df['model'])
+
+            kwargs = []
+            for model in self.model_dict.keys():
+                if model in processed_models:
+                    log.warn(f'Processed {self.name} with model {model}. Skipping')
+                    continue
+
+                kwargs = [{'model': model,
+                        'average_tokens': self.cfg.model.average_tokens,
+                        'estimator': self.model_dict[model][0],
+                        'param_dict': self.model_dict[model][1]} ]
+
         return kwargs
 
     def gpu_gridsearch_cv(self, estimator, param_dict, xdata, ydata):

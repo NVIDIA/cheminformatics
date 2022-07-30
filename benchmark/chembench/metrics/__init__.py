@@ -1,8 +1,12 @@
 import os
+import logging
 import numpy as np
+import pandas as pd
 import cupy as cp
 
 from pydoc import locate
+
+log = logging.getLogger(__name__)
 
 
 class BaseMetric():
@@ -27,10 +31,24 @@ class BaseMetric():
     def is_prediction(self):
         return False
 
-    def variations(self):
+    def variations(self, result_filename):
         radius_list = list(self.cfg.sampling.radius)
         sample_size = self.cfg.sampling.sample_size
-        return [{'radius': float(x), 'num_samples': sample_size} for x in radius_list]
+
+        results_file = os.path.join(f'{result_filename}.csv')
+        processed_radius = set()
+        if os.path.exists(results_file):
+            results_df = pd.read_csv(results_file)
+            processed_radius = set(results_df['radius'])
+
+        kwargs = []
+        for radius in radius_list:
+            if radius not in processed_radius:
+                kwargs.append({'radius': float(radius), 'num_samples': sample_size})
+            else:
+                log.warn(f'Processed {self.name} with radius {radius}. Skipping')
+
+        return kwargs
 
     def compute_metrics(self, num_samples, radius):
         return NotImplemented

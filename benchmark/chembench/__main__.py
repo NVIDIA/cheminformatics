@@ -15,13 +15,11 @@ def convert_runtime(time_):
     return time_.seconds + (time_.microseconds / 1.0e6)
 
 
-def save_metric_results(mode_name, metric_list, output_dir, return_predictions):
+def save_metric_results(file_path, metric_list, return_predictions):
     '''
     Saves metrics into a CSV file.
     '''
     metric_df = pd.concat(metric_list, axis=1).T
-    file_path = os.path.join(output_dir, f'{mode_name}')
-
     if return_predictions:
         pickle_file = file_path + '.pkl'
         log.info(f'Writing predictions to {pickle_file}...')
@@ -76,7 +74,7 @@ def main(cfg):
 
     # Fetch samples and embeddings and update database.
     log.info(f'Generating samples and embedding...')
-    ds_generator.sample()
+    # ds_generator.sample()
     log.setLevel(cfg.log.level)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -85,8 +83,11 @@ def main(cfg):
         if not metric.enabled:
             continue
         impl = locate(metric.impl)(metric_name, metric, cfg)
+        file_path = os.path.join(cfg.output.path,
+                                 f'{cfg.model.display_name}-{cfg.exp_name}-{metric_name}')
 
-        variations = impl.variations()
+
+        variations = impl.variations(result_filename=file_path)
         for variation in variations:
             log.info(f'Processing {metric_name} with parameters {variations}...')
             start_time = datetime.now()
@@ -111,9 +112,8 @@ def main(cfg):
 
                 return_predictions = impl.is_prediction()
                 result = OrderedDict(sorted(result.items()))
-                save_metric_results(f'{cfg.model.display_name}-{cfg.exp_name}-{metric_name}',
+                save_metric_results(file_path,
                                     [pd.Series(result)],
-                                    cfg.output.path,
                                     return_predictions=return_predictions)
 
         impl.cleanup()

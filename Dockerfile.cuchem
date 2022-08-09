@@ -1,6 +1,10 @@
 # Copyright 2020 NVIDIA Corporation
 FROM rapidsai/rapidsai:21.08-cuda11.2-runtime-ubuntu20.04-py3.7
 
+# Needed due to https://github.com/NVIDIA/cheminformatics/issues/163
+RUN rm /etc/apt/sources.list.d/cuda.list
+RUN rm /etc/apt/sources.list.d/nvidia-ml.list
+
 RUN apt-get update \
     && apt-get upgrade -y \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y wget git unzip tmux \

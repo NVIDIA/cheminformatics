@@ -8,7 +8,12 @@ import pandas as pd
 from datetime import datetime
 from copy import deepcopy
 from cuchembench.data import MoleculeGenerator
-from cuchembench.plot import (create_single_model_plots, create_multimodel_aggregated_plots, make_model_plots)
+from cuchembench.plot import (load_benchmark_files, \
+                              make_multimodel_sampling_plots, \
+                              make_multimodel_similarity_search_plot, \
+                              make_multimodel_physchem_plots, \
+                              make_multimodel_bioactivity_plots,
+                              make_correlation_plots)
 
 # Dataset classess
 from cuchembench.datasets.physchem import (ChEMBLApprovedDrugs,
@@ -347,19 +352,57 @@ def main(cfg):
     # Plotting
     if cfg.root.do_plots:
         metric_paths = cfg.plotting.metric_paths
-        metric_labels = cfg.plotting.metric_labels
-        assert not isinstance(metric_paths, str) and not isinstance(metric_labels, str), AssertionError('The variables metric_paths and metric_labels must be lists')
-        assert len(metric_paths) == len(metric_labels), AssertionError('The variables metric_paths and metric_labels must be the same length')
+        exp_name_list = cfg.plotting.exp_name_list
+        assert not isinstance(metric_paths, str) and not isinstance(exp_name_list, str), AssertionError('The variables metric_paths and exp_name_list must be lists')
+        assert len(metric_paths) == len(exp_name_list), AssertionError('The variables metric_paths and exp_name_list must be the same length')
 
-        plot_dir = cfg.plotting.plot_path
-        os.makedirs(plot_dir, exist_ok=True)
+        save_plots = cfg.plotting.save_plots
+        reports_dir = cfg.plotting.reports_dir
+        os.makedirs(reports_dir, exist_ok=True)
 
-        # create_single_model_plots(metric_paths=metric_paths, metric_labels=metric_labels, plot_dir=plot_dir) # TODO: improve test handling if specific metric data is absent
-        if len(metric_paths) > 1:
-            create_multimodel_aggregated_plots(metric_paths=metric_paths, metric_labels=metric_labels, plot_dir=plot_dir)
+        # load data
+        df = load_benchmark_files(metric_paths=metric_paths, exp_name_list=exp_name_list, parse_timestamps=False)
 
-        make_model_plots(max_seq_len, 'physchem', output_dir=output_dir, plot_dir=plot_dir)
-        make_model_plots(max_seq_len, 'bioactivity', output_dir=output_dir, plot_dir=plot_dir)
+        # Sample plots
+        acceptance_criteria = cfg.plotting.acceptance_criteria
+        make_multimodel_sampling_plots(df=df, acceptance_criteria=acceptance_criteria, save_plots=save_plots, reports_dir=reports_dir)
+
+        # Embedding plots
+        radii_query_str = 'top_k == 100.0' # Limit to only top k = 100
+        df_ss = df.query(radii_query_str)
+        make_multimodel_similarity_search_plot(df=df_ss, 
+                                               save_plots=save_plots, 
+                                               reports_dir=reports_dir)
+
+        make_multimodel_physchem_plots(df=df, 
+                                       save_plots=save_plots, 
+                                       reports_dir=reports_dir)
+
+        make_multimodel_bioactivity_plots(df=df, 
+                                          limit_genes=28, # limit to the first 28 genes, can also provide a list of genes
+                                          save_plots=save_plots, 
+                                          reports_dir=reports_dir)
+
+        # Correlation plots -- physchem and bioactivities
+        df_pkl = load_benchmark_files(metric_paths=metric_paths, 
+                                      exp_name_list=exp_name_list, 
+                                      file_type='pkl') # Need pkl data for correlation plots
+        
+        for exp_name in exp_name_list:
+            make_correlation_plots(df_pkl, 
+                                exp_name=exp_name,
+                                max_seq_len=max_seq_len, 
+                                plot_type='physchem', 
+                                reports_dir=reports_dir, 
+                                num_rows_per_page=3)
+
+            make_correlation_plots(df_pkl, 
+                                exp_name=exp_name,
+                                max_seq_len=max_seq_len, 
+                                plot_type='bioactivity', 
+                                reports_dir=reports_dir, 
+                                num_rows_per_page=2, 
+                                property_list=['AKT2', 'ALK']) # Can subset
 
 
 if __name__ == '__main__':

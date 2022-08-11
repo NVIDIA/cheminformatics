@@ -48,20 +48,20 @@ def load_bioactivity_input_data(max_seq_len):
 
 
 def load_benchmark_files(metric_paths: List[str], 
-                         metric_labels: Optional[List[str]] = None, 
+                         exp_name_list: Optional[List[str]] = None, 
                          parse_timestamps: bool = False,
                          file_type: str = 'csv'):
     """Load aggregated metric results from CSV or pkl files"""
     
-    metric_labels = metric_labels if metric_labels else [None] * len(metric_paths)
-    assert len(metric_labels) == len(metric_paths)
+    exp_name_list = exp_name_list if exp_name_list else [None] * len(metric_paths)
+    assert len(exp_name_list) == len(metric_paths)
     custom_date_parser = lambda x: datetime.strptime(x, "%Y%m%d_%H%M%S")
     
     file_type = file_type.lower()
     assert file_type in ['csv', 'pkl'], AssertionError(f'File type must be one of "csv" or "pkl", got {file_type}.')
 
     combined_metric_df = []
-    for metric_path, metric_label in zip(metric_paths, metric_labels):
+    for metric_path, metric_label in zip(metric_paths, exp_name_list):
         file_list = glob.glob(os.path.join(metric_path, '**', f'*.{file_type}'), recursive=True)
             
         metric_df = []

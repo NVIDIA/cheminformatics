@@ -77,8 +77,8 @@ def make_multimodel_similarity_search_plot(df: pd.DataFrame,
                wspace=0.1, 
                hspace=0.2)
     
+    plt.tight_layout()
     if save_plots:
-        plt.tight_layout()
         save_path = os.path.join(reports_dir, 'Similarity_Search_Aggregated_Benchmark.png')
         fig.savefig(save_path, dpi=300)
 
@@ -159,8 +159,9 @@ def make_multimodel_physchem_plots(df: pd.DataFrame,
                     top=0.90, 
                     wspace=0.1, 
                     hspace=0.2)
+    
+    plt.tight_layout()
     if save_plots:
-        plt.tight_layout()
         save_path = os.path.join(reports_dir, 'Physchem_Aggregated_Benchmark.png')
         fig.savefig(save_path, dpi=300)
 

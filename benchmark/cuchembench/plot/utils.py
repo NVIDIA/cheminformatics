@@ -4,9 +4,6 @@ import pandas as pd
 import seaborn as sns
 from typing import Optional
 
-# PoR acceptance criteria
-# ACCEPTANCE_CRITERIA = {'validity': 0.98, 'novelty': 0.50} # TODO
-
 
 def setup_plot_grid(num_plots: int, 
                 plots_per_row: int, 

@@ -7,6 +7,7 @@ from .utils import set_plotting_style, setup_plot_grid, label_bars
 
 __ALL__ = ['make_multimodel_sampling_plots']
 
+
 def make_multimodel_sampling_plots(df: pd.DataFrame, 
                                    acceptance_criteria: Optional[dict] = None,
                                    save_plots: bool = False, 

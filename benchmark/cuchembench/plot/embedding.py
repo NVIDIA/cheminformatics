@@ -201,8 +201,10 @@ def make_multimodel_bioactivity_plots(df: pd.DataFrame,
     
     gene_list = sorted(df[property_field].dropna().unique())
     if limit_genes:
-        limit_index = gene_list.index(limit_genes) if isinstance(limit_genes, str) else limit_genes
-        gene_list = gene_list[: limit_index+1]
+        if isinstance(limit_genes, int):
+            gene_list = gene_list[:limit_genes]
+        else:
+            gene_list = sorted(limit_genes)
         logging.info(f'The genes being plotted have been limited to {gene_list}')
         query += f' & ({property_field} in {gene_list})'
     

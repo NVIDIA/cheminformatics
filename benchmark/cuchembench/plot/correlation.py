@@ -1,31 +1,36 @@
 import os
 import math
-from typing import Optional, List
+from typing import Optional, List, Union
 from .data import load_physchem_input_data, load_bioactivity_input_data
 from .utils import setup_plot_grid
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
-__ALL__ = ['']
+import logging
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+__ALL__ = ['make_correlation_plots']
 
 def make_correlation_plots(df: pd.DataFrame,
                            exp_name: str,
                            max_seq_len: int, 
                            plot_type: str, 
                            reports_dir: Optional[str] = '.', 
-                           num_rows_per_page: Optional[int] = 3,
-                           property_list: Optional[List[str]] = None):
+                           num_rows_per_page: Optional[int] = 8,
+                           limit_genes: Optional[Union[List[str], int]] = None):
     """Make correlation plots of predictions for diagnostics
 
     Args:
         df (pd.DataFrame): Dataframe of input CSV data
         exp_name (str): Experiment name to be selected
         max_seq_len (int): Maximum sequence length for 
-        plot_type
+        plot_type (str): Plot either physchem or bioactivity results
         reports_dir (Optional[str], optional): Directory. Defaults to current directory.
-        num_rows_per_page
-        property_list        
+        num_rows_per_page: (Optional[int]): Number of rows per page
+        limit_genes (list of strings or int): Limit the genes plotted to a list of specific genes
+                    or the first N (integer) number of genes in alphabetical order. Only applies to bioactivity
     """
 
     assert plot_type in ['physchem', 'bioactivity'], AssertionError(f'Error: plot_type must be one of "physchem", "bioactivity", got {plot_type}.')
@@ -46,11 +51,21 @@ def make_correlation_plots(df: pd.DataFrame,
         properties_field = 'gene'
         input_data = load_bioactivity_input_data(max_seq_len=max_seq_len)
         save_path = os.path.join(reports_dir, f'Bioactivity_Model_Diagnostic_Plots_{exp_name_out}.pdf')
+        
+        gene_list = sorted(df[properties_field].dropna().unique())
+        if limit_genes:
+            if isinstance(limit_genes, int):
+                gene_list = gene_list[:limit_genes]
+            else:
+                gene_list = sorted(limit_genes)
+            logging.info(f'The genes being plotted have been limited to {gene_list}')
+            
 
     # Get selected data
     query = f'({kpi_field} in {kpis}) & ({comparison_field} == "{exp_name}")'
-    if property_list:
-        query += f' & ({properties_field} in {property_list})'
+    if (plot_type == 'bioactivity') and limit_genes:
+        query += f' & ({properties_field} in {gene_list})'
+        
     df = df.query(query)
     properties = df[properties_field].unique()
 
@@ -62,7 +77,9 @@ def make_correlation_plots(df: pd.DataFrame,
     with PdfPages(save_path) as pdf:
         for page in range(num_pages):
             fig, ax_list = setup_plot_grid(num_plots=num_plots, plots_per_row=plots_per_row, xscale=4, yscale=4)
-            for row, property_ in enumerate(properties):
+            beg_prop = page * num_rows_per_page
+            end_prop = (page + 1) * num_rows_per_page
+            for row, property_ in enumerate(properties[beg_prop:end_prop]):
                 for col, model in enumerate(models):
                     xdata = input_data[property_]
                     mask = (df[model_field] == model) & (df[properties_field] == property_)        

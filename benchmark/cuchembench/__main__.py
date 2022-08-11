@@ -360,6 +360,8 @@ def main(cfg):
         reports_dir = cfg.plotting.reports_dir
         os.makedirs(reports_dir, exist_ok=True)
 
+        limit_genes = cfg.plotting.limit_genes
+
         # load data
         df = load_benchmark_files(metric_paths=metric_paths, exp_name_list=exp_name_list, parse_timestamps=False)
 
@@ -377,9 +379,9 @@ def main(cfg):
         make_multimodel_physchem_plots(df=df, 
                                        save_plots=save_plots, 
                                        reports_dir=reports_dir)
-
+        
         make_multimodel_bioactivity_plots(df=df, 
-                                          limit_genes=28, # limit to the first 28 genes, can also provide a list of genes
+                                          limit_genes=limit_genes,
                                           save_plots=save_plots, 
                                           reports_dir=reports_dir)
 
@@ -401,8 +403,8 @@ def main(cfg):
                                 max_seq_len=max_seq_len, 
                                 plot_type='bioactivity', 
                                 reports_dir=reports_dir, 
-                                num_rows_per_page=2, 
-                                property_list=['AKT2', 'ALK']) # Can subset
+                                num_rows_per_page=4, 
+                                limit_genes=limit_genes)
 
 
 if __name__ == '__main__':

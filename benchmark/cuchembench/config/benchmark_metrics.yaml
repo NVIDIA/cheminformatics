@@ -118,15 +118,15 @@ metric:
 
 plotting:
   metric_paths:
-    - /workspace/data/benchmark_output/benchmark_data_rajesh/nemo_20220714
-    - /workspace/data/benchmark_output/benchmark_data_rajesh/nemo_20220720
+    - /data/benchmark_output/nemo_20220714
+    - /data/benchmark_output/nemo_20220720
   exp_name_list: # labels to append to model names for plotting, can be null, must be same length as metric_paths
     - 'MegaMolBARTv0.2 (2022/07/14)'
     - 'MegaMolBARTv0.2 (2022/07/20)'
   acceptance_criteria:
     validity: 0.98
     novelty: 0.50
-  reports_dir: /workspace/data/benchmark_output/reports_test #/data/benchmark_output/plots
+  limit_genes: 4 # limit the genes plotted -- int or list of gene names or null for all
+  reports_dir: /data/benchmark_output/reports_test #/data/benchmark_output/plots
   save_plots: True
   max_seq_len: ${sampling.max_seq_len}
-  

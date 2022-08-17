@@ -12,8 +12,8 @@ root:
 
 model:
   name: MegaMolBART #Latent #CDDD
-  exp_name: prcvr_k4 #vae_k4 #mim_k1_salv # prcvr_k4 #seq2seq # mim_same_aug_k1 #
-  checkpoint_file: Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo  # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo
+  exp_name: seq2seq #vae_k4 #mim_k1_salv # prcvr_k4 #seq2seq # mim_same_aug_k1 #
+  checkpoint_file: Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo  # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo # Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo # VAE_SSA_steps_4_latent_dim_-1_Draco_nodes_4_gpus_16.nemo #Prcvr_SSA_no_mask_steps_4_Draco_nodes_4_gpus_16.nemo #Base_Small_Span_Aug_Half_noam_Draco_nodes_4_gpus_16.nemo MIM_SSA_steps_1_latent_dim_-1_same_aug_sample_logv.nemo
   training_data: /data/db/zinc_train_half.sqlite3 # /data/db/cddd_train.sqlite3 # 
   batch_size: 100 # 100 for seq2seq radii > 1 batch_size of 500 is too much for single GPU
   perceiver_average: False
@@ -22,18 +22,18 @@ model:
 sampling:
   max_seq_len: 512
   sample_size: 10
-  db: /data/db/embedding_cache_megamolbart_prcvr_k4_sampling_full_test.sqlite3 #embedding_cache_megamolbart_vae_k4_sampling_full.sqlite3
+  db: /data/db/embedding_cache_megamolbart_seq2seq_sampling_full.sqlite3 #embedding_cache_megamolbart_vae_k4_sampling_full.sqlite3
   concurrent_requests: 10
 
 output:
-  path: /data/benchmark_output/prcvr_test
+  path: /data/benchmark_output/seq2seq_test
 
 metric:
   validity:
     enabled: True
     input_size: 20000
     radius:
-      - 1.2 #1.2 #1.2 # 0.7
+      - 1.2 #1.2 #1.2 #1.2 # 0.7
 
   unique:
     enabled: True
@@ -60,26 +60,26 @@ metric:
     radius: ${metric.validity.radius}
 
   scaffold_unique:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
   
   scaffold_non_identical_similarity:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
     nbits: 2048
 
   scaffold_novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}
 
   effective_scaffold_novelty:
-    enabled: True
+    enabled: False
     input_size: ${metric.validity.input_size}
     remove_invalid: False
     radius: ${metric.validity.radius}

@@ -128,7 +128,7 @@ DOCKER_CMD="docker run \
     -v ${CONTENT_PATH}:/home \
     -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
     -v ${MODEL_PATH}:/models \
-    --shm-size=1g \
+   --shm-size=10g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
     -e HOME=/workspace \

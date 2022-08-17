@@ -278,14 +278,14 @@ def main(cfg):
                 break
 
     generator = MoleculeGenerator(inferrer, db_file=cfg.sampling.db, batch_size=cfg.model.batch_size, nbits = nbits)
-    for radius in radii:
-        log.info(f'Generating samples for radius {radius}...')
-        generator.generate_and_store(data_files,
-                                     num_requested=10,
-                                     scaled_radius=radius,
-                                     force_unique=False,
-                                     sanitize=True,
-                                     concurrent_requests=cfg.sampling.concurrent_requests)
+    # for radius in radii:
+    #     log.info(f'Generating samples for radius {radius}...')
+    #     generator.generate_and_store(data_files,
+    #                                  num_requested=10,
+    #                                  scaled_radius=radius,
+    #                                  force_unique=False,
+    #                                  sanitize=True,
+    #                                  concurrent_requests=cfg.sampling.concurrent_requests)
     generator.conn.close()
 
     for metric_dict in metric_list:

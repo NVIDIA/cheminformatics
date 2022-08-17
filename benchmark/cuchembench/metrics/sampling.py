@@ -104,6 +104,31 @@ class Unique(BaseSampleMetric):
         radius_list = [float(x) for x in radius_list]
         return {'radius': radius_list}
 
+    def count(self, num_samples, radius):
+        with closing(sqlite3.connect(self.cfg.sampling.db,
+                                     uri=True,
+                                     check_same_thread=False)) as conn:
+            unique_result = conn.execute(f'''
+                SELECT SUM(dist_cnt)
+                FROM (
+                SELECT count(DISTINCT ss.smiles) as dist_cnt
+                FROM smiles s, smiles_samples ss
+                WHERE s.id = ss.input_id
+                    AND s.model_name = ?
+                    AND s.scaled_radius = ?
+                    AND s.force_unique = ?
+                    AND s.sanitize = ?
+                    AND ss.is_generated = 1
+                    AND ss.is_valid = 1
+                    AND s.processed = 1
+                    AND s.dataset_type = ?
+                GROUP BY s.id);
+                ''',
+                [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
+
+            rec = unique_result.fetchone()
+        return rec[0]
+
     def compute_metrics(self, num_samples, radius):
         validity = Validity(self.inferrer, self.cfg)
         with closing(sqlite3.connect(self.cfg.sampling.db,
@@ -189,7 +214,15 @@ class Novelty(BaseSampleMetric):
     def compute_metrics(self, num_samples, radius):
         validity = Validity(self.inferrer, self.cfg)
         valid_molecules, self.total_molecules = validity.compute_metrics(num_samples, radius)
+        logger.error(f'{valid_molecules}, {self.total_molecules}')
         self.total_molecules = self.total_molecules//num_samples
+        # unique_molecules = valid_molecules
+        unique = Unique(self.inferrer, self.cfg)
+        valid_molecules, total_molecules = unique.compute_metrics(num_samples, radius)
+        logger.error(f'{valid_molecules}, {total_molecules}')
+        unique_molecules = unique.count(num_samples, radius)
+        logger.error(f'{unique_molecules}')
+        
 
         with closing(sqlite3.connect(self.cfg.sampling.db,
                                      uri=True,
@@ -211,9 +244,10 @@ class Novelty(BaseSampleMetric):
                 ''',
                 [self.inferrer.__class__.__name__, radius, 0, 1, 'SAMPLE'])
             rec = res.fetchone()
-            novel_molecules = valid_molecules - rec[0]
+            logger.error(f'response: {rec}')
+            novel_molecules = unique_molecules - rec[0]
 
-        return novel_molecules, valid_molecules
+        return novel_molecules, unique_molecules
 
 class NonIdenticality(BaseSampleMetric):
     name = 'non_identicality'

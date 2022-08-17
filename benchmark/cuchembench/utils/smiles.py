@@ -39,7 +39,7 @@ def calculate_morgan_fingerprint(smiles, radius, nbits):
         fingerprints[i] = fp
     return fingerprints
 
-def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_invalid=True, nbits = 512):
+def calc_morgan_fingerprints(dataframe, smiles_col='canonical_smiles', remove_invalid=True, nbits=512):
     """Calculate Morgan fingerprints on SMILES strings
 
     Args:

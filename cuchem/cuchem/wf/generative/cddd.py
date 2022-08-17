@@ -144,7 +144,6 @@ class Cddd(BaseGenerativeWorkflow):
                            scaled_radius=None,
                            force_unique=False,
                            sanitize=True):
-
         num_points = int(num_points) + 2
         if len(smiles) < 2:
             raise Exception('At-least two or more smiles are expected')

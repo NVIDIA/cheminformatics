@@ -50,6 +50,8 @@ Build your container:
 ./launch.sh build
 ```
 
+
+***DEPRECATED:***
 Download the ChEMBL database (version 27):
 ```
 ./launch.sh dbSetup
@@ -57,7 +59,7 @@ Download the ChEMBL database (version 27):
 
 Launch the interactive ChEMBL exploration tool:
 ```
-./launch.sh start
+./launch.sh dev
 ```
 
 ```

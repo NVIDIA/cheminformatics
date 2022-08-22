@@ -12,7 +12,7 @@ from cuml.linear_model import LinearRegression, ElasticNet
 from cuml.metrics.regression import r2_score
 from cuml.svm import SVR
 from cuml.ensemble import RandomForestRegressor
-from cuml.experimental.preprocessing import StandardScaler
+from cuml.preprocessing import StandardScaler
 
 from . import BaseEmbeddingMetric
 

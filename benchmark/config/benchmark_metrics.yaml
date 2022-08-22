@@ -6,7 +6,7 @@ model:
   random_weights: False
   display_name: NeMoMegaMolBART
   training_data: /data/db/zinc_train.sqlite3
-  batch_size: 100
+  batch_size: 50
   perceiver_average: False
   noise_mode: 2
   average_tokens: True

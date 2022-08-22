@@ -10,8 +10,7 @@ class Cache(metaclass=Singleton):
         self._data = {}
 
     def delete(self, property):
-
-        if self._data.get(property):
+        if property in self._data:
             self._data.pop(property)
 
     def set_data(self, property, value):

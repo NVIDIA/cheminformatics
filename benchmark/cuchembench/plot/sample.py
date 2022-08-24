@@ -12,7 +12,8 @@ def make_multimodel_sampling_plots(df: pd.DataFrame,
                                    acceptance_criteria: Optional[dict] = None,
                                    save_plots: bool = False, 
                                    plots_per_row: int = 2,
-                                   reports_dir: Optional[str] = '.'):
+                                   reports_dir: Optional[str] = '.',
+                                   base_filename: Optional[str] = 'Sampling_Aggregated_Benchmark'):
     """Make plots for sampling metrics
 
     Args:
@@ -22,6 +23,7 @@ def make_multimodel_sampling_plots(df: pd.DataFrame,
         save_plots (bool, optional): Save plots to disk. Defaults to False.
         plots_per_row (int, optional): Number of plots per row. Defaults to 2.
         reports_dir (Optional[str], optional): Directory. Defaults to current directory.
+        base_filename (str, optional): Provide base filename. Default is Sampling_Aggregated_Benchmark.
     """
     
     # Other config -- TODO consider making configurable
@@ -70,5 +72,7 @@ def make_multimodel_sampling_plots(df: pd.DataFrame,
                         hspace=0.2)
     plt.tight_layout()
     if save_plots:
-        save_path = os.path.join(reports_dir, 'Sampling_Aggregated_Benchmark.png')
+        save_path = os.path.join(reports_dir, f'{base_filename}.png')
         fig.savefig(save_path, dpi=300)
+
+    return fig

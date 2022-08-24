@@ -19,7 +19,8 @@ def make_correlation_plots(df: pd.DataFrame,
                            plot_type: str, 
                            reports_dir: Optional[str] = '.', 
                            num_rows_per_page: Optional[int] = 8,
-                           limit_genes: Optional[Union[List[str], int]] = None):
+                           limit_genes: Optional[Union[List[str], int]] = None,
+                           base_filename: Optional[str] = None):
     """Make correlation plots of predictions for diagnostics
 
     Args:
@@ -45,12 +46,13 @@ def make_correlation_plots(df: pd.DataFrame,
         kpis = ['physchem', 'physchem_esol', 'physchem_freesolv', 'physchem_lipophilicity']
         properties_field = 'property'
         input_data = load_physchem_input_data(max_seq_len=max_seq_len)
-        save_path = os.path.join(reports_dir, f'Physchem_Model_Diagnostic_Plots_{exp_name_out}.pdf')
+        base_filename = base_filename if base_filename else 'Physchem_Model_Diagnostic_Plots'
+        
     else:
         kpis = ['bioactivity']
         properties_field = 'gene'
         input_data = load_bioactivity_input_data(max_seq_len=max_seq_len)
-        save_path = os.path.join(reports_dir, f'Bioactivity_Model_Diagnostic_Plots_{exp_name_out}.pdf')
+        base_filename = base_filename if base_filename else 'Bioactivity_Model_Diagnostic_Plots'
         
         gene_list = sorted(df[properties_field].dropna().unique())
         if limit_genes:
@@ -60,6 +62,7 @@ def make_correlation_plots(df: pd.DataFrame,
                 gene_list = sorted(limit_genes)
             logging.info(f'The genes being plotted have been limited to {gene_list}')
             
+    save_path = os.path.join(reports_dir, f'{base_filename}_{exp_name_out}.pdf')
 
     # Get selected data
     query = f'({kpi_field} in {kpis}) & ({comparison_field} == "{exp_name}")'

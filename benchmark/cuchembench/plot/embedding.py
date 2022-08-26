@@ -27,13 +27,15 @@ def _extract_physchem_name(dataset_names: List[str]):
 
 def make_multimodel_similarity_search_plot(df: pd.DataFrame, 
                                            save_plots: bool = False, 
-                                           reports_dir: Optional[str] = '.'):
+                                           reports_dir: Optional[str] = '.',
+                                           base_filename: Optional[str] = 'Similarity_Search_Aggregated_Benchmark'):
     """Make plot for similarity search
 
     Args:
         df (pd.DataFrame): Dataframe of input CSV data
         save_plots (bool, optional): Save plots to disk. Defaults to False.
-        reports_dir (Optional[str], optional): Directory. Defaults to current directory.
+        reports_dir (str, optional): Directory. Defaults to current directory.
+        base_filename (str, optional): Provide base filename. Default is Similarity_Search_Aggregated_Benchmark.
     """
     
     # Other config -- TODO consider making configurable
@@ -79,15 +81,18 @@ def make_multimodel_similarity_search_plot(df: pd.DataFrame,
     
     plt.tight_layout()
     if save_plots:
-        save_path = os.path.join(reports_dir, 'Similarity_Search_Aggregated_Benchmark.png')
+        save_path = os.path.join(reports_dir, f'{base_filename}.png')
         fig.savefig(save_path, dpi=300)
+
+    return fig
 
 
 def make_multimodel_physchem_plots(df: pd.DataFrame, 
                                    save_plots: bool = False, 
                                    max_plot_ratio: float = 10.0,
                                    plots_per_row: int = 2,
-                                   reports_dir: Optional[str] = '.'):
+                                   reports_dir: Optional[str] = '.',
+                                   base_filename: Optional[str] = 'Physchem_Aggregated_Benchmark'):
     """Make plots for physchem metrics
 
     Args:
@@ -96,6 +101,7 @@ def make_multimodel_physchem_plots(df: pd.DataFrame,
         max_plot_ratio (float, optional): Max limit for y-axis. Defaults to 10.
         plots_per_row (int, optional): Number of plots per row. Defaults to 2.
         reports_dir (Optional[str], optional): Directory. Defaults to current directory.
+        base_filename (str, optional): Provide base filename. Default is Physchem_Aggregated_Benchmark.
     """
 
     # Other config -- TODO consider making configurable
@@ -162,8 +168,10 @@ def make_multimodel_physchem_plots(df: pd.DataFrame,
     
     plt.tight_layout()
     if save_plots:
-        save_path = os.path.join(reports_dir, 'Physchem_Aggregated_Benchmark.png')
+        save_path = os.path.join(reports_dir, f'{base_filename}.png')
         fig.savefig(save_path, dpi=300)
+
+    return fig
 
 
 def make_multimodel_bioactivity_plots(df: pd.DataFrame, 
@@ -172,7 +180,8 @@ def make_multimodel_bioactivity_plots(df: pd.DataFrame,
                                        plot_type: str = 'line',
                                        plots_per_row: int = 1,
                                        limit_genes: Optional[Union[List[str], int]] = None,
-                                       reports_dir: Optional[str] = '.'):
+                                       reports_dir: Optional[str] = '.',
+                                       base_filename: Optional[str] = 'Bioactivity_Aggregated_Benchmark'):
     """Make plots for bioactivity metrics
 
     Args:
@@ -184,6 +193,7 @@ def make_multimodel_bioactivity_plots(df: pd.DataFrame,
         limit_genes (list of strings or int): Limit the genes plotted to a list of specific genes
             or the first N (integer) number of genes in alphabetical order
         reports_dir (Optional[str], optional): Directory. Defaults to current directory.
+        base_filename (str, optional): Provide base filename. Default is Bioactivity_Aggregated_Benchmark.
     """
 
     # Other config -- TODO consider making configurable
@@ -258,5 +268,7 @@ def make_multimodel_bioactivity_plots(df: pd.DataFrame,
                     hspace=0.2)
     if save_plots:
         plt.tight_layout()
-        save_path = os.path.join(reports_dir, 'Bioactivity_Aggregated_Benchmark.png')
+        save_path = os.path.join(reports_dir, f'{base_filename}.png')
         fig.savefig(save_path, dpi=300)
+
+    return fig

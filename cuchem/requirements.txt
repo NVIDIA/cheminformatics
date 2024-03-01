@@ -2,7 +2,7 @@ tensorflow-gpu==1.15.5
 dash==1.19.0
 jupyter-dash==0.4.0
 dash_bootstrap_components==0.11.1
-dash_core_components==1.15.0
+dash_core_components==2.0.0
 dash_html_components==1.1.2
 progressbar2==3.53.1
 tables==3.6.1

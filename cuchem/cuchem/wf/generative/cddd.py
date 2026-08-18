@@ -64,7 +64,7 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                      'embeddings': neighboring_embeddings,
                                      'embeddings_dim': dims,
                                      'Generated': [True for i in range(len(generated_mols))]})
-        generated_df.iat[0, 2] = False
+        generated_df.iat[0, 3] = False
 
         if force_unique:
             generated_df = self.compute_unique_smiles(generated_df,
@@ -110,8 +110,8 @@ class Cddd(BaseGenerativeWorkflow, metaclass=Singleton):
                                       'Generated': [True for i in range(num_points)]})
 
             # Mark the source and desinations as not generated
-            interp_df.iat[0, 2] = False
-            interp_df.iat[-1, 2] = False
+            interp_df.iat[0, 3] = False
+            interp_df.iat[-1, 3] = False
 
             if force_unique:
                 interp_df = self.compute_unique_smiles(interp_df,
